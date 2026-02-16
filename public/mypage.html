@@ -1,0 +1,25 @@
+
+ 
+<img src="${user.avatar && user.avatar ! = 'null.png'
+  ? user.avatar
+  : 'https://cdn.discordapp.com/embed/avatars/0.png'}"
+  class="w-12 h-12 rounded-full">
+<div>${user.name}</div>
+<button 
+  data-user="${userId}" 
+  data-index="${index}" 
+  class="edit-btn">
+  수정
+</button>
+
+<button 
+  data-user="${userId}" 
+  data-index="${index}" 
+  class="edit-btn">
+  삭제
+</button>
+
+<div class="day ${attendance.has(dayKey) ? 'bg-green-500' : ''}">
+</div>
+     <script src="mypage.js" defer></script>
+   

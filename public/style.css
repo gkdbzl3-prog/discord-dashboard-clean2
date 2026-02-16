@@ -1,0 +1,10 @@
+body {
+  background-color: #f3f0ff; /* lavender-bg 직접 값 */
+  font-family: ui-sans-serif, system-ui;
+}
+
+button {
+  position: relative;
+  z-index: 9999;
+ background-color: beige;
+}

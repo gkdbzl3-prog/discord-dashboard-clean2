@@ -1,0 +1,21 @@
+{
+  "743880211547816046": {
+    "username": "ryuri0115",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769833499182,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 14400,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769833499182,
+          "checkIn": "2026-01-31T04:24:59.182Z",
+          "by": "auto"
+        }
+      }
+    }
+  }
+}
