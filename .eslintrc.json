@@ -1,0 +1,15 @@
+{
+  "env": {
+    "node": true,
+    "browser": true,
+    "es2021": true
+  },
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-redeclare": "error",          // 같은 이름 재정의 ❌
+    "no-dupe-keys": "error",           // 객체 키 중복 ❌
+    "no-dupe-args": "error",           // 함수 파라미터 중복 ❌
+    "no-unused-vars": ["warn"],        // 안 쓰는 변수 ⚠️
+    "no-use-before-define": "warn"     // 정의 전에 사용 ⚠️
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "743880211547816046": {
+    "username": "ryuri0115",
+    "totalSeconds": 4167,
+    "sessions": [
+      {
+        "start": "2026-01-31T04:24:59.182Z",
+        "end": "2026-01-31T05:34:26.811Z",
+        "seconds": 4167,
+        "channelId": "1450028410549174293"
+      }
+    ],
+    "currentStart": null,
+    "currentChannelId": null,
+    "goalTodaySec": 14400,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769833499182,
+          "checkIn": "2026-01-31T04:24:59.182Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "1255709951729602591": {
+    "username": "b1anket__24350",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769834181859,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769834181859,
+          "checkIn": "2026-01-31T04:36:21.859Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "1384786633693462549": {
+    "username": "sea.4m.e",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769835571026,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769835571026,
+          "checkIn": "2026-01-31T04:59:31.026Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "1146001494307524638": {
+    "username": "gyul000_00827",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769836807349,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769836807349,
+          "checkIn": "2026-01-31T05:20:07.349Z",
+          "by": "auto"
+        }
+      }
+    }
+  }
+}

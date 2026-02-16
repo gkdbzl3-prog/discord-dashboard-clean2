@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Manual Entry - 쪼쪼쪼각할모방</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#9942f0",
+                "background-light": "#f7f6f8",
+                "background-dark": "#191022",
+              },
+              fontFamily: {
+                "display": ["Inter", "sans-serif"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark min-h-screen flex items-center justify-center relative overflow-hidden">
+<!-- Gradient Background Decoration -->
+<div class="absolute inset-0 bg-gradient-to-br from-primary/10 via-background-light to-primary/5 dark:from-primary/20 dark:via-background-dark dark:to-primary/10 -z-10"></div>
+<!-- Top Right Brand Image (Cherry) -->
+<div class="absolute top-8 right-8 w-16 h-16 md:w-24 md:h-24 opacity-80 hover:opacity-100 transition-opacity cursor-pointer">
+<img alt="Study Group Logo" class="w-full h-full object-contain" data-alt="A small cute cherry icon logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAa6bkXqOeIl-heBuyd17XwhpOT4-5fSfeo0V6g-rqgFo9kVCsNI1MJ6LsHQfldsAjQIwDwnWw-mqaX_vaajK1zQ5P9u_-yeSZ26j5WbRE6UDd8TtJZnp-QD1Iol-n_qORtGL_JMzzT57B-sMAnAoLULrjXBfYTJeoYx8iCoWgQrPt6iICXZ47ROC9mY8d5nWGwJS4FXeP81RGcdUs15keYNKVqDtu9ZsgXVCJGoqWHw9Me4qZpY7EL57F6789KW6rv425_ODcVDg9"/>
+</div>
+<!-- Bottom Left Brand Image (Click) -->
+<div class="absolute bottom-8 left-8 w-20 h-20 md:w-32 md:h-32 opacity-40">
+<img alt="Decorative Click Icon" class="w-full h-full object-contain" data-alt="A stylized decorative click hand icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnA6AStmqux6kLIofO42f3vWQY5IoohRXIJW6MY0FKBfdG5eDqPV56d3J_zPUYyD3szKXTeq5X_4VQuyhRdvTMip-rl9bsyOT31DWAGJ_R4c2BchTLmOlDTxpEsey7vPYyPtQP65ipg5bPmWD9PE3Yo8G0N7gtPQKd4xqHXwxOj3Dw9qv__Qyou0VMz-daudyvMcHxr_XwHZInl4JqSJK4u4ohgUAlFWRyC3651TkIrc1vSPzJVemyF0mDNAQqaYKjVBR-77prMWxu"/>
+</div>
+<!-- Back Button -->
+<div class="absolute top-8 left-8">
+<button class="flex items-center text-primary hover:text-primary/80 transition-colors font-medium">
+<span class="material-icons mr-1">arrow_back</span>
+<span>Back</span>
+</button>
+</div>
+<!-- Main Card Container -->
+<main class="w-full max-w-lg px-6 py-12">
+<div class="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl shadow-primary/10 border border-primary/5 overflow-hidden">
+<!-- Header Section -->
+<div class="p-8 pb-4">
+<h1 class="text-2xl font-bold text-zinc-800 dark:text-zinc-100 mb-1">Manual Entry</h1>
+<p class="text-sm text-zinc-500 dark:text-zinc-400">Log your study session for 쪼쪼쪼각할모방</p>
+</div>
+<!-- Form Content -->
+<form class="p-8 pt-4 space-y-6" onsubmit="return false;">
+<!-- Date Input -->
+<div class="space-y-2">
+<label class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300" for="date">Date</label>
+<div class="relative">
+<span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-lg">calendar_today</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all dark:text-white" id="date" name="date" type="date" value="2023-10-27"/>
+</div>
+</div>
+<!-- Time Input -->
+<div class="space-y-2">
+<label class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300" for="time">Time (Minutes)</label>
+<div class="relative">
+<span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-lg">timer</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all dark:text-white" id="time" name="time" placeholder="e.g. 45" type="number"/>
+</div>
+</div>
+<!-- Memo Text Area -->
+<div class="space-y-2">
+<label class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300" for="memo">Memo</label>
+<textarea class="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all resize-none dark:text-white" id="memo" name="memo" placeholder="What did you focus on during this session?" rows="4"></textarea>
+</div>
+<!-- Save Button -->
+<div class="pt-4">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-primary/25 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="submit">
+<span class="material-icons text-xl">save</span>
+                        SAVE SESSION
+                    </button>
+<p class="text-center text-[11px] text-zinc-400 mt-4 uppercase tracking-widest font-medium">
+                        Consistency is Key
+                    </p>
+</div>
+</form>
+</div>
+<!-- Secondary Decoration (Abstract Pattern) -->
+<div class="mt-8 flex justify-center space-x-2">
+<div class="w-1.5 h-1.5 rounded-full bg-primary/20"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-primary/20"></div>
+</div>
+</main>
+<!-- Background Pattern -->
+<div class="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05] -z-20">
+<svg height="100%" width="100%">
+<pattern height="40" id="grid" patternunits="finalUserspaceOnUse" width="40">
+<path class="text-primary" d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" stroke-width="1"></path>
+</pattern>
+<rect fill="url(#grid)" height="100%" width="100%"></rect>
+</svg>
+</div>
+</body></html>

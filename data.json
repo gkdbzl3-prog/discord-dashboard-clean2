@@ -1,0 +1,74 @@
+{
+  "743880211547816046": {
+    "usertag": "ryuri0115",
+    "todayseconds": 0,
+    "sessions": [],
+    "currentStart": null,
+    "currentChannelId": null,
+    "goaltodaysec": 0,
+    "attendance": {
+      "lastDay": null,
+      "streak": 0,
+      "days": {}
+    }
+  },
+  "476226483703250956": {
+    "usertag": "wisdomrang",
+    "todayseconds": 0,
+    "sessions": [],
+    "currentStart": null,
+    "currentChannelId": null,
+    "goaltodaysec": 0,
+    "attendance": {
+      "lastDay": null,
+      "streak": 0,
+      "days": {}
+    }
+  },
+  "gkdbzl2": {
+    "sessions": [
+      {
+        "start": "2026-02-13T06:00:49.603Z",
+        "end": "2026-02-13T06:00:49.603Z",
+        "seconds": 60,
+        "manual": true
+      },
+      {
+        "start": "2026-02-13T06:04:43.856Z",
+        "end": "2026-02-13T06:04:43.856Z",
+        "seconds": 60,
+        "manual": true
+      },
+      {
+        "start": "2026-02-13T06:08:29.521Z",
+        "end": "2026-02-13T06:08:29.521Z",
+        "seconds": 60,
+        "manual": true
+      },
+      {
+        "start": "2026-02-13T06:10:14.406Z",
+        "end": "2026-02-13T06:10:14.406Z",
+        "seconds": 60,
+        "manual": true
+      },
+      {
+        "start": "2026-02-13T06:14:11.173Z",
+        "end": "2026-02-13T06:14:11.173Z",
+        "seconds": 60,
+        "manual": true
+      },
+      {
+        "start": "2026-02-13T06:22:24.471Z",
+        "end": "2026-02-13T06:22:24.471Z",
+        "seconds": 60,
+        "manual": true
+      },
+      {
+        "start": "2026-02-13T06:31:51.082Z",
+        "end": "2026-02-13T06:31:51.082Z",
+        "seconds": 60,
+        "manual": true
+      }
+    ]
+  }
+}

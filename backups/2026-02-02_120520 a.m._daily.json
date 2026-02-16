@@ -1,0 +1,133 @@
+{
+  "743880211547816046": {
+    "username": "ryuri0115",
+    "totalSeconds": 13701,
+    "sessions": [
+      {
+        "start": "2026-01-31T04:24:59.182Z",
+        "end": "2026-01-31T05:34:26.811Z",
+        "seconds": 4167,
+        "channelId": "1450028410549174293"
+      },
+      {
+        "start": "2026-02-01T00:36:36.557Z",
+        "end": "2026-02-01T03:15:31.164Z",
+        "seconds": 9534,
+        "channelId": "1450028410549174293"
+      }
+    ],
+    "currentStart": null,
+    "currentChannelId": null,
+    "goalTodaySec": 18000,
+    "attendance": {
+      "lastDay": "2026-02-01",
+      "streak": 2,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769833499182,
+          "checkIn": "2026-01-31T04:24:59.182Z",
+          "by": "auto"
+        },
+        "2026-02-01": {
+          "checkInMs": 1769906196557,
+          "checkIn": "2026-02-01T00:36:36.557Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "1255709951729602591": {
+    "username": "b1anket__24350",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769834181859,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769834181859,
+          "checkIn": "2026-01-31T04:36:21.859Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "1384786633693462549": {
+    "username": "sea.4m.e",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769835571026,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-01-31",
+      "streak": 1,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769835571026,
+          "checkIn": "2026-01-31T04:59:31.026Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "1146001494307524638": {
+    "username": "gyul000_00827",
+    "totalSeconds": 46047,
+    "sessions": [
+      {
+        "start": "2026-01-31T05:20:07.349Z",
+        "end": "2026-01-31T13:20:07.349Z",
+        "seconds": 28800,
+        "channelId": "1450028410549174293"
+      },
+      {
+        "start": "2026-02-01T09:55:25.665Z",
+        "end": "2026-02-01T14:42:53.040Z",
+        "seconds": 17247,
+        "channelId": "1450028410549174293"
+      }
+    ],
+    "currentStart": null,
+    "currentChannelId": null,
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-02-01",
+      "streak": 2,
+      "days": {
+        "2026-01-31": {
+          "checkInMs": 1769836807349,
+          "checkIn": "2026-01-31T05:20:07.349Z",
+          "by": "auto"
+        },
+        "2026-02-01": {
+          "checkInMs": 1769939725665,
+          "checkIn": "2026-02-01T09:55:25.665Z",
+          "by": "auto"
+        }
+      }
+    }
+  },
+  "507177245648093185": {
+    "username": "ex7307",
+    "totalSeconds": 0,
+    "sessions": [],
+    "currentStart": 1769952030410,
+    "currentChannelId": "1450028410549174293",
+    "goalTodaySec": 0,
+    "attendance": {
+      "lastDay": "2026-02-01",
+      "streak": 1,
+      "days": {
+        "2026-02-01": {
+          "checkInMs": 1769952030410,
+          "checkIn": "2026-02-01T13:20:30.410Z",
+          "by": "auto"
+        }
+      }
+    }
+  }
+}
