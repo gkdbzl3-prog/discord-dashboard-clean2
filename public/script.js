@@ -4,11 +4,11 @@ window.token =
 
 window.API = {};
 
-window.API.fetch = async function (path) {
-  const res = await fetch(`${path}?token=${encodeURIComponent(window.token)}`);
-  if (!res.ok) throw new Error("API error");
-  return res.json();
-};
+// window.API.fetch = async function (path) {
+// //   const res = await fetch(`${path}?token=${encodeURIComponent(window.token)}`);
+// //   if (!res.ok) throw new Error("API error");
+// //   return res.json();
+// // };
 
 
 
@@ -85,7 +85,9 @@ window.errorUI = (msg) => `
 
 
 
-
+document.getElementById("fab").onclick = () => {
+  window.showManual();
+};
 
 
 
@@ -98,6 +100,7 @@ document.addEventListener("click", (e) => {
   if (page === "today") window.showToday();
   if (page === "mypage") window.showMyPage();
   if (page === "manual") window.showManual();
+if (page === "total") window.showTotal();
 });
 
 document.getElementById("todayUserSelect").onchange = function () {

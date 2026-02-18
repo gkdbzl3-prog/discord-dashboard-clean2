@@ -2,6 +2,11 @@ if (!window.token) {
   window.token = localStorage.getItem("adminToken");
 }
 
+function kstNow() {
+  const now = new Date();
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000);
+}
+
 window.showTotal = async function () {
 
   const view = document.getElementById("view");

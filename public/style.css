@@ -5,6 +5,13 @@
   border-bottom: 1px solid #eee;
 }
 
+.tweet {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
 .avatar {
   width: 48px;
   height: 48px;
@@ -16,14 +23,28 @@
 }
 
 .tweet-header {
-  display: flex;
+ display: flex;
   gap: 8px;
   font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .name {
   font-weight: bold;
 }
+
+.handle {
+  color: #666;
+  font-size: 14px;
+}
+
+.status.online {
+  color: #1da1f2;
+  font-size: 13px;
+}
+
 
 .id {
   color: #666;
@@ -38,4 +59,18 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
+}
+
+#fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #1da1f2;
+  color: white;
+  font-size: 28px;
+  border: none;
+  cursor: pointer;
 }

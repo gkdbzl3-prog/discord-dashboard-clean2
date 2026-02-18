@@ -51,43 +51,26 @@ function renderLiveUsers() {
 
 
 
-function renderTimeline() {
+window.renderTimeline = function (users) {
 
-  const area = document.getElementById("timelineArea");
-  if (!area) return;
+  const container = document.getElementById("timeline");
 
-  const users = window.usersCache;
-
-  area.innerHTML = users.map(u => {
-
-    const percent = Math.min(100,
-      u.totalSec && u.goalSec
-        ? Math.floor((u.totalSec / u.goalSec) * 100)
-        : 0
-    );
-
-    return `
-      <div class="bg-white p-5 rounded-xl shadow-sm">
-
-        <div class="flex items-center gap-3 mb-3">
-          <img src="${u.avatar}" class="w-10 h-10 rounded-full">
-          <div class="font-semibold">${u.name}</div>
+  container.innerHTML = users.map(u => `
+    <div class="tweet">
+      <img src="${u.avatar}" class="avatar">
+      <div class="tweet-body">
+        <div class="tweet-header">
+          <span class="name">${u.name}</span>
+          <span class="handle">@${u.id.slice(0,6)}</span>
+          ${u.isStudying ? '<span class="status online">● Online</span>' : ''}
         </div>
 
-        <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-          <div class="h-full bg-indigo-500"
-               style="width: ${percent}%"></div>
+        <div class="tweet-content">
+          ${formatSeconds(u.todaySec || 0)}
         </div>
-
-        <div class="text-xs text-gray-500 mt-2">
-          ${(u.totalSec / 3600).toFixed(1)}h
-        </div>
-
       </div>
-    `;
-
-  }).join("");
-
+    </div>
+  `).join("");
 }
 
 window.calcTodayPercent = function (todaysec, goalSec) {
@@ -105,8 +88,8 @@ window.showToday = async function () {
   const view = document.getElementById("view");
   if (!view) return;
 
- await window.loadUsers();
-const users = window.usersCache;
+  const data = await window.API.fetch("/today");
+  const users = data.users ||[];
 
 
   view.innerHTML = `
