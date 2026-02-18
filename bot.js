@@ -3,31 +3,63 @@ require('dotenv').config();
 
 const startDashboardServer = require('./dashboard');
 const { loadData, saveData } = require('./data/store');
-const { Client, Intents } = require('discord.js');
-const data = loadData();
-
+const {
+  Client,
+  GatewayIntentBits,
+  Partials
+} = require("discord.js");
 
 
   
-
-
 const client = new Client({
   intents: [
-    Intents.FLAGS.GUILDS,
-    Intents.FLAGS.GUILD_MESSAGES,
-    Intents.FLAGS.GUILD_VOICE_STATES
-  ]
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.GuildVoiceStates
+  ],
+  partials: [Partials.GuildMember]
 });
 
-// ✅ ready 이벤트는 여기
-client.once('ready', () => {
-  console.log('👾 봇 준비 완료:', client.user.Tag);
-
-  // 여기서만 대시보드 실행
-  startDashboardServer(client);
-});
+// client.on('ready', async () => {
+//   console.log('봇 로그인 완료');
 
 
+
+
+//   const guild = client.guilds.cache.first();
+//   if (!guild) return;
+
+//   await guild.members.fetch();
+
+//   const data = loadData();
+
+//   guild.members.cache.forEach(member => {
+//     const userId = member.id;
+
+//     if (!data[userId]) data[userId] = {};
+
+//     data[userId].avatar = member.user.displayAvatarURL({ size: 128 });
+//     data[userId].nickname = member.displayName;
+//   });
+
+//   saveData(data);
+//   console.log("초기 인장 저장 완료");
+// });
+
+
+let dirty = false;
+
+function markDirty() {
+  dirty = true;
+}
+
+setInterval(() => {
+  if (dirty) {
+    saveData(data);
+    dirty = false;
+  }
+}, 5000);
 
 
 function computeTodayWeekAll(user) {
@@ -60,35 +92,44 @@ function computeTodayWeekAll(user) {
   };
 }
 
-client.on("presenceUpdate", (oldState, newState) => {
-
-  const member = newState.member || oldState.member;
+client.on('presenceUpdate', (oldState, newState) => {
+  const member = newState.member;
   if (!member) return;
 
   const userId = member.id;
-
   const data = loadData();
-  data[userId] = data[userId] || {};
+
+  if (!data[userId]) data[userId] = {};
 
   data[userId].nickname = member.displayName;
-  data[userId].avatar = member.user.displayAvatarURL();
+data[userId].avatar = member.user.displayAvatarURL({ size: 128 });
 
-  saveData(data);
+// markDirty();   // saveData ❌ 대신 이거
 
+
+  
 });
 
-client.on('voiceStateUpdate', (oldState, newState) => {
- const member = newState.member || oldState.member;
-if (!member) return;
-
-const userId = member.id;
+s
 
 
+client.on("voiceStateUpdate", (oldState, newState) => {
+console.log("voiceStateUpdate fired");
+  const member = newState.member || oldState.member;
+  if (!member) return;
 
+  const data = loadData();
+  const userId = member.id;
 
-constuser.userTag = member.displayName;
-  console.log(
-  `[VOICE] ${member.userTag}`,
+data[userId].nickname = member.displayName;
+data[userId].avatar = member.user.displayAvatarURL({ size: 128 });
+
+  if (!data[userId]) data[userId] = {};
+
+ 
+
+console.log(
+  `[VOICE] ${member.displayName}`,
   'oldVideo:', oldState.selfVideo,
   'newVideo:', newState.selfVideo,
   'oldCh:', oldState.channelId,
@@ -96,13 +137,10 @@ constuser.userTag = member.displayName;
 );
 
   try {
-    const data = loadData();
-
-    const member = newState.member || oldState.member;
-    if (!member) return;
+   
 
     
-const userTag = member.displayName;
+const usertag = member.displayName;
     const oldVideo = oldState.selfVideo;
     const newVideo = newState.selfVideo;
 
@@ -114,12 +152,14 @@ const userTag = member.displayName;
 
     if (!logCh) return;
 
+
+
     // 유저 데이터 보장
     if (!data[userId]) {
      data[userId] = {
-      nickname: member.displayName,
-  avatar: member.user.displayAvatarURL('https://cdn.discordapp.com/embed/avatars/0.png'),
-  attendance,
+      nickname: msg.member?.displayName || msg.author.username,
+ avatar: member.user.displayAvatarURL({ size: 128 }),
+
       todayseconds: 0,
       sessions: [],
       currentStart: null,
@@ -143,23 +183,25 @@ const userTag = member.displayName;
       data[userId].currentChannelId = STUDY_VC_ID;
       saveData(data);
 
-      logCh.send(`🎥 ${userTag} STUDY 입장 + 캠 ON`);
+      logCh.send(`🎥 ${usertag} STUDY 입장 + 캠 ON`);
     }
 
     /* =========================
        2️⃣ 캠 ON / OFF 로그 (독립)
     ========================= */
     if (!oldVideo && newVideo) {
-      logCh.send(`📷 ${userTag} 캠 ON`);
+      logCh.send(`📷 ${usertag} 캠 ON`);
     }
 
     if (oldVideo && !newVideo) {
-      logCh.send(`📷 ${userTag} 캠 OFF`);
+      logCh.send(`📷 ${usertag} 캠 OFF`);
     }
 
   } catch (e) {
     console.error('❌ voiceStateUpdate error:', e);
   }
+// markDirty();   // saveData ❌ 대신 이거
+
 });
 
  
@@ -204,7 +246,7 @@ client.on('messageCreate', async (msg) => {
   if (content === '!time') {
     const {todaysec, weekSec, allSec } = computeTodayWeekAll(u);
     await msg.reply(
-      `🕒 ${user.userTag}\n` +
+      `🕒 ${user.usertag}\n` +
       `- 오늘: ${formatSeconds(todaysec)}\n` +
       `- 이번주: ${formatSeconds(weekSec)}\n` +
       `- 누적: ${formatSeconds(allSec)}`
@@ -214,7 +256,7 @@ client.on('messageCreate', async (msg) => {
 
   // ===== !today =====
   if (content.startsWith('!today')) {
-    const { todaysec } = computeTodayWeekAll(u);
+    const { todaysec, weekSec, allSec } = computeTodayWeekAll(user);
     await msg.reply(`📅 오늘 공부: ${formatSeconds(todaysec)}`);
     return;
   }
@@ -242,4 +284,5 @@ client.on('messageCreate', async (msg) => {
 });
 
 
-client.login(process.env.DISCORD_TOKEN);
+startDashboardServer(client);
+// client.login(process.env.DISCORD_TOKEN);

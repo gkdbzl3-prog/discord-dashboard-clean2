@@ -4,7 +4,14 @@
   ? user.avatar
   : 'https://cdn.discordapp.com/embed/avatars/0.png'}"
   class="w-12 h-12 rounded-full">
-<div>${user.name}</div>
+
+<div class="p-4 bg-white rounded-xl shadow flex items-center gap-4">
+<img src="${user.avatar || defaultAvatar}">
+  <div>
+
+    <div class="font-bold">닉네임</div>
+    <div class="text-sm text-gray-400">1.2h</div>
+
 <button 
   data-user="${userId}" 
   data-index="${index}" 
@@ -19,6 +26,8 @@
   삭제
 </button>
 
+  </div>
+</div>
 <div class="day ${attendance.has(dayKey) ? 'bg-green-500' : ''}">
 </div>
      <script src="mypage.js" defer></script>

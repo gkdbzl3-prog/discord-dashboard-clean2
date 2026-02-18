@@ -1,10 +1,41 @@
-body {
-  background-color: #f3f0ff; /* lavender-bg 직접 값 */
-  font-family: ui-sans-serif, system-ui;
+.tweet-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
 }
 
-button {
-  position: relative;
-  z-index: 9999;
- background-color: beige;
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.tweet-body {
+  flex: 1;
+}
+
+.tweet-header {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.name {
+  font-weight: bold;
+}
+
+.id {
+  color: #666;
+}
+
+.online {
+  color: #1da1f2;
+}
+
+
+.button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
 }

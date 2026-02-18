@@ -38,6 +38,7 @@ window.calcTodayPercent = function(todaysec, goalSec) {
 
 
 window.renderCalendar = function(view, days) {
+
   const cal = view.querySelector('.days-calendar');
   if (!cal) return;
 
@@ -56,6 +57,8 @@ window.renderCalendar = function(view, days) {
       </div>
     `;
   });
+
+
 };
 
 
@@ -67,20 +70,26 @@ window.formatTime = function (sec) {
 
 
 window.renderToday = function(data) {
+
   const badgeRow = document.querySelector('.badge-row');
+const user = data.finalUsers?.[0]
 
   badgeRow.innerHTML = `
-${user.badge ? `<span class="text-orange-500 font-bold">${user.badge}</span>` : ""}      ${data.isStudying ? '진행중' : '종료'}
+${user.badge ? `<span class="text-orange-500 font-bold">${user.badge}</span>` : ""} 
+${data.isStudying ? '진행중' : '종료'}
     <span class="badge blue">
       ${formatTime(data.todaysec)}
     </span>
   `;
+const grid = document.getElementById("dayseGrid");
+if (!grid) return;
 }
+
 
 window.renderUserProgress = function(finalUsers) {
   const view = document.getElementById('view');
   view.innerHTML = '';
-
+if (!view) return;
   finalUsers.forEach(user => {
     const percent = Math.min(
       100,
@@ -89,20 +98,24 @@ window.renderUserProgress = function(finalUsers) {
 
     view.innerHTML += `
       <div class="user-progress">
-        <div class="user-name">${name}</div>
+        <div class="user-name">${user.name}</div>
         <div class="progress">
           <div class="progress-bar" style="width:${percent}%"></div>
         </div>
       </div>
     `;
   });
+const grid = document.getElementById("daysGrid");
+if (!grid) return;
+
 }
 
 
 window.loadMonth = function(month) {
 
   const view = document.getElementById('view');
-
+if (!view) return;
+if (!window.token) return;
   fetch(`/days?token=${encodeURIComponent(window.token)}`)
     .then(r => r.json())
     .then(data => {
@@ -120,13 +133,19 @@ window.renderMonthSummary = function (days) {
 
   document.querySelector('.month-label').textContent = '이번 달';
   document.querySelector('.month-total').textContent = `${h}시간`;
+
 };
 
 
 
 
 
-window.showDays = function(view) {
+window.showDays = async function(view) {
+await window.loadUsers();
+const users = window.usersCache;
+const data = await window.API.fetch("/days");
+if (!view) return;
+if (!window.token) return;
   fetch(`/days?token=${encodeURIComponent(window.token)}`)
     .then(r => {
 if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
@@ -145,11 +164,20 @@ if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
   
 
 
-window.showDayDetail = function(dayKey) {
-    
+window.showDayDetail = async function(dayKey) {
+await window.loadUsers();
+    const view = document.getElementById("view");
+await window.loadUsers();
+const users = window.usersCache;
+if (!view) return;
   const detail = document.querySelector('.day-detail');
+
   if (detail) detail.innerHTML = "⌛ 데이터를 불러오는 중...";
 
+const data = await window.API.fetch("/days");   
+const days = data.days || []
+
+if (!window.token) return;
   fetch(`/days?token=${encodeURIComponent(window.token)}`)
     .then(r => {
 if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
@@ -181,18 +209,18 @@ if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
           `).join('')}
         </div>
       `;
+
 const tbody = document.getElementById("days-tbody");
+if (!tbody) return;
 tbody.innerHTML = days.map(d => `
-  
-<tr>
-    <td class="flex items-center gap-2">
-      ${d.users.map(u => `
-        <img src="${u.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}"
-             class="w-6 h-6 rounded-full"/>
+  <tr>
+    <td>
+      ${(d.users| []).map(user => `
+        <img src="${user.avatar || '기본이미지'}" class="w-6 h-6 rounded-full" />
       `).join("")}
       ${d.dayKey}
     </td>
-    <td class="text-right">${(d.totalSec/3600).toFixed(1)}h</td>
+    <td>${(d.totalSec / 3600).toFixed(1)}h</td>
   </tr>
 `).join("");
     })
@@ -200,7 +228,10 @@ tbody.innerHTML = days.map(d => `
       console.error("Detail 로드 실패:", err);
       if (detail) detail.innerHTML =
         `<p style="color:red;">⚠️ 오류: ${err.message}</p>`;
+
     });
+const grid = document.getElementById("daysGrid");
+if (!grid) return;
 };
 
 window.prevMonth = function () {
@@ -219,27 +250,12 @@ window.nextMonth = function () {
 
 
 
-window.showUser = function (name) {
-  show('mypage');
-
-  setTimeout(() => {
-    fetch(`/user?token=${encodeURIComponent(window.token)}`)
-
-      .then(r => r.json())
-      .then(data => {
-        document.querySelector('.mypage-name').textContent = name;
-      });
-  }, 50);
-};
-
-window.showUserPage = function(name) {
-  show('mypage');
-};
 
 
 window.renderTodaySummary = function(data) {
-  const el = document.querySelector('.today-summary');
-  if (!el) return;
+
+const el = document.getElementById("someId");
+if (!el) return;  if (!el) return;
   el.innerHTML = `
 
     <div class="badge-row">
@@ -257,11 +273,15 @@ window.renderTodaySummary = function(data) {
       </div>
     </div>
   `;
+const grid = document.getElementById("daysGrid");
+if (!grid) return;
 };
 
 
 window.toast = function (msg) {
+
   const t = document.getElementById('toast');
+
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 1500);

@@ -1,126 +1,162 @@
+// today.js – Today 메인 표시, 중복/불필요 함수 제거
 
-  // 모든 .js 파일 상단 공통 권장 사항
 if (!window.token) {
   window.token =
     new URLSearchParams(location.search).get("token") ||
     localStorage.getItem("adminToken");
 }
-const today = data.today || []; 
-window.generateDateKey = function (offset) {
-  const d = new Date();
-  d.setDate(d.getDate() - offset);
-  return d.toISOString().slice(0, 10);
-}
 
 
-window.showToday = async function () {
 
-  const view = document.getElementById("view");
-   const tbody = document.getElementById("today-tbody");
-  const res = await fetch(`/today?token=${encodeURIComponent(window.token)}`);
-  const data = await res.json();
-
-  const finalUsers = data.finalUsers || [];
-
-  view.innerHTML = `
-    <h2 class="text-2xl font-bold mb-6">Today</h2>
-    <div id="todayGrid"></div>
-  `;
-tbody.innerHTML = today.map(d => `
-  <tr>
-    <td class="flex items-center gap-2">
-      ${d.users.map(u => `
-        <img src="${u.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}"
-             class="w-6 h-6 rounded-full"/>
-      `).join("")}
-      ${d.dayKey}
-    </td>
-    <td class="text-right">${(d.totalSec/3600).toFixed(1)}h</td>
-  </tr>
-`).join("");
-  renderTodayCards(finalUsers);
+window.formatTime = function (seconds) {
+  if (!seconds) return "0분";
+  const mins = Math.floor(seconds / 60);
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return hrs > 0 ? `${hrs}시간 ${remainMins}분` : `${mins}분`;
 };
 
 
 
-window.renderToday = async function () {
 
-  const view = document.getElementById("view");
+function renderLiveUsers() {
 
-  try {
-    const res = await fetch(`/today?token=${encodeURIComponent(window.token)}`);
-    const data = await res.json();
+  const liveUsers = window.usersCache.filter(u => u.online);
 
-    renderTodayCards(data.finalUsers || []);
+  const area = document.getElementById("liveArea");
+  if (!area) return;
 
-  } catch (err) {
-    view.innerHTML = "로딩 실패";
-  }
-};
-
-
-window.renderTodayCards = function (finalUsers) {
-  const grid = document.getElementById("todayGrid");
-//  const thisWeek = days.filter(d => {
-//       const date = new Date(d.dayKey);
-//       return date >= weekStart;
-//     });
-  if (!grid) return;
-
-  grid.innerHTML = finalUsers.map(user => {
-    const percent = user.goalSec
-      ? Math.min(100, Math.floor((user.totalSec / user.goalSec) * 100))
-      : 0;
-
-    return `
-      <div class="p-4 bg-white rounded-xl shadow">
-
-        <div class="font-bold">${user.name}</div>
-        <div>${percent}%</div>
+  if (liveUsers.length === 0) {
+    area.innerHTML = `
+      <div class="text-center text-gray-400">
+        현재 활동 중인 유저 없음
       </div>
     `;
-  }).join("");
-};
+    return;
+  }
 
-
-
-
-
-
-window.renderProgress = function (d) {
-  const percent = user.goalSec
-    ? Math.min(100, Math.floor(d.ttodaysec / d.goalSec * 100))
-    : 0;
-
-  return `
-    <div class="progress">
-      <div class="progress-bar" style="width:${percent}%"></div>
+  area.innerHTML = `
+    <div class="flex gap-4 justify-center flex-wrap">
+      ${liveUsers.map(u => `
+        <div class="text-center">
+          <img src="${u.avatar}" class="w-14 h-14 rounded-full mx-auto">
+          <div class="text-sm mt-1 font-medium">${u.name}</div>
+          <div class="text-xs text-green-500">LIVE 🔥</div>
+        </div>
+      `).join("")}
     </div>
   `;
 }
 
 
-window.calcTodayPercent = function(todaysec, goalSec) {
+
+
+function renderTimeline() {
+
+  const area = document.getElementById("timelineArea");
+  if (!area) return;
+
+  const users = window.usersCache;
+
+  area.innerHTML = users.map(u => {
+
+    const percent = Math.min(100,
+      u.totalSec && u.goalSec
+        ? Math.floor((u.totalSec / u.goalSec) * 100)
+        : 0
+    );
+
+    return `
+      <div class="bg-white p-5 rounded-xl shadow-sm">
+
+        <div class="flex items-center gap-3 mb-3">
+          <img src="${u.avatar}" class="w-10 h-10 rounded-full">
+          <div class="font-semibold">${u.name}</div>
+        </div>
+
+        <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full bg-indigo-500"
+               style="width: ${percent}%"></div>
+        </div>
+
+        <div class="text-xs text-gray-500 mt-2">
+          ${(u.totalSec / 3600).toFixed(1)}h
+        </div>
+
+      </div>
+    `;
+
+  }).join("");
+
+}
+
+window.calcTodayPercent = function (todaysec, goalSec) {
   if (!goalSec || goalSec === 0) return 0;
   return Math.min(100, Math.round((todaysec / goalSec) * 100));
 };
 
 
 
-// formatMin 헬퍼 함수 (없다면 추가)
-window.formatMin = function (seconds) {
-  if (!seconds) return '0분';
-  const mins = Math.floor(seconds / 60);
-  const hrs = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  
-  if (hrs > 0) {
-    return `${hrs}시간 ${remainMins}분`;
-  }
-  return `${mins}분`;
-}
+window.showToday = async function () {
+
+
+  await window.loadUsers();
+
+  const view = document.getElementById("view");
+  if (!view) return;
+
+ await window.loadUsers();
+const users = window.usersCache;
+
+
+  view.innerHTML = `
+    <div class="max-w-2xl mx-auto">
+
+      <h2 class="text-xl font-bold mb-4">Today</h2>
+    <div id="timeline"></div>
+      <div id="liveArea" class="mb-6"></div>
+
+  `;
+const timeline = document.getElementById("timeline");
+
+ users.forEach(u => {
+    timeline.innerHTML += `
+      <div class="tweet-card">
+        <img src="${u.avatar || defaultAvatar}" class="avatar">
+onclick="window.showMyPage('${u.id}')"
+        <div class="tweet-body">
+          <div class="tweet-header">
+            <span class="name">${u.name}</span>
+            <span class="id">@${u.id.slice(0,6)}</span>
+            <span class="online">${u.online ? "●" : ""}</span>
+          </div>
+          <div class="tweet-content">
+            오늘 공부 ${Math.floor((u.totalSeconds || 0)/60)}분
+          </div>
+        </div>
+      </div>
+    `;
+  });
 
 
 
+const timelineHtml = users.map(u => `
+  <div class="tweet">
+    <img src="${u.avatar}" class="avatar">
+    <div>
+      <div class="name">
+        ${u.name} <span>@${u.id}</span>
+      </div>
+      <div class="content">
+        ${formatSessions(u)}
+      </div>
+    </div>
+  </div>
+`).join("");
+
+document.getElementById("view").innerHTML = timelineHtml;
+  renderLiveUsers();
+  renderTimeline();
 
 
+};

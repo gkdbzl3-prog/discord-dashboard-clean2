@@ -1,34 +1,47 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50">
+<body>
+  <header>탭 버튼들</header>
+  <main id="view"></main>   <!-- 여기 -->
+</body>
+  <!-- 헤더 -->
+  <header class="p-6 border-b bg-white">
+    <h1 class="text-xl font-bold">Admin Dashboard</h1>
 
-  <!-- 네비 영역 -->
-  <div class="p-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-   <h1 class="text-xl font-bold mb-4">Admin Dashboard</h1>
-  <nav class="flex gap-4">
-    <button data-page="today" class="px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:opacity-90 transition">Today</button>
-    <button data-page="weekly" class="px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:opacity-90 transition">Weekly</button>
-    <button data-page="mypage" class="px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:opacity-90 transition">My Page</button>
-    <button data-page="manual" class="px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:opacity-90 transition">Manual</button>
-    <button data-page="total" class="px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:opacity-90 transition">Total</button>
-  </nav>
+    <!-- 탭 -->
+    <nav class="flex gap-3 mt-4">
+      <button data-page="today" class="tab">Today</button>
+      <button data-page="total" class="tab">Total</button>
+      <button data-page="mypage" class="tab">My Page</button>
+
+      <!-- Manual은 아이콘 버튼 -->
+      <button data-page="manual" class="tab">⚙️</button>
+    </nav>
+  </header>
+
+  <!-- 여기 하나만 렌더 -->
+<header> ... </header>
+<main id="view"></main>
+<div class="tweet">
+  <img class="avatar">
+  <div class="tweet-body">
+    <div class="tweet-header">
+      <span class="name">날</span>
+      <span class="handle">@7438...</span>
+      <span class="status online">● Online</span>
+    </div>
+    <div class="tweet-content">
+      10:00 ~ 10:50 (50분)
+    </div>
   </div>
+</div>
+<main class="p-6"></main>
+  <div id="view"></div>
 
-  <main class="p-6 bg-bgLight dark:bg-bgDark min-h-screen">
-    <div id="view"></div>
-  </main>
 
-  <!-- 스크립트는 body 맨 아래 -->
  
+
+  <script src="/script.js"></script>
   <script src="/today.js"></script>
-  <script src="/weekly.js"></script>
   <script src="/total.js"></script>
   <script src="/mypage.js"></script>
   <script src="/manual.js"></script>
- <script src="/script.js"></script>
 </body>
-</html>

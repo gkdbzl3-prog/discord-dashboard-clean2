@@ -7,20 +7,17 @@ const { loadData } = require('./data/store');
 
 const express = require('express');
 const path = require('path');
-const createAdminRouter = require('./admin');
+
 
 module.exports = function startDashboardServer(client) {
 console.log("client 들어옴?", !!client);
   const app = express();
-  const PORT = 3000;
-
+ 
   app.locals.client = client; // ⭐ 이거 중요
-
+const createAdminRouter = require('./routes/admin');
   app.use(express.json());
   app.use(express.static('public'));
-
   app.use('/', createAdminRouter(client));
-
   console.log("createAdminRouter:", createAdminRouter);
 
   
@@ -54,52 +51,6 @@ console.log("client 들어옴?", !!client);
  
 
 
-
-  // 주간/전체 기록 데이터
-  app.get('/days', (req, res) => {
-  const data = loadData();
-  const result = [];
-
-  Object.entries(data).forEach(([userId, user]) => {
-
-    const name =
-  user.nickname ||
-  user.userTag ||
-  user.username ||
-  userId.replace("ryurui_", "") ||
-  "Unknown";
-
-    const avatar =
-      user.avatar ||
-      `https:/cdn.discordapp.com/embed/avatars/0.png`;
-
-    if (!user.sessions) return;
-
-    user.sessions.forEach(s => {
-      const dayKey = s.start?.slice(0, 10);
-      if (!dayKey) return;
-
-      let day = result.find(d => d.dayKey === dayKey);
-
-      if (!day) {
-        day = { dayKey, todaysec: 0, users: [] };
-        result.push(day);
-      }
-
-      day.todaysec += s.seconds || 0;
-
-      if (!day.users.find(x => x.id === userId)) {
-        day.users.push({
-          id: userId,
-          name,
-          avatar
-        });
-      }
-    });
-  });
-
-  res.json({ logs: result });
-});;
 
   app.post('/manual', (req, res) => {
     try {
@@ -144,8 +95,7 @@ console.log("client 들어옴?", !!client);
 });
 
   // 서버 시작
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🖥️  Dashboard listening on http:/localhost:${PORT}`);
-  });
+ const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0');
 
 }

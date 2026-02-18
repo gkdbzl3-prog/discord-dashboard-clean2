@@ -3,7 +3,7 @@ chcp 65001
 title Multi-Runner (Bot + ngrok)
 
 REM 1. 디스코드 봇 실행
-cd /d C:\finalUsers\user\Downloads\Discord-bot
+cd /d C:\Users\user\Documents\discord-dashboard-clean2
 start "Discord Bot" cmd /k "node bot.js"
 
 echo 7초 대기 중...

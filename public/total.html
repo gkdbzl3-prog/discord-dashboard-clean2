@@ -7,12 +7,21 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-
+<div class="p-4 bg-white rounded-xl shadow flex items-center gap-4">
+<img src="${user.avatar || defaultAvatar}">
+  <div>
+    <div class="font-bold">닉네임</div>
+    <div class="text-sm text-gray-400">1.2h</div>
   <h1>📊 Total</h1>
 
   <div id="totalTable"></div>
 
+
+  </div>
+</div>
+
+
+
   <script src="/total.js"></script>
-  
 </body>
 </html>

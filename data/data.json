@@ -68,7 +68,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/avatars/743880211547816046/11c4715db26adaf95d6ce315987fdb88.webp?size=128",
+    "nickname": "날"
   },
   "1255709951729602591": {
     "usertag": "b1anket__24350",
@@ -87,7 +89,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/avatars/1255709951729602591/937c055e9287b405ad154f9b168348d1.webp?size=128",
+    "nickname": "담요"
   },
   "1384786633693462549": {
     "usertag": "sea.4m.e",
@@ -113,7 +117,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/avatars/1384786633693462549/2738e279eec1bf099ea37e07c9234a8b.webp?size=128",
+    "nickname": "말감이"
   },
   "1146001494307524638": {
     "usertag": "gyul000_00827",
@@ -172,7 +178,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/embed/avatars/5.png",
+    "nickname": "귤"
   },
   "507177245648093185": {
     "usertag": "ex7307",
@@ -198,7 +206,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/avatars/507177245648093185/32b9a242186d18f903f18aa41bf4e60b.webp?size=128",
+    "nickname": "믕"
   },
   "856206410013868053": {
     "usertag": "yon_dooh_",
@@ -224,7 +234,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/avatars/856206410013868053/420841a30b1d273ebf45e4d001ad6f31.webp?size=128",
+    "nickname": "y"
   },
   "476226483703250956": {
     "usertag": "wisdomrang",
@@ -273,7 +285,9 @@
           "by": "auto"
         }
       }
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/embed/avatars/3.png",
+    "nickname": "말랑"
   },
   "972413596464185344": {
     "userTag": "ryurui_",
@@ -286,7 +300,9 @@
       "lastDay": null,
       "streak": 0,
       "days": {}
-    }
+    },
+    "avatar": "https://cdn.discordapp.com/avatars/972413596464185344/09bf64252655a5feeec9df60cfe45b52.webp?size=128",
+    "nickname": "부계 날"
   },
   "gkdbzl2": {
     "sessions": [
@@ -294,7 +310,8 @@
         "start": "2026-02-13T06:35:55.884Z",
         "end": "2026-02-13T06:35:55.884Z",
         "seconds": 60,
-        "manual": true
+        "manual": true,
+        "lastEdit": "2026-02-17T20:04:47.908Z"
       },
       {
         "start": "2026-02-13T06:49:44.656Z",
@@ -451,7 +468,87 @@
         "seconds": 120,
         "manual": true,
         "start": "2026-02-16T01:20:09.197Z"
+      },
+      {
+        "seconds": 180,
+        "manual": true,
+        "start": "2026-02-17T09:46:31.087Z"
+      },
+      {
+        "seconds": 120,
+        "manual": true,
+        "start": "2026-02-17T10:06:20.387Z"
+      },
+      {
+        "start": "2026-02-17T19:47:44.605Z",
+        "end": "2026-02-17T19:47:44.605Z",
+        "seconds": 180,
+        "manual": true
       }
     ]
+  },
+  "400278072613404674": {
+    "avatar": "https://cdn.discordapp.com/avatars/400278072613404674/5dbcfa0ff03ebc4b5905ade877853926.webp?size=128",
+    "nickname": "꿍냐"
+  },
+  "449875548139945984": {
+    "avatar": "https://cdn.discordapp.com/avatars/449875548139945984/119d9297da9bcaec3ba0c17732da950b.webp?size=128",
+    "nickname": "망난 공기계"
+  },
+  "483561919765282816": {
+    "avatar": "https://cdn.discordapp.com/avatars/483561919765282816/2a470d073fe7d7f3e98752f852064034.webp?size=128",
+    "nickname": "나은"
+  },
+  "738773152401981472": {
+    "avatar": "https://cdn.discordapp.com/avatars/738773152401981472/b42f0828b99d224d4307c82e4af5775f.webp?size=128",
+    "nickname": "망난"
+  },
+  "902079248653758554": {
+    "avatar": "https://cdn.discordapp.com/avatars/902079248653758554/3b0669886304c6989dd70cbb53ac61ee.webp?size=128",
+    "nickname": "쭁박"
+  },
+  "921333313673756692": {
+    "avatar": "https://cdn.discordapp.com/avatars/921333313673756692/2bd0182d1f9953907c5fcba173e3aaee.webp?size=128",
+    "nickname": "노란동그라밍"
+  },
+  "1158022885458325674": {
+    "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
+    "nickname": "므엥이"
+  },
+  "1232472208727867404": {
+    "avatar": "https://cdn.discordapp.com/avatars/1232472208727867404/ea9ad98b69dbdf7137987f4ccbba4451.webp?size=128",
+    "nickname": "담요"
+  },
+  "1233678136403820565": {
+    "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
+    "nickname": "탐"
+  },
+  "1391635736008327169": {
+    "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
+    "nickname": "라오타"
+  },
+  "1450035056021082214": {
+    "avatar": "https://cdn.discordapp.com/avatars/1450035056021082214/edbb3b24a96dc2b05d90ad13dee3867a.webp?size=128",
+    "nickname": "빙수"
+  },
+  "1450371246347911219": {
+    "avatar": "https://cdn.discordapp.com/avatars/1450371246347911219/f7f2e9361e8a54ce6e72580ac7b967af.webp?size=128",
+    "nickname": "일영2"
+  },
+  "1452569229785042954": {
+    "avatar": "https://cdn.discordapp.com/avatars/1452569229785042954/8569adcbd36c70a7578c017bf5604ea5.webp?size=128",
+    "nickname": "능솨"
+  },
+  "1455045474594852936": {
+    "avatar": "https://cdn.discordapp.com/avatars/1455045474594852936/1ec32b1a85e39c0fa3c080b9c1eed0d9.webp?size=128",
+    "nickname": "라해"
+  },
+  "1456972605717221476": {
+    "avatar": "https://cdn.discordapp.com/avatars/1456972605717221476/8569adcbd36c70a7578c017bf5604ea5.webp?size=128",
+    "nickname": "하늘"
+  },
+  "1466022968860737649": {
+    "avatar": "https://cdn.discordapp.com/avatars/1466022968860737649/39f1813c383a5eda16ba8da5efe93f18.webp?size=128",
+    "nickname": "타임코드"
   }
 }
