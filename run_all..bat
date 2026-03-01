@@ -10,7 +10,7 @@ echo 7초 대기 중...
 timeout /t 7
 
 REM 2. ngrok 실행 (ngrok 폴더로 이동해서 실행)
-cd /d C:\finalUsers\user\AppData\Local\ngrok
+cd /d C:\Users\user\AppData\Local\ngrok
 start "ngrok Tunnel" cmd /k "ngrok http 3000"
 
 echo 모든 프로세스가 시작되었습니다!

@@ -1,16 +1,27 @@
 require('dotenv').config();
-
-
-const startDashboardServer = require('./dashboard');
+console.log("BOT STARTED");
+const express = require('express');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const createAdminRouter = require('./routes/admin');
 const { loadData, saveData } = require('./data/store');
-const {
-  Client,
-  GatewayIntentBits,
-  Partials
-} = require("discord.js");
 
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
+app.get("/save-memo", (req, res) => {
+  const { memo } = req.query;
 
-  
+ feed.push({
+  type: "memo",
+  userId: window.currentUserId,   // 🔥 추가
+  text: memoText,
+  createdAt: Date.now()
+});
+
+  res.json({ ok: true });
+});
+app.get('/favicon.ico', (req, res) => res.status(204));
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -21,31 +32,38 @@ const client = new Client({
   partials: [Partials.GuildMember]
 });
 
-// client.on('ready', async () => {
-//   console.log('봇 로그인 완료');
+// 👇 client 만든 다음 라우터 등록
+app.use('/', createAdminRouter(client));
+
+// 👇 서버 실행은 딱 한 번만
+app.listen(3000, () => {
+  console.log('Server running on 3000');
+});
+
+client.login(process.env.DISCORD_TOKEN);
 
 
+client.on('clientReady', async () => {
+  console.log('봇 로그인 완료');
+  const guild = client.guilds.cache.first();
+  if (!guild) return;
 
+  await guild.members.fetch();
 
-//   const guild = client.guilds.cache.first();
-//   if (!guild) return;
+  const data = loadData();
 
-//   await guild.members.fetch();
+  guild.members.cache.forEach(member => {
+    const userId = member.id;
 
-//   const data = loadData();
+    if (!data.users[userId]) data.users[userId] = {};
 
-//   guild.members.cache.forEach(member => {
-//     const userId = member.id;
+    data.users[userId].avatar = member.user.displayAvatarURL({ size: 128 });
+    data.users[userId].nickname = member.displayName;
+  });
 
-//     if (!data[userId]) data[userId] = {};
-
-//     data[userId].avatar = member.user.displayAvatarURL({ size: 128 });
-//     data[userId].nickname = member.displayName;
-//   });
-
-//   saveData(data);
-//   console.log("초기 인장 저장 완료");
-// });
+  saveData(data);
+  
+});
 
 
 let dirty = false;
@@ -55,6 +73,7 @@ function markDirty() {
 }
 
 setInterval(() => {
+const data = loadData();
   if (dirty) {
     saveData(data);
     dirty = false;
@@ -99,94 +118,46 @@ client.on('presenceUpdate', (oldState, newState) => {
   const userId = member.id;
   const data = loadData();
 
-  if (!data[userId]) data[userId] = {};
+  if (!data.users[userId]) data.users[userId] = {};
 
-  data[userId].nickname = member.displayName;
-data[userId].avatar = member.user.displayAvatarURL({ size: 128 });
+  data.users[userId].nickname = member.displayName;
+data.users[userId].avatar = member.user.displayAvatarURL({ size: 128 });
 
-// markDirty();   // saveData ❌ 대신 이거
+markDirty();   // saveData ❌ 대신 이거
 
 
   
 });
 
-s
+
 
 
 client.on("voiceStateUpdate", (oldState, newState) => {
-console.log("voiceStateUpdate fired");
-  const member = newState.member || oldState.member;
-  if (!member) return;
-
+console.log("ENV STUDY:", process.env.STUDY_VC_ID);
+  const userId = newState.id;
   const data = loadData();
-  const userId = member.id;
 
-data[userId].nickname = member.displayName;
-data[userId].avatar = member.user.displayAvatarURL({ size: 128 });
+  if (!data.users || !data.users[userId]) return;
 
-  if (!data[userId]) data[userId] = {};
+  const STUDY_VC_ID = process.env.STUDY_VC_ID;
 
- 
+  const isInStudy = newState.channelId === STUDY_VC_ID;
 
-console.log(
-  `[VOICE] ${member.displayName}`,
-  'oldVideo:', oldState.selfVideo,
-  'newVideo:', newState.selfVideo,
-  'oldCh:', oldState.channelId,
-  'newCh:', newState.channelId
-);
+  // 🎥 캠이 OFF → ON으로 바뀐 순간
+  if (!oldState.selfVideo && newState.selfVideo && isInStudy) {
+    data.users[userId].currentStart = Date.now();
+    saveData(data);
+    console.log("캠 ON → 온라인:", userId);
+  }
 
-  try {
-   
+  // 📷 캠이 ON → OFF로 바뀐 순간
+  if (oldState.selfVideo && !newState.selfVideo) {
+    data.users[userId].currentStart = null;
+    saveData(data);
+    console.log("캠 OFF → 오프라인:", userId);
+  }
 
-    
-const usertag = member.displayName;
-    const oldVideo = oldState.selfVideo;
-    const newVideo = newState.selfVideo;
-
-    const oldChId = oldState.channelId;
-    const newChId = newState.channelId;
-
-    const STUDY_VC_ID = process.env.STUDY_VC_ID;
-    const logCh = client.channels.cache.get(process.env.LOG_CHANNEL_ID);
-
-    if (!logCh) return;
-
-
-
-    // 유저 데이터 보장
-    if (!data[userId]) {
-     data[userId] = {
-      nickname: msg.member?.displayName || msg.author.username,
- avatar: member.user.displayAvatarURL({ size: 128 }),
-
-      todayseconds: 0,
-      sessions: [],
-      currentStart: null,
-      currentChannelId: null,
-    };
-
-
-
-    }
-
-    /* =========================
-       1️⃣ STUDY 입장 + 캠 ON
-    ========================= */
-    const enteredStudy =
-      oldChId !== STUDY_VC_ID &&
-      newChId === STUDY_VC_ID &&
-      newVideo === true;
-
-    if (enteredStudy && !data[userId].currentStart) {
-      data[userId].currentStart = Date.now();
-      data[userId].currentChannelId = STUDY_VC_ID;
-      saveData(data);
-
-      logCh.send(`🎥 ${usertag} STUDY 입장 + 캠 ON`);
-    }
-
-    /* =========================
+   /* =========================
        2️⃣ 캠 ON / OFF 로그 (독립)
     ========================= */
     if (!oldVideo && newVideo) {
@@ -197,13 +168,8 @@ const usertag = member.displayName;
       logCh.send(`📷 ${usertag} 캠 OFF`);
     }
 
-  } catch (e) {
-    console.error('❌ voiceStateUpdate error:', e);
-  }
-// markDirty();   // saveData ❌ 대신 이거
-
+console.log("newChannel:", newState.channelId, "study:", STUDY_VC_ID);
 });
-
  
 
 client.on('messageCreate', async (msg) => {
@@ -227,8 +193,8 @@ client.on('messageCreate', async (msg) => {
   }
 
   // 유저 데이터 없으면 여기서 생성
-  if (!data[userId]) {
-    data[userId] = {
+  if (!data.users[userId]) {
+    data.users[userId] = {
       nickname,
       todayseconds: 0,
       sessions: [],
@@ -240,7 +206,7 @@ client.on('messageCreate', async (msg) => {
     saveData(data);
   }
 
-  const user = data[userId];
+  const user = data.users[userId];
 
   // ===== !time =====
   if (content === '!time') {
@@ -284,5 +250,4 @@ client.on('messageCreate', async (msg) => {
 });
 
 
-startDashboardServer(client);
-// client.login(process.env.DISCORD_TOKEN);
+

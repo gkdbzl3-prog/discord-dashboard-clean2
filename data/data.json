@@ -1,554 +1,337 @@
 {
-  "743880211547816046": {
-    "usertag": "ryuri0115",
-    "totalSeconds": 75092,
-    "sessions": [
-      {
-        "start": "2026-01-31T04:24:59.182Z",
-        "end": "2026-01-31T05:34:26.811Z",
-        "seconds": 4167,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-01T00:36:36.557Z",
-        "end": "2026-02-01T03:15:31.164Z",
-        "seconds": 9534,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T01:41:51.415Z",
-        "end": "2026-02-02T01:41:53.651Z",
-        "seconds": 2,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T01:42:03.457Z",
-        "end": "2026-02-02T07:17:32.003Z",
-        "seconds": 20128,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T07:49:03.452Z",
-        "end": "2026-02-02T15:49:03.452Z",
-        "seconds": 28800,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T16:17:35.307Z",
-        "end": "2026-02-02T19:45:16.486Z",
-        "seconds": 12461,
-        "channelId": "1450028410549174293"
-      }
-    ],
-    "currentStart": 1770082559510,
-    "currentChannelId": "1450028410549174293",
-    "goalTodaySec": 18000,
-    "attendance": {
-      "lastDay": "2026-02-03",
-      "streak": 4,
-      "days": {
-        "2026-01-31": {
-          "checkInMs": 1769833499182,
-          "checkIn": "2026-01-31T04:24:59.182Z",
-          "by": "auto"
-        },
-        "2026-02-01": {
-          "checkInMs": 1769906196557,
-          "checkIn": "2026-02-01T00:36:36.557Z",
-          "by": "auto"
-        },
-        "2026-02-02": {
-          "checkInMs": 1769996511415,
-          "checkIn": "2026-02-02T01:41:51.415Z",
-          "by": "auto"
-        },
-        "2026-02-03": {
-          "checkInMs": 1770049055307,
-          "checkIn": "2026-02-02T16:17:35.307Z",
-          "by": "auto"
-        }
-      }
+  "users": {
+    "1146001494307524638": {
+      "avatar": "https://cdn.discordapp.com/embed/avatars/5.png",
+      "nickname": "귤",
+      "currentStart": 1772105356447
     },
-    "avatar": "https://cdn.discordapp.com/avatars/743880211547816046/11c4715db26adaf95d6ce315987fdb88.webp?size=128",
-    "nickname": "날"
-  },
-  "1255709951729602591": {
-    "usertag": "b1anket__24350",
-    "totalSeconds": 0,
-    "sessions": [],
-    "currentStart": 1769834181859,
-    "currentChannelId": "1450028410549174293",
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": "2026-01-31",
-      "streak": 1,
-      "days": {
-        "2026-01-31": {
-          "checkInMs": 1769834181859,
-          "checkIn": "2026-01-31T04:36:21.859Z",
-          "by": "auto"
-        }
-      }
-    },
-    "avatar": "https://cdn.discordapp.com/avatars/1255709951729602591/937c055e9287b405ad154f9b168348d1.webp?size=128",
-    "nickname": "담요"
-  },
-  "1384786633693462549": {
-    "usertag": "sea.4m.e",
-    "totalSeconds": 28800,
-    "sessions": [
-      {
-        "start": "2026-01-31T04:59:31.026Z",
-        "end": "2026-01-31T12:59:31.026Z",
-        "seconds": 28800,
-        "channelId": "1450028410549174293"
-      }
-    ],
-    "currentStart": null,
-    "currentChannelId": null,
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": "2026-01-31",
-      "streak": 1,
-      "days": {
-        "2026-01-31": {
-          "checkInMs": 1769835571026,
-          "checkIn": "2026-01-31T04:59:31.026Z",
-          "by": "auto"
-        }
-      }
-    },
-    "avatar": "https://cdn.discordapp.com/avatars/1384786633693462549/2738e279eec1bf099ea37e07c9234a8b.webp?size=128",
-    "nickname": "말감이"
-  },
-  "1146001494307524638": {
-    "usertag": "gyul000_00827",
-    "totalSeconds": 69229,
-    "sessions": [
-      {
-        "start": "2026-01-31T05:20:07.349Z",
-        "end": "2026-01-31T13:20:07.349Z",
-        "seconds": 28800,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-01T09:55:25.665Z",
-        "end": "2026-02-01T14:42:53.040Z",
-        "seconds": 17247,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T06:40:38.845Z",
-        "end": "2026-02-02T09:10:12.553Z",
-        "seconds": 8973,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T15:48:35.848Z",
-        "end": "2026-02-02T19:45:25.656Z",
-        "seconds": 14209,
-        "channelId": "1450028410549174293"
-      }
-    ],
-    "currentStart": null,
-    "currentChannelId": null,
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": "2026-02-03",
-      "streak": 4,
-      "days": {
-        "2026-01-31": {
-          "checkInMs": 1769836807349,
-          "checkIn": "2026-01-31T05:20:07.349Z",
-          "by": "auto"
-        },
-        "2026-02-01": {
-          "checkInMs": 1769939725665,
-          "checkIn": "2026-02-01T09:55:25.665Z",
-          "by": "auto"
-        },
-        "2026-02-02": {
-          "checkInMs": 1770014438845,
-          "checkIn": "2026-02-02T06:40:38.845Z",
-          "by": "auto"
-        },
-        "2026-02-03": {
-          "checkInMs": 1770047315848,
-          "checkIn": "2026-02-02T15:48:35.848Z",
-          "by": "auto"
-        }
-      }
-    },
-    "avatar": "https://cdn.discordapp.com/embed/avatars/5.png",
-    "nickname": "귤"
-  },
-  "507177245648093185": {
-    "usertag": "ex7307",
-    "totalSeconds": 8305,
-    "sessions": [
-      {
-        "start": "2026-02-01T13:20:30.410Z",
-        "end": "2026-02-01T15:38:56.152Z",
-        "seconds": 8305,
-        "channelId": "1450028410549174293"
-      }
-    ],
-    "currentStart": null,
-    "currentChannelId": null,
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": "2026-02-01",
-      "streak": 1,
-      "days": {
-        "2026-02-01": {
-          "checkInMs": 1769952030410,
-          "checkIn": "2026-02-01T13:20:30.410Z",
-          "by": "auto"
-        }
-      }
-    },
-    "avatar": "https://cdn.discordapp.com/avatars/507177245648093185/32b9a242186d18f903f18aa41bf4e60b.webp?size=128",
-    "nickname": "믕"
-  },
-  "856206410013868053": {
-    "usertag": "yon_dooh_",
-    "totalSeconds": 5370,
-    "sessions": [
-      {
-        "start": "2026-02-02T01:41:33.498Z",
-        "end": "2026-02-02T03:11:03.922Z",
-        "seconds": 5370,
-        "channelId": "1450028410549174293"
-      }
-    ],
-    "currentStart": 1770031574201,
-    "currentChannelId": "1450028410549174293",
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": "2026-02-02",
-      "streak": 1,
-      "days": {
-        "2026-02-02": {
-          "checkInMs": 1769996493498,
-          "checkIn": "2026-02-02T01:41:33.498Z",
-          "by": "auto"
-        }
-      }
-    },
-    "avatar": "https://cdn.discordapp.com/avatars/856206410013868053/420841a30b1d273ebf45e4d001ad6f31.webp?size=128",
-    "nickname": "y"
-  },
-  "476226483703250956": {
-    "usertag": "wisdomrang",
-    "totalSeconds": 29600,
-    "sessions": [
-      {
-        "start": "2026-02-02T04:38:10.060Z",
-        "end": "2026-02-02T08:49:21.810Z",
-        "seconds": 15071,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-02T09:31:03.268Z",
-        "end": "2026-02-02T13:08:29.901Z",
-        "seconds": 13046,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-03T00:19:05.845Z",
-        "end": "2026-02-03T00:33:13.515Z",
-        "seconds": 847,
-        "channelId": "1450028410549174293"
-      },
-      {
-        "start": "2026-02-03T00:33:21.399Z",
-        "end": "2026-02-03T00:43:57.974Z",
-        "seconds": 636,
-        "channelId": "1450028410549174293"
-      }
-    ],
-    "currentStart": 1770082584461,
-    "currentChannelId": "1450028410549174293",
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": "2026-02-03",
-      "streak": 2,
-      "days": {
-        "2026-02-02": {
-          "checkInMs": 1770007090060,
-          "checkIn": "2026-02-02T04:38:10.060Z",
-          "by": "auto"
-        },
-        "2026-02-03": {
-          "checkInMs": 1770077945845,
-          "checkIn": "2026-02-03T00:19:05.845Z",
-          "by": "auto"
-        }
-      }
-    },
-    "avatar": "https://cdn.discordapp.com/embed/avatars/3.png",
-    "nickname": "말랑"
-  },
-  "972413596464185344": {
-    "userTag": "ryurui_",
-    "totalSeconds": 0,
-    "sessions": [],
-    "currentStart": null,
-    "currentChannelId": null,
-    "goalTodaySec": 0,
-    "attendance": {
-      "lastDay": null,
-      "streak": 0,
-      "days": {}
-    },
-    "avatar": "https://cdn.discordapp.com/avatars/972413596464185344/09bf64252655a5feeec9df60cfe45b52.webp?size=128",
-    "nickname": "부계 날"
-  },
-  "gkdbzl2": {
-    "sessions": [
-      {
-        "start": "2026-02-13T06:35:55.884Z",
-        "end": "2026-02-13T06:35:55.884Z",
-        "seconds": 60,
-        "manual": true,
-        "lastEdit": "2026-02-17T20:04:47.908Z"
-      },
-      {
-        "start": "2026-02-13T06:49:44.656Z",
-        "end": "2026-02-13T06:49:44.656Z",
-        "seconds": 60,
-        "manual": true
-      }
-    ]
-  },
-  "ryurui_gkdbzl2": {
-    "nickname": "gkdbzl2",
-    "sessions": [
-      {
-        "start": "2026-02-13T07:48:58.388Z",
-        "end": "2026-02-13T07:48:58.388Z",
-        "seconds": 60,
-        "manual": true
-      }
-    ]
-  },
-  "ryurui_undefined": {
-    "nickname": "ryurui_undefined",
-    "sessions": [
-      {
-        "start": "2026-02-13T12:14:54.910Z",
-        "end": "2026-02-13T12:14:54.910Z",
-        "seconds": 60,
-        "manual": true
-      },
-      {
-        "start": "2026-02-13T12:14:55.054Z",
-        "end": "2026-02-13T12:14:55.054Z",
-        "seconds": 60,
-        "manual": true
-      },
-      {
-        "start": "2026-02-13T12:16:09.583Z",
-        "end": "2026-02-13T12:16:09.583Z",
-        "seconds": 1800,
-        "manual": true
-      },
-      {
-        "start": "2026-02-13T12:16:09.726Z",
-        "end": "2026-02-13T12:16:09.726Z",
-        "seconds": 1800,
-        "manual": true
-      }
-    ]
-  },
-  "ryurui_날": {
-    "nickname": "날",
-    "sessions": [
-      {
-        "start": "2026-02-13T12:33:10.818Z",
-        "end": "2026-02-13T12:33:10.818Z",
-        "seconds": 600,
-        "manual": true
-      },
-      {
-        "start": "2026-02-14T11:57:36.772Z",
-        "end": "2026-02-14T11:57:36.772Z",
-        "seconds": 240,
-        "manual": true
-      },
-      {
-        "start": "2026-02-14T12:09:21.003Z",
-        "end": "2026-02-14T12:09:21.003Z",
-        "seconds": 180,
-        "manual": true
-      },
-      {
-        "start": "2026-02-14T12:20:51.705Z",
-        "end": "2026-02-14T12:20:51.705Z",
-        "seconds": 300,
-        "manual": true
-      },
-      {
-        "start": "2026-02-14T17:04:16.202Z",
-        "end": "2026-02-14T17:04:16.202Z",
-        "seconds": 60,
-        "manual": true
-      },
-      {
-        "start": "2026-02-15T00:11:03.648Z",
-        "end": "2026-02-15T00:11:03.648Z",
-        "seconds": 60,
-        "manual": true
-      },
-      {
-        "seconds": -60,
-        "manual": true,
-        "start": "2026-02-15T12:06:23.030Z"
-      }
-    ]
-  },
-  "finalUsers": {
-    "ryurui_날": {
+    "743880211547816046": {
+      "avatar": "https://cdn.discordapp.com/avatars/743880211547816046/11c4715db26adaf95d6ce315987fdb88.webp?size=128",
       "nickname": "날",
+      "currentStart": 1772105021887,
       "sessions": [
         {
-          "start": "2026-02-13T14:09:25.504Z",
-          "end": "2026-02-13T14:10:25.504Z",
           "seconds": 60,
-          "manual": true
+          "manual": true,
+          "start": "2026-02-26T16:38:51.941Z",
+          "end": "2026-02-26T16:38:51.941Z"
         },
         {
-          "start": "2026-02-13T14:15:35.554Z",
-          "end": "2026-02-13T14:16:35.554Z",
           "seconds": 60,
-          "manual": true
+          "manual": true,
+          "start": "2026-02-26T17:58:34.815Z",
+          "end": "2026-02-26T17:58:34.815Z"
         },
         {
-          "start": "2026-02-13T14:15:26.029Z",
-          "end": "2026-02-13T14:21:26.029Z",
-          "seconds": 360,
-          "manual": true
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-26T17:58:39.765Z",
+          "end": "2026-02-26T17:58:39.765Z"
         },
         {
-          "start": "2026-02-13T14:36:32.441Z",
-          "end": "2026-02-13T14:38:32.441Z",
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-26T17:59:52.142Z",
+          "end": "2026-02-26T17:59:52.142Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-26T18:00:26.703Z",
+          "end": "2026-02-26T18:00:26.703Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-26T18:03:34.231Z",
+          "end": "2026-02-26T18:03:34.231Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-26T18:05:42.183Z",
+          "end": "2026-02-26T18:05:42.183Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-26T18:09:11.435Z",
+          "end": "2026-02-26T18:09:11.435Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-27T02:09:53.275Z",
+          "end": "2026-02-27T02:09:53.275Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-27T02:57:56.300Z",
+          "end": "2026-02-27T02:57:56.300Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T02:24:07.135Z",
+          "end": "2026-02-28T02:24:07.135Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T02:24:11.875Z",
+          "end": "2026-02-28T02:24:11.875Z"
+        },
+        {
           "seconds": 120,
-          "manual": true
+          "manual": true,
+          "start": "2026-02-28T02:43:07.005Z",
+          "end": "2026-02-28T02:43:07.005Z"
         },
         {
-          "start": "2026-02-13T14:49:29.754Z",
-          "end": "2026-02-13T14:52:29.754Z",
-          "seconds": 180,
-          "manual": true
+          "seconds": 120,
+          "manual": true,
+          "start": "2026-02-28T02:43:13.179Z",
+          "end": "2026-02-28T02:43:13.180Z"
         },
         {
-          "start": "2026-02-13T14:54:41.172Z",
-          "end": "2026-02-13T14:55:41.172Z",
+          "seconds": 120,
+          "manual": true,
+          "start": "2026-02-28T02:44:21.388Z",
+          "end": "2026-02-28T02:44:21.388Z"
+        },
+        {
+          "seconds": 120,
+          "manual": true,
+          "start": "2026-02-28T02:44:27.905Z",
+          "end": "2026-02-28T02:44:27.905Z"
+        },
+        {
+          "seconds": 120,
+          "manual": true,
+          "start": "2026-02-28T02:44:55.307Z",
+          "end": "2026-02-28T02:44:55.307Z"
+        },
+        {
           "seconds": 60,
-          "manual": true
+          "manual": true,
+          "start": "2026-02-28T02:59:01.781Z",
+          "end": "2026-02-28T02:59:01.782Z"
         },
         {
-          "start": "2026-02-13T15:00:44.105Z",
-          "end": "2026-02-13T15:01:44.105Z",
           "seconds": 60,
-          "manual": true
+          "manual": true,
+          "start": "2026-02-28T02:59:06.811Z",
+          "end": "2026-02-28T02:59:06.811Z"
         },
         {
-          "start": "2026-02-13T15:12:39.400Z",
-          "end": "2026-02-13T15:13:39.400Z",
           "seconds": 60,
-          "manual": true
+          "manual": true,
+          "start": "2026-02-28T02:59:54.371Z",
+          "end": "2026-02-28T02:59:54.371Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T03:00:36.401Z",
+          "end": "2026-02-28T03:00:36.401Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T03:10:52.201Z",
+          "end": "2026-02-28T03:10:52.201Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T03:11:14.686Z",
+          "end": "2026-02-28T03:11:14.686Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T03:11:57.767Z",
+          "end": "2026-02-28T03:11:57.767Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T08:25:21.070Z",
+          "end": "2026-02-28T08:25:21.070Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T08:25:25.435Z",
+          "end": "2026-02-28T08:25:25.435Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T08:25:27.752Z",
+          "end": "2026-02-28T08:25:27.752Z"
         }
-      ]
+      ],
+      "totalSeconds": 2280
+    },
+    "449875548139945984": {
+      "avatar": "https://cdn.discordapp.com/avatars/449875548139945984/119d9297da9bcaec3ba0c17732da950b.webp?size=128",
+      "nickname": "망난 공기계"
+    },
+    "476226483703250956": {
+      "avatar": "https://cdn.discordapp.com/embed/avatars/3.png",
+      "nickname": "말랑"
+    },
+    "483561919765282816": {
+      "avatar": "https://cdn.discordapp.com/avatars/483561919765282816/2a470d073fe7d7f3e98752f852064034.webp?size=128",
+      "nickname": "나은"
+    },
+    "507177245648093185": {
+      "avatar": "https://cdn.discordapp.com/avatars/507177245648093185/32b9a242186d18f903f18aa41bf4e60b.webp?size=128",
+      "nickname": "믕"
+    },
+    "738773152401981472": {
+      "avatar": "https://cdn.discordapp.com/avatars/738773152401981472/b42f0828b99d224d4307c82e4af5775f.webp?size=128",
+      "nickname": "망난"
+    },
+    "856206410013868053": {
+      "avatar": "https://cdn.discordapp.com/avatars/856206410013868053/420841a30b1d273ebf45e4d001ad6f31.webp?size=128",
+      "nickname": "y",
+      "sessions": [
+        {
+          "seconds": 7200,
+          "manual": true,
+          "start": "2026-03-01T15:28:58.338Z",
+          "end": "2026-03-01T15:28:58.338Z"
+        }
+      ],
+      "totalSeconds": 7200
+    },
+    "921333313673756692": {
+      "avatar": "https://cdn.discordapp.com/avatars/921333313673756692/2bd0182d1f9953907c5fcba173e3aaee.webp?size=128",
+      "nickname": "노란동그라밍"
+    },
+    "972413596464185344": {
+      "avatar": "https://cdn.discordapp.com/avatars/972413596464185344/09bf64252655a5feeec9df60cfe45b52.webp?size=128",
+      "nickname": "부계 날"
+    },
+    "1158022885458325674": {
+      "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
+      "nickname": "므엥이"
+    },
+    "1232472208727867404": {
+      "avatar": "https://cdn.discordapp.com/avatars/1232472208727867404/ea9ad98b69dbdf7137987f4ccbba4451.webp?size=128",
+      "nickname": "담요"
+    },
+    "1233678136403820565": {
+      "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
+      "nickname": "탐"
+    },
+    "1255709951729602591": {
+      "avatar": "https://cdn.discordapp.com/avatars/1255709951729602591/937c055e9287b405ad154f9b168348d1.webp?size=128",
+      "nickname": "담요"
+    },
+    "1384786633693462549": {
+      "avatar": "https://cdn.discordapp.com/avatars/1384786633693462549/2738e279eec1bf099ea37e07c9234a8b.webp?size=128",
+      "nickname": "말감이"
+    },
+    "1391635736008327169": {
+      "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
+      "nickname": "라오타"
+    },
+    "1450035056021082214": {
+      "avatar": "https://cdn.discordapp.com/avatars/1450035056021082214/edbb3b24a96dc2b05d90ad13dee3867a.webp?size=128",
+      "nickname": "빙수"
+    },
+    "1450371246347911219": {
+      "avatar": "https://cdn.discordapp.com/avatars/1450371246347911219/f7f2e9361e8a54ce6e72580ac7b967af.webp?size=128",
+      "nickname": "일영2"
+    },
+    "1452569229785042954": {
+      "avatar": "https://cdn.discordapp.com/avatars/1452569229785042954/8569adcbd36c70a7578c017bf5604ea5.webp?size=128",
+      "nickname": "능솨"
+    },
+    "1455045474594852936": {
+      "avatar": "https://cdn.discordapp.com/avatars/1455045474594852936/1ec32b1a85e39c0fa3c080b9c1eed0d9.webp?size=128",
+      "nickname": "라해"
+    },
+    "1456972605717221476": {
+      "avatar": "https://cdn.discordapp.com/avatars/1456972605717221476/8569adcbd36c70a7578c017bf5604ea5.webp?size=128",
+      "nickname": "하늘"
+    },
+    "1466022968860737649": {
+      "avatar": "https://cdn.discordapp.com/avatars/1466022968860737649/39f1813c383a5eda16ba8da5efe93f18.webp?size=128",
+      "nickname": "스터디봇"
+    },
+    "users": {
+      "nickname": "users",
+      "avatar": null,
+      "sessions": [
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T02:26:35.864Z",
+          "end": "2026-02-28T02:26:35.864Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T02:26:42.444Z",
+          "end": "2026-02-28T02:26:42.444Z"
+        },
+        {
+          "seconds": 60,
+          "manual": true,
+          "start": "2026-02-28T02:27:02.067Z",
+          "end": "2026-02-28T02:27:02.067Z"
+        }
+      ],
+      "totalSeconds": 240
     }
   },
-  "날": {
-    "sessions": [
-      {
-        "seconds": 120,
-        "manual": true,
-        "start": "2026-02-16T01:20:09.197Z"
-      },
-      {
-        "seconds": 180,
-        "manual": true,
-        "start": "2026-02-17T09:46:31.087Z"
-      },
-      {
-        "seconds": 120,
-        "manual": true,
-        "start": "2026-02-17T10:06:20.387Z"
-      },
-      {
-        "start": "2026-02-17T19:47:44.605Z",
-        "end": "2026-02-17T19:47:44.605Z",
-        "seconds": 180,
-        "manual": true
-      }
-    ]
-  },
-  "400278072613404674": {
-    "avatar": "https://cdn.discordapp.com/avatars/400278072613404674/5dbcfa0ff03ebc4b5905ade877853926.webp?size=128",
-    "nickname": "꿍냐"
-  },
-  "449875548139945984": {
-    "avatar": "https://cdn.discordapp.com/avatars/449875548139945984/119d9297da9bcaec3ba0c17732da950b.webp?size=128",
-    "nickname": "망난 공기계"
-  },
-  "483561919765282816": {
-    "avatar": "https://cdn.discordapp.com/avatars/483561919765282816/2a470d073fe7d7f3e98752f852064034.webp?size=128",
-    "nickname": "나은"
-  },
-  "738773152401981472": {
-    "avatar": "https://cdn.discordapp.com/avatars/738773152401981472/b42f0828b99d224d4307c82e4af5775f.webp?size=128",
-    "nickname": "망난"
-  },
-  "902079248653758554": {
-    "avatar": "https://cdn.discordapp.com/avatars/902079248653758554/3b0669886304c6989dd70cbb53ac61ee.webp?size=128",
-    "nickname": "쭁박"
-  },
-  "921333313673756692": {
-    "avatar": "https://cdn.discordapp.com/avatars/921333313673756692/2bd0182d1f9953907c5fcba173e3aaee.webp?size=128",
-    "nickname": "노란동그라밍"
-  },
-  "1158022885458325674": {
-    "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
-    "nickname": "므엥이"
-  },
-  "1232472208727867404": {
-    "avatar": "https://cdn.discordapp.com/avatars/1232472208727867404/ea9ad98b69dbdf7137987f4ccbba4451.webp?size=128",
-    "nickname": "담요"
-  },
-  "1233678136403820565": {
-    "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
-    "nickname": "탐"
-  },
-  "1391635736008327169": {
-    "avatar": "https://cdn.discordapp.com/embed/avatars/0.png",
-    "nickname": "라오타"
-  },
-  "1450035056021082214": {
-    "avatar": "https://cdn.discordapp.com/avatars/1450035056021082214/edbb3b24a96dc2b05d90ad13dee3867a.webp?size=128",
-    "nickname": "빙수"
-  },
-  "1450371246347911219": {
-    "avatar": "https://cdn.discordapp.com/avatars/1450371246347911219/f7f2e9361e8a54ce6e72580ac7b967af.webp?size=128",
-    "nickname": "일영2"
-  },
-  "1452569229785042954": {
-    "avatar": "https://cdn.discordapp.com/avatars/1452569229785042954/8569adcbd36c70a7578c017bf5604ea5.webp?size=128",
-    "nickname": "능솨"
-  },
-  "1455045474594852936": {
-    "avatar": "https://cdn.discordapp.com/avatars/1455045474594852936/1ec32b1a85e39c0fa3c080b9c1eed0d9.webp?size=128",
-    "nickname": "라해"
-  },
-  "1456972605717221476": {
-    "avatar": "https://cdn.discordapp.com/avatars/1456972605717221476/8569adcbd36c70a7578c017bf5604ea5.webp?size=128",
-    "nickname": "하늘"
-  },
-  "1466022968860737649": {
-    "avatar": "https://cdn.discordapp.com/avatars/1466022968860737649/39f1813c383a5eda16ba8da5efe93f18.webp?size=128",
-    "nickname": "타임코드"
-  }
+  "feed": [
+    {
+      "id": 1772267142754,
+      "userId": "743880211547816046",
+      "nickname": "날",
+      "text": "안뇽",
+      "createdAt": 1772267142754
+    },
+    {
+      "id": 1772117379722,
+      "userId": "1146001494307524638",
+      "nickname": "귤",
+      "text": "똥",
+      "createdAt": 1772117379722
+    },
+    {
+      "id": 1772116988939,
+      "userId": "743880211547816046",
+      "nickname": "날",
+      "text": "ㄴ",
+      "createdAt": 1772116988939
+    },
+    {
+      "id": 1772116376749,
+      "userId": "743880211547816046",
+      "nickname": "날",
+      "text": "ㄴㄴ",
+      "createdAt": 1772116376749
+    },
+    {
+      "id": 1772105548632,
+      "userId": "743880211547816046",
+      "nickname": "날",
+      "text": "ㅇ",
+      "createdAt": 1772105548632
+    },
+    {
+      "id": 1772105141220,
+      "userId": "743880211547816046",
+      "nickname": "날",
+      "text": "안뇽",
+      "createdAt": 1772105141220
+    }
+  ]
 }

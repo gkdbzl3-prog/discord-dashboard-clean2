@@ -45,7 +45,7 @@ window.renderCalendar = function(view, days) {
   cal.innerHTML = '';
 
   days.forEach(d => {
-    const hours = Math.floor(d.totalSec / 3600);
+    const hours = Math.floor(d.totalSeconds / 3600);
 
     cal.innerHTML += `
       <div class="day" onclick="showDayDetail('${d.dayKey}')">
@@ -69,21 +69,7 @@ window.formatTime = function (sec) {
 }
 
 
-window.renderToday = function(data) {
 
-  const badgeRow = document.querySelector('.badge-row');
-const user = data.finalUsers?.[0]
-
-  badgeRow.innerHTML = `
-${user.badge ? `<span class="text-orange-500 font-bold">${user.badge}</span>` : ""} 
-${data.isStudying ? '진행중' : '종료'}
-    <span class="badge blue">
-      ${formatTime(data.todaysec)}
-    </span>
-  `;
-const grid = document.getElementById("dayseGrid");
-if (!grid) return;
-}
 
 
 window.renderUserProgress = function(finalUsers) {
@@ -128,8 +114,8 @@ if (!window.token) return;
 };
 
 window.renderMonthSummary = function (days) {
-  const totalSec = days.reduce((sum, d) => sum + d.totalSec, 0);
-  const h = Math.floor(totalSec / 3600);
+  const totalSeconds = days.reduce((sum, d) => sum + d.totalSeconds, 0);
+  const h = Math.floor(totalSeconds / 3600);
 
   document.querySelector('.month-label').textContent = '이번 달';
   document.querySelector('.month-total').textContent = `${h}시간`;
@@ -142,7 +128,7 @@ window.renderMonthSummary = function (days) {
 
 window.showDays = async function(view) {
 await window.loadUsers();
-const users = window.usersCache;
+const { usersCache } = await window.API.fetch("/days");
 const data = await window.API.fetch("/days");
 if (!view) return;
 if (!window.token) return;
@@ -165,10 +151,10 @@ if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
 
 
 window.showDayDetail = async function(dayKey) {
-await window.loadUsers();
+await window.loadusers();
     const view = document.getElementById("view");
 await window.loadUsers();
-const users = window.usersCache;
+window.loadUsers = window.usersCache;
 if (!view) return;
   const detail = document.querySelector('.day-detail');
 
@@ -202,7 +188,7 @@ if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
           <h4>📅 ${dayKey}</h4>
           ${day.users.map(u => `
             <div class="detail-row">
-          <img src="${user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}"
+      
               <span>${user.name}</span>
               <span>${Math.floor((u.todaySec || 0)/60)}분</span>
             </div>
@@ -211,16 +197,18 @@ if (!r.ok) throw new Error('서버 응답이 없습니다 (404/500)');
       `;
 
 const tbody = document.getElementById("days-tbody");
+const DEFAULT_AVATAR = "https://cdn.discordapp.com/embed/avatars/0.png";
 if (!tbody) return;
 tbody.innerHTML = days.map(d => `
   <tr>
     <td>
       ${(d.users| []).map(user => `
-        <img src="${user.avatar || '기본이미지'}" class="w-6 h-6 rounded-full" />
+       <img src="${user.avatar || DEFAULT_AVATAR}"
+     onerror="this.src='${DEFAULT_AVATAR}'"/>
       `).join("")}
       ${d.dayKey}
     </td>
-    <td>${(d.totalSec / 3600).toFixed(1)}h</td>
+    <td>${(d.totalSeconds / 3600).toFixed(1)}h</td>
   </tr>
 `).join("");
     })
@@ -263,7 +251,7 @@ if (!el) return;  if (!el) return;
         ${data.online?.length ? '진행중' : '휴식'}
       </span>
       <span class="badge blue">
-        ${Math.floor(data.totalSec / 3600)}h
+        ${Math.floor(data.totalSeconds / 3600)}h
       </span>
     </div>
 

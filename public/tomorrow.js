@@ -6,7 +6,7 @@
 window.showTomorrow = async function () {
 
 await window.loadUsers();
-const users = window.usersCache; // usersCache 채움
+const { users } = await window.API.fetch("/today");
 
 const view = document.getElementById("view");
   if (!view) return;
@@ -18,6 +18,11 @@ const view = document.getElementById("view");
   `;
 
   const grid = document.getElementById("tomorrowGrid");
+const DEFAULT_AVATAR = "https://cdn.discordapp.com/embed/avatars/0.png";
+const avatarUrl =
+  user.avatar && user.avatar !== "null"
+    ? user.avatar
+    : DEFAULT_AVATAR;
   if (!grid) return;
 
 
@@ -27,11 +32,9 @@ const view = document.getElementById("view");
     grid.innerHTML = users.map(u => `
  <div style="display:flex; flex-wrap:wrap; gap:6px; max-width:200px;">
   ${(d.users || []).map(u => `
-    <img 
-      src="${u.avatar || defaultAvatar}" 
-      style="width:28px; height:28px; border-radius:50%; object-fit:cover;"
-      onerror="this.src='${defaultAvatar}'"
-    >
+   <img class="avatar"
+     src="${avatarUrl}"
+     onerror="this.src='${DEFAULT_AVATAR}'">
   `).join("")}
 </div>
               <select id="todayUserSelect">

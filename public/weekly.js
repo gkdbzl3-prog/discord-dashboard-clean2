@@ -6,11 +6,13 @@ if (!window.token) {
     localStorage.getItem("adminToken");
 }
 
-const defaultAvatar = "https://cdn.discordapp.com/embed/avatars/0.png";
+
+
+
 
 window.showWeekly = async function () {
 await window.loadUsers();
-const users = window.usersCache;
+const { users } = await window.API.fetch("/weekly");
   const view = document.getElementById("view");
   if (!view) return;
 
