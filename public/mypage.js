@@ -38,9 +38,13 @@ window.showMyPage = async function (userId) {
   const view = document.getElementById("view");
   if (!view) return;
 
-  const users = await window.API.fetch("/mypage");
+  const todayData = await window.API.fetch("/today");
+  const rawUsers = todayData?.users || {};
+  const users = Array.isArray(rawUsers)
+    ? rawUsers
+    : Object.entries(rawUsers).map(([id, u]) => ({ id, ...u }));
 
-  const user = data.find(u => u.id === userId);
+  const user = users.find(u => u && String(u.id) === String(userId));
 
   if (!user) {
     console.log("유저 못 찾음");
