@@ -4,6 +4,24 @@ if (!window.token) {
     localStorage.getItem("adminToken");
 }
 
+window.normalizeUsersArray = function(rawUsers) {
+  if (Array.isArray(rawUsers)) {
+    return rawUsers.filter(Boolean);
+  }
+
+  return Object.entries(rawUsers || {})
+    .map(([id, user]) => ({ id, ...user }))
+    .filter(u => u && u.id);
+};
+
+window.buildUsersCache = function(rawUsers) {
+  const cache = {};
+  window.normalizeUsersArray(rawUsers).forEach(u => {
+    cache[String(u.id)] = u;
+  });
+  return cache;
+};
+
 
 
 
@@ -326,30 +344,39 @@ const DEFAULT_AVATAR = "https://cdn.discordapp.com/embed/avatars/0.png";
 
 window.showToday = async function () {
 
-console.log("🔥 showToday called");
+console.log("?? showToday called");
 let nicknameFromUrl = params.get("nickname");
 
-if (!nicknameFromUrl) {
-  nicknameFromUrl = localStorage.getItem("nickname");
-}
+if (window.isLoadingToday) return;
+window.isLoadingToday = true;
 
-if (nicknameFromUrl) {
-  localStorage.setItem("nickname", nicknameFromUrl);
-}
-  const res = await fetch(`/today?token=${window.token}`);
- const data = await window.API.fetch('/today');
+try {
+  if (!nicknameFromUrl) {
+    nicknameFromUrl = localStorage.getItem("nickname");
+  }
 
-window.usersCache = data.users;
-  const users = data.users || {};
+  if (nicknameFromUrl) {
+    localStorage.setItem("nickname", nicknameFromUrl);
+  }
 
-  const userEntries = Object.entries(users);
-const usersObj = data.users || {};
-const userIds = Object.keys(usersObj);
+  const data = await window.API.fetch("/today");
+  const rawUsers = data.users || {};
+  const users = Array.isArray(rawUsers)
+    ? rawUsers
+    : Object.entries(rawUsers).map(([id, user]) => ({ id, ...user }));
 
-if (userIds.length > 0) {
-  window.currentUserId = userIds[0];
-}
-  // 🔥 닉네임으로 userId 찾기
+  window.usersCache = users.reduce((acc, user) => {
+    if (user && user.id) acc[String(user.id)] = user;
+    return acc;
+  }, {});
+
+  const userEntries = users.map(user => [String(user.id), user]);
+  const userIds = userEntries.map(([id]) => id);
+
+  if (userIds.length > 0) {
+    window.currentUserId = userIds[0];
+  }
+
   let foundUserId = null;
 
   if (nicknameFromUrl) {
@@ -361,35 +388,33 @@ if (userIds.length > 0) {
     }
   }
 
-  // 🔥 못 찾으면 첫 번째 유저
   if (!foundUserId && userEntries.length > 0) {
     foundUserId = userEntries[0][0];
   }
 
   window.currentUserId = foundUserId;
-  window.currentNickname = users[foundUserId]?.name || null;
+  window.currentNickname = window.usersCache[foundUserId]?.name || null;
 
   console.log("currentUserId:", window.currentUserId);
 
   const view = document.getElementById("view");
 
   view.innerHTML = `
-    ${window.renderDashboard(Object.values(users))}
+    ${window.renderDashboard(users)}
     <div id="activityCard" class="activity-card">
       <h3>Activity Feed</h3>
       <div class="feed-container"></div>
     </div>
   `;
 
-  window.renderFeed(data.feed, users);
+  window.renderFeed(data.feed, window.usersCache);
   attachUserCardEvents();
-attachMemoEnter();
-
-
+  attachMemoEnter();
+} finally {
+  window.isLoadingToday = false;
+}
 
 };
-
-
 window.attachUserCardEvents = function () {
  document.querySelectorAll(".user-card").forEach(card => {
     card.addEventListener("click", () => {

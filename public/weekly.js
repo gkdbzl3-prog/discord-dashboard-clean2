@@ -12,7 +12,6 @@ if (!window.token) {
 
 window.showWeekly = async function () {
 await window.loadUsers();
-const { users } = await window.API.fetch("/weekly");
   const view = document.getElementById("view");
   if (!view) return;
 
@@ -35,6 +34,11 @@ const { users } = await window.API.fetch("/weekly");
   try {
     const data = await window.API.fetch("/weekly");
     const days = data.days || [];
+    const weeklyUsers = Array.isArray(data.users)
+      ? data.users
+      : Object.values(data.users || {});
+    const defaultAvatar =
+      "https://cdn.discordapp.com/embed/avatars/0.png";
 
     const today = new Date();
     const last7 = days.filter(d => {
@@ -83,8 +87,8 @@ const { users } = await window.API.fetch("/weekly");
           <td class="py-2">
             <select id="todayUserSelect">
   <option value="">Nickname</option>
-  ${users.map(u => `
-    <option value="${u.id}">${u.name}</option>
+  ${weeklyUsers.map(user => `
+    <option value="${user.id}">${user.name}</option>
   `).join("")}
 </select>
 
