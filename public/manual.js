@@ -26,7 +26,7 @@ window.formatTimeHM = function(totalSeconds) {
 
 window.showManualModal = async function() {
 
-stopLiveCounter();
+if (typeof window.stopLiveCounter === "function") window.stopLiveCounter();
   if (window.liveCounter) {
     clearInterval(window.liveCounter);
     window.liveCounter = null;
@@ -38,7 +38,7 @@ stopLiveCounter();
     }
 
     // 유저 목록 로드
-    if (!window.usersCache || window.usersCache.length === 0) {
+    if (!window.usersCache || Object.keys(window.usersCache).length === 0) {
         await window.loadUsers();
     }
 
@@ -86,7 +86,7 @@ const users = Object.values(window.usersCache || {});
         </div>
     `;
 
-  console.log(document.getElementById("manualModal").style.display);
+  const manualModalEl = document.getElementById("manualModal"); if (manualModalEl) console.log(manualModalEl.style.display);
     // ===== 숫자 증감 버튼 =====
     const minusBtn = overlay.querySelector('.num-btn.minus');
     const plusBtn = overlay.querySelector('.num-btn.plus');

@@ -127,7 +127,7 @@ setInterval(() => {
         : DEFAULT_AVATAR;
 
     return `
-      <div class="user-card" data-nickname="${user.name}"  data-start="${user.currentStart || ''}"
+      <div class="user-card" data-id="${user.id}" data-nickname="${user.name}"  data-start="${user.currentStart || ''}"
      data-seconds="${user.seconds || 0}">
         <img class="avatar" src="${avatarUrl}">
         <div class="user-name-row">
@@ -418,9 +418,9 @@ try {
 window.attachUserCardEvents = function () {
  document.querySelectorAll(".user-card").forEach(card => {
     card.addEventListener("click", () => {
-      const nickname = card.dataset.nickname;
-      window.currentNickname = nickname;
-      window.showToday();
+      const id = card.dataset.id;
+      if (!id) return;
+      window.showMyPage(id);
     });
   });
 }

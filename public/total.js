@@ -44,7 +44,7 @@ if (mode === 'weekly') {
 
     } else {
 
-      Object.values(rawData || {}).forEach(u => {
+      (Array.isArray(rawData.users) ? rawData.users : Object.values(rawData.users || {})).forEach(u => {
         const id = u.id || u.userId;
         if (!id) return;
 
