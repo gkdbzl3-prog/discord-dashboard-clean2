@@ -208,7 +208,7 @@ const avatarUrl =
 
   <div class="feed-left">
     <div class="feed-avatar">
-      <img src="${avatarUrl}" />
+      <img src="${avatarUrl}" onclick="window.showMyPage('${item.userId}')" />
     </div>
 
     <div class="feed-main">

@@ -7,7 +7,14 @@ const qsToken = new URLSearchParams(location.search).get("token");
 if (qsToken) localStorage.setItem("adminToken", qsToken);
 
 
-
+Object.defineProperty(window, "currentUser", {
+  set(value) {
+    this._currentUser = value;
+  },
+  get() {
+    return this._currentUser;
+  }
+});
 
 let nicknameFromUrl = params.get("nickname"); // 🔥 통일
 
@@ -41,21 +48,35 @@ window.formatTimeAgo = function (dateString) {
 
 window.API = window.API || {};
 
-// script.js 내 API 정의 부분
-window.API = {
-    fetch: async function(path) {
-        // path 정의: 전달받은 경로에 인코딩된 토큰을 합칩니다.
-        const separator = path.includes('?') ? '&' : '?';
-        const fullPath = `${path}${separator}token=${encodeURIComponent(window.token)}`;
-        
-        console.log("🚀 최종 요청 Path:", fullPath); // 로그로 확인 가능
 
-        const res = await fetch(fullPath);
-        if (!res.ok) throw new Error("API error");
-        return await res.json();
-    }
+window.ADMIN_TOKEN = "쪼쪼쪼각할모방";
+
+window.API.fetch = async function (url) {
+
+  const res = await fetch(
+    `${url}?token=${window.ADMIN_TOKEN}`
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("API 오류:", text);
+    throw new Error("API failed");
+  }
+
+  return res.json();
 };
 
+window.API.post = async function(url, body) {
+
+
+  const res = await fetch(`${url}?token=${window.token}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  return await res.json();
+};
 
 window.currentUserId = null;
 
@@ -69,39 +90,36 @@ document.documentElement.appendChild(toastRoot);
 
 
 
-
-
 window.loadUsers = async function () {
+
   const data = await window.API.fetch("/today");
+const DEFAULT_AVATAR =
+    "https://cdn.discordapp.com/embed/avatars/0.png";
+  const rawUsers = data.users || {};
+const EXCLUDED_IDS = [
+  "users",
+  "146602968860737649" // 🔥 실제 스터디봇 ID
+];
 
-  if (!data || typeof data !== "object") {
-    console.error("loadUsers: invalid data", data);
-    window.usersCache = [];
-    return;
-  }
+const EXCLUDED_NAMES = [
+  "스터디봇",
+  "users"
+];
 
-  if (Array.isArray(data)) {
-    console.error("loadUsers: /today returned ARRAY. 서버 응답 형태가 잘못됨", data);
-    window.usersCache = [];
-    return;
-  }
-
-  window.usersCache = Object.entries(data).map(([id, user]) => ({
-    id: String(id),
-    name: user?.nickname || user?.usertag || user?.username || String(id),
-    avatar: user?.avatar || window.defaultAvatar,
-    sessions: Array.isArray(user?.sessions) ? user.sessions : [],
-    totalSeconds: user?.totalSeconds || 0,
-    online: !!user?.currentStart,
+const list = Object.entries(rawUsers)
+  .filter(([id, user]) =>
+    !EXCLUDED_IDS.includes(id) &&
+    !EXCLUDED_NAMES.includes(user.name)
+  )
+  .map(([id, user]) => ({
+    id,
+    name: user.name || "이름없음",
+    avatar: user.avatar || DEFAULT_AVATAR,
+    sessions: user.sessions || [],
+    totalSeconds: user.totalSeconds || 0,
+    currentStart: user.currentStart || null
   }));
 }
-
-window.loadMyPageUsers = async function () {
-  return await window.API.fetch("/mypage");
-};
- 
-
-
 
 
 
@@ -268,23 +286,17 @@ const fabMenu = document.getElementById("fab-menu");
         };
     }
 
-fabMemo.addEventListener("click", () => {
-  window.showMemo();
-  fabContainer.classList.remove("open");
-});
 
-document.addEventListener("click", (e) => {
-  if (e.target.classList.contains("heart-btn")) {
-    e.target.classList.toggle("liked");
-    e.target.classList.add("heart-pop");
 
-    setTimeout(() => {
-      e.target.classList.remove("heart-pop");
-    }, 300);
-  }
-});
+  if (fabMemo) fabMemo.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.saveSimpleMemo();
+    }
+  });
 
-fabEdit.addEventListener("click", (e) => {
+if (fabEdit) fabEdit.addEventListener("click", (e) => {
   e.stopPropagation();   // 🔥 핵심
   e.preventDefault();
   window.showManualModal();
@@ -333,21 +345,76 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-
+document.getElementById("recordInput")?.setAttribute("spellcheck", "false");
+document.getElementById("memo-editor")?.setAttribute("spellcheck", "false");
 
 });
 
 
 window.showToast = function(message, type = "success") {
 
-  const existing = document.querySelector(".toast");
-  if (existing) existing.remove();
+  let root = document.getElementById("toast-root");
+
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "toast-root";
+    document.body.appendChild(root);
+  }
 
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
   toast.textContent = message;
 
-  document.body.appendChild(toast);
+  root.appendChild(toast);
 
-  setTimeout(() => toast.remove(), 2500);
+  setTimeout(() => {
+    toast.remove();
+  }, 2500);
+};
+
+window.showInputModal = function (message, onConfirm) {
+
+  const overlay = document.createElement("div");
+  overlay.className = "app-overlay";
+
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <p>${message}</p>
+      <input type="number" id="modalInput" min="1" value="1" />
+      <div class="modal-buttons">
+        <button id="inputCancel">취소</button>
+        <button id="inputOk">확인</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector("#modalInput");
+  const okBtn = overlay.querySelector("#inputOk");
+  const cancelBtn = overlay.querySelector("#inputCancel");
+
+  input.focus();
+  input.select();
+
+  okBtn.onclick = () => {
+    const value = input.value;
+    if (!value || value <= 0) {
+      window.showToast("올바른 숫자를 입력해주세요", "error");
+      return;
+    }
+    onConfirm(Number(value));
+    overlay.remove();
+  };
+
+  cancelBtn.onclick = () => {
+    overlay.remove();
+  };
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      okBtn.click();
+    }
+  });
 };
