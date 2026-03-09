@@ -47,6 +47,10 @@ window.applyTodayUsers = function (rawUsers) {
   usersArray.forEach((u) => {
     if (!u || !u.id) return;
     u.isOnline = window.isUserOnline(u);
+    u._lastSeenAt = Date.now();
+    if (u.isOnline && !Number.isFinite(Number(u.currentStart))) {
+      u.currentStart = Date.now();
+    }
     window.usersCache[u.id] = u;
   });
 };
@@ -96,9 +100,8 @@ window.renderDashboard = function() {
       : '<span class="online-dot offline"></span>';
 
     const todaySeconds = getTodaySeconds(user);
-
     const todayText = formatTime(todaySeconds);
-    const totalAllText = formatTime(user.totalSeconds || 0);
+    const totalAllText = formatTime(getLiveTotalSeconds(user));
 
     const DEFAULT_AVATAR =
       "https://cdn.discordapp.com/embed/avatars/0.png";
@@ -137,34 +140,6 @@ window.renderDashboard = function() {
 
 
 
- document.querySelectorAll(".user-card").forEach(card => {
-
-    const userId = card.dataset.id;
-    const user = window.usersCache[userId];
-    if (!user) return;
-
-    
-localStorage.setItem("studyStart", Date.now());
-
-
-
-  const todaySeconds = getTodaySeconds(user);
-
-
-const hours = Math.floor(todaySeconds / 3600);
-const minutes = Math.floor((todaySeconds % 3600) / 60);
-
-const timeText =
-  hours > 0
-    ? `${hours}시간 ${minutes}분`
-    : `${minutes}분`;
-   const meta = card.querySelector(".user-meta");
-if (meta) meta.textContent = `오늘 ${timeText}`;
-   
-
-
-
-  });
 const today = new Date().toLocaleDateString("ko-KR", {
     month: "long",
     day: "numeric",
@@ -263,17 +238,34 @@ window.getTodaySeconds = function (user) {
   return todaySeconds;
 };
 
+window.getLiveTotalSeconds = function (user) {
+  if (!user) return 0;
+  let total = Number(user.totalSeconds || 0);
+  if (!Number.isFinite(total) || total < 0) total = 0;
+
+  if (window.isUserOnline(user)) {
+    const start = Number(user.currentStart);
+    if (Number.isFinite(start) && start > 0) {
+      total += Math.max(0, Math.floor((Date.now() - start) / 1000));
+    }
+  }
+  return total;
+};
+
 
 window.startDashboardInterval = function () {
 
   if (window.dashboardInterval) return;
 
   window.dashboardInterval = setInterval(async () => {
-
-    const rawData = await window.API.fetch("/today");
-    window.applyTodayUsers(rawData.users);
-    window.renderDashboard();
-    window.updateOnlineStatus(rawData.users);
+    try {
+      const rawData = await window.API.fetch("/today");
+      window.applyTodayUsers(rawData.users);
+      window.renderDashboard();
+      window.updateOnlineStatus(rawData.users);
+    } catch (err) {
+      console.error("dashboard polling failed:", err);
+    }
 
   }, 5000);
 
@@ -303,7 +295,7 @@ window.updateDashboardLiveCounters = function () {
     if (!card) return;
 
     const todayText = formatTime(getTodaySeconds(user));
-    const totalAllText = formatTime(user.totalSeconds || 0);
+    const totalAllText = formatTime(getLiveTotalSeconds(user));
 
     const meta = card.querySelector(".user-meta");
     if (meta) meta.textContent = `오늘 ${todayText}`;
