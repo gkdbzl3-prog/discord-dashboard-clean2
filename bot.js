@@ -256,12 +256,12 @@ client.on("error", err => {
 
 
 channel.members.forEach(member => {
-  if (!member.user.bot && member.voice.selfVideo) {
-    if (data.users[member.id]) {
-      data.users[member.id].currentStart = now;
-      data.users[member.id].eventStart = now;
-      console.log("재시작 동기화 → 온라인:", member.user.username);
-    }
+  if (member.user.bot) return;
+  const user = ensureUserExists(data, member);
+  if (member.voice.selfVideo) {
+    user.currentStart = now;
+    user.eventStart = now;
+    console.log("재시작 동기화 → 온라인:", member.user.username);
   }
 });
 
