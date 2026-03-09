@@ -6,6 +6,9 @@
 app = 'zzozzozzo'
 primary_region = 'nrt'
 
+[env]
+  DATA_FILE = '/data/data.json'
+
 [http_service]
   internal_port = 8080
   force_https = true
@@ -18,3 +21,7 @@ primary_region = 'nrt'
   memory = '1gb'
   cpus = 1
   memory_mb = 1024
+
+[[mounts]]
+  source = 'dashboard_data'
+  destination = '/data'

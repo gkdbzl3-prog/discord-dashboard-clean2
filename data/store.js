@@ -1,7 +1,9 @@
 ﻿// data/store.js
 const fs = require('fs');
 const path = require('path');
-const DATA_FILE = path.join(__dirname, 'data.json');
+const DATA_FILE = process.env.DATA_FILE
+  ? path.resolve(process.env.DATA_FILE)
+  : path.join(process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname, 'data.json');
 const DATA_DIR = path.dirname(DATA_FILE);
 const LOCK_FILE = `${DATA_FILE}.lock`;
 
