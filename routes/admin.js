@@ -1,539 +1,550 @@
-
-const express = require('express');
+﻿const express = require('express');
 const { loadData, saveData } = require('../data/store');
 
 module.exports = function createAdminRouter(client) {
-console.log("ADMIN ROUTER LOADED");
   const router = express.Router();
 
-
-
-
-
-const USER_REGISTRY = [
-    { nickname: "날" }, { nickname: "부계 날" }, { nickname: "탐" },
-    { nickname: "망난" }, { nickname: "나은" }, { nickname: "하늘" },
-    { nickname: "믕" }, { nickname: "말감이" }, { nickname: "y" },
-    { nickname: "라해" }, { nickname: "능솨" }, { nickname: "노란동그라밍" },
-    { nickname: "담요" }, { nickname: "라오타" }, { nickname: "일영" },
-    { nickname: "므엥이" }, { nickname: "꿍냐" }, { nickname: "귤" },
-    { nickname: "빙수" }
-];
-
-
-router.get("/today", (req, res) => {
-
-  const token = req.query.token;
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ error: "invalid token" });
-  }
-
-  try {
-
-const data = loadData();
-
-const usersData = data.users || {};
-const result = {};
-
-Object.entries(usersData).forEach(([userId, user]) => {
-result[userId] = {
-  id: userId,
-  name: user.nickname || "알 수 없음",
-  avatar: user.avatar,
-  seconds: 0,
-  online: user.currentStart ? true : false,
-  sessions: user.sessions || [],        // 🔥 추가
-  totalSeconds: user.totalSeconds || 0  // 🔥 추가
-
-};
-});
-
-res.json({
-  users: result,
-  feed: data.feed || []
-});
-
-  } catch (err) {
-    console.error("❌ today 라우터 오류:", err);
-    res.status(500).json({ error: "server error" });
-  }
-
-});
-
-
-// --- Weekly 라우터 수정 ---
-router.get('/weekly', (req, res) => {
-  try {
-    const data = loadData();
-    const result = [];
-    Object.entries(data).forEach(([userId, user]) => {
-      if (!user.sessions) return;
-      user.sessions.forEach(s => {
-        const dayKey = s.start?.slice(0, 10);
-        if (!dayKey) return;
-        let day = result.find(d => d.dayKey === dayKey);
-        if (!day) {
-          day = { dayKey, totalSeconds: 0, users: [] };
-          result.push(day);
-        }
-
-        let existingUser = day.users.find(u => u.id === userId);
-        if (!existingUser) {
-          day.users.push({
-            id: userId, // 클릭 이벤트를 위해 ID 필수!
-            name: user.nickname || user.usertag || user.username || userId,
-            avatar: user.avatar ,
-            seconds: s.seconds || 0 // 처음 세션 시간 할당
-          });
-        } else {
-          existingUser.seconds += (s.seconds || 0); // 기존 시간에 합산
-        }
-        day.totalSeconds += (s.seconds || 0);
-      });
-    });
-    res.json({ days: result });
-  } catch (err) {
-    res.status(500).json({ error: "서버 오류" });
-  }
-});
-
-
-
-
-router.get("/dashboard", (req, res) => {
-  const token = req.query.token;
-
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ error: "invalid token" });
-  }
-
-  const data = loadData() || {};
-
-  const finalUsers = Object.entries(data).map(([userId, user]) => ({
-    id: userId,
-    name: user.nickname || user.usertag || user.username || userId,
-    badge: (user.attendance?.streak || 0) >= 7 ? "🔥 7일 달성" : null,
-    avatar: user.avatar,
-    totalSeconds: user.totalSeconds || 0,
-    goalSec: user.goalSec ?? 3600,
-    streak: user.attendance?.streak || 0,
-    online: !!user.currentStart,
-    sessions: user.sessions || [],
-  }));
-
-  return res.json({ users: finalUsers });
-});
-
-
-
-
-// 🔹 DAYS (total용)
-router.get('/days', (req, res) => {
-  try {
-    const data = loadData();
-    const result = [];
-
-    Object.entries(data).forEach(([userId, user]) => {
-      if (!user.sessions) return;
-
-      user.sessions.forEach(s => {
-        const dayKey = s.start?.slice(0, 10);
-        if (!dayKey) return;
-
-        let day = result.find(d => d.dayKey === dayKey);
-        if (!day) {
-          day = { dayKey, totalSeconds: 0, users: [] };
-          result.push(day);
-        }
-
-        day.totalSeconds += s.seconds || 0;
-
-        if (!day.users.some(u => u.id === userId)) {
-          day.users.push({
-            id: userId,
-            name: user.nickname || user.usertag || user.username || userId,
-             avatar: user.avatar ,
-            seconds: s.seconds || 0
-          });
-        }
-      });
-    });
-
-    res.json({ days: result });
-  } catch (err) {
-    res.status(500).json({ err: "서버 오류" });
-  }
-});
-
-
-// 세션 삭제
-router.post('/delete-session', (req, res) => {
-  const { token, userId, index } = req.body;
-
-  console.log("🔍 삭제 요청 받음:");
-  console.log("  token:", token ? "있음" : "없음");
-  console.log("  index:", index, typeof index);
-
-  // 토큰 체크
-  if (token !== process.env.ADMIN_TOKEN) {
-    console.error("❌ 토큰 불일치");
-    return res.status(403).json({ ok: false, error: "Invalid token" });
-  }
-
-  const data = loadData();
-  console.log("📂 현재 데이터의 유저 목록:", Object.keys(data));
-
-  // userId가 데이터에 있는지 확인
-  if (!data.users[userId]) {
-    console.error(`❌ 유저를 찾을 수 없음: ${userId}`);
-    console.log("  사용 가능한 유저:", Object.keys(data));
-    return res.status(404).json({ 
-      ok: false, 
-      error: "User not found",
-      availableUsers: Object.keys(data)
-    });
-  }
-
-  // 세션 배열이 있는지 확인
-  if (!data.users[userId].sessions) {
-    console.error(`❌ 유저(${userId})에게 세션 배열이 없음`);
-    return res.status(404).json({ ok: false, error: "No sessions array" });
-  }
-
-  // 인덱스가 유효한지 확인
-  if (index < 0 || index >= data.users[userId].sessions.length) {
-    console.error(`❌ 잘못된 인덱스: ${index} (전체 세션 수: ${data.users[userId].sessions.length})`);
-    return res.status(404).json({ 
-      ok: false, 
-      error: "Invalid index",
-      sessionCount: data.users[userId].sessions.length
-    });
-  }
-
-  // 삭제 전 로그
-  console.log(`🗑️ 삭제할 세션:`, data.users[userId].sessions[index]);
-  
-  // 세션 삭제
-  data.users[userId].sessions.splice(index, 1);
-  
-  saveData(data);
-  console.log(`✅ 삭제 완료: ${userId}의 세션 ${index}번`);
-  
-  return res.json({ ok: true });
-});
-
-// 세션 수정
-router.post('/edit-session', (req, res) => {
-  const { token, userId, index, newSeconds, editTime } = req.body;
-
-  console.log("🔍 수정 요청 받음:");
-  console.log("  token:", token ? "있음" : "없음");
-  console.log("  index:", index, typeof index);
-  console.log("  newSeconds:", newSeconds);
-
-  // 토큰 체크
-  if (token !== process.env.ADMIN_TOKEN) {
-    console.error("❌ 토큰 불일치");
-    return res.status(403).json({ ok: false, error: "Invalid token" });
-  }
-
-  const data = loadData();
-  const user = data.find(u => u.id === userId);
-
-  if (!user) {
-    console.error(`❌ 유저를 찾을 수 없음: ${userId}`);
-    return res.status(404).json({ 
-      ok: false, 
-      error: "User not found",
-      availableUsers: Object.keys(data)
-    });
-  }
-
-  if (!user.sessions) {
-    console.error(`❌ 유저(${userId})에게 세션 배열이 없음`);
-    return res.status(404).json({ ok: false, error: "No sessions array" });
-  }
-
-  if (index < 0 || index >= user.sessions.length) {
-    console.error(`❌ 잘못된 인덱스: ${index}`);
-    return res.status(404).json({ 
-      ok: false, 
-      error: "Invalid index",
-      sessionCount: user.sessions.length
-    });
-  }
-
-  // 수정 전 로그
-  console.log(`✏️ 수정 전:`, user.sessions[index]);
-  
-  // 세션 수정
-  user.sessions[index].seconds = Number(newSeconds);
-  user.sessions[index].lastEdit = editTime || new Date().toISOString();
-  
-  saveData(data);
-  console.log(`✅ 수정 완료:`, user.sessions[index]);
-  
-  res.json({ ok: true });
-});
-
-// 🔹 MYPAGE
-
-router.get('/mypage', (req, res) => {
-  try {
+  function readData() {
     const data = loadData() || {};
-
-    const finalUsers = Object.entries(data).map(([userId, user = {}]) => ({
-      id: userId,
-      name: user.nickname || user.usertag || user.username || userId,
-      badge:
-        (user.attendance?.streak ?? 0) >= 7
-          ? "🔥 7일 달성"
-          : null,
-      avatar: user.avatar || null,
-      totalSeconds: user.totalSeconds || 0,
-      goalSec: user.goalSec ?? 3600,
-      streak: user.attendance?.streak ?? 0,
-      online: !!user.currentStart
-    }));
-
-    console.log("MYPAGE RESPONSE:", finalUsers); // 여기로 이동
-
-    res.json(finalUsers);
-
-  } catch (err) {
-    console.error("MYPAGE ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-
-
-
-
-// 서버 라우터 코드
-router.get('/manual-data', (req, res) => {
-console.log("🔥 manual-data GET 호출됨");
-  const token = req.query.token;
-
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ error: "Invalid token" });
+    if (!data.users || typeof data.users !== 'object') data.users = {};
+    if (!Array.isArray(data.feed)) data.feed = [];
+    return data;
   }
 
-  const data = loadData();
-  const users = data.users || {};
-console.log("GET에서 읽은 데이터:", data.users);
-
-console.log("GET에서 읽은 users:", data.users);
-  const result = Object.entries(users).map(([userId, user]) => ({
-    id: userId,
-    name: user.nickname || userId,
-    avatar: user.avatar || null,
-    sessions: user.sessions || [],
-    totalSeconds: user.totalSeconds || 0
-  }));
-
-  res.json(result);
-});
-
-router.post('/manual-data', (req, res) => {
-
-  const { token, userId, minutes } = req.body;
-
-  // 토큰 체크
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ ok: false, error: "Invalid token" });
+  function isTokenInvalid(req) {
+    const token = req.query?.token || req.body?.token;
+    return !!(token && token !== process.env.ADMIN_TOKEN);
   }
 
-  const data = loadData();
-console.log("저장 직전 데이터:", data.users[userId]);
-
-console.log("GET에서 읽은 users:", data.users);
-  if (!data.users[userId]) {
-    data.users[userId] = {
-      nickname: userId,
-      avatar: null,
-      sessions: [],
-      totalSeconds: 0
-    };
+  function userNameOf(user, userId) {
+    return user?.nickname || user?.name || user?.username || userId;
   }
 
-  if (!data.users[userId].sessions) {
-    data.users[userId].sessions = [];
+  function secondsOf(s) {
+    const direct = Number(s?.seconds || 0);
+    if (Number.isFinite(direct) && direct > 0) return Math.floor(direct);
+    const startMs = typeof s?.start === 'number' ? s.start : new Date(s?.start).getTime();
+    const endMs = typeof s?.end === 'number' ? s.end : new Date(s?.end).getTime();
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+      return Math.floor((endMs - startMs) / 1000);
+    }
+    return 0;
   }
 
-  const newSession = {
-    seconds: Number(minutes) * 60,
-    manual: true,
-    start: new Date().toISOString(),
-    end: new Date().toISOString(),
-  };
-
-  data.users[userId].sessions.push(newSession);
-
-  // totalSeconds 업데이트
-  data.users[userId].totalSeconds = (data.users[userId].totalSeconds || 0) + newSession.seconds;
-
-  saveData(data);
-  console.log(`✅ 수동 세션 추가: ${userId}에게 ${minutes}분 추가됨`);
-
-  res.json({ ok: true });
-});
-
-
-
-router.post('/memo', (req, res) => {
-  const { userId, memo } = req.body;
-
-  const data = loadData();
-
-  if (!data.users[userId]) {
-    return res.status(404).json({ error: "유저 없음" });
+  function aggregateSessions(sessions) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const hasTagged = list.some((s) => typeof s?.source === 'string');
+    if (!hasTagged) return list;
+    return list.filter((s) => !s?.source || s?.source === 'camera_event' || s?.source === 'manual' || s?.manual === true);
   }
 
-  data.users[userId].memo = memo;
-
-  saveData(data);
-
- res.json({ success: true });
-
-});
-
-router.get('/save-memo', (req, res) => {
-  // 1. 프론트엔드에서 보낸 쿼리 파라미터들 추출
-  const { token, userId, memo } = req.query; 
-
-  // 2. 토큰 검증 (process.env.ADMIN_TOKEN과 비교)
-  if (token !== process.env.ADMIN_TOKEN) {
-    console.error("❌ 토큰 불일치");
-    return res.status(403).json({ error: "invalid token" });
+  function aggregateTotalSeconds(user) {
+    return aggregateSessions(user?.sessions).reduce((sum, s) => sum + secondsOf(s), 0);
   }
 
-  // 3. 데이터 로드 및 저장
-  const data = loadData();
-  
-  // 여기서 userId가 정확히 매칭되어야 합니다 (data.users[userId] 체크)
-  if (userId && data.users[userId]) {
-    data.users[userId].memo = memo;
-    saveData(data);
-    console.log(`✅ 메모 저장 완료: [${userId}] -> ${memo}`);
-    return res.json({ success: true });
-  } else {
-    console.error(`❌ 유저를 찾을 수 없음: ID [${userId}]`);
-    return res.status(404).json({ error: "user not found or invalid id" });
-  }
-});
+  function normalizeFeed(feed = []) {
+    const list = Array.isArray(feed) ? feed : [];
+    const milestoneSeen = new Set();
+    const out = [];
 
+    for (const raw of list) {
+      if (!raw || typeof raw !== 'object') continue;
+      const text = String(raw.text ?? '').trim();
+      if (!text || /^undefined$/i.test(text)) continue;
 
+      const createdAt = Number(raw.createdAt || Date.now());
+      const userId = String(raw.userId || '');
+      const isFiveHour = /오늘\s*5시간\s*달성/.test(text);
 
-// 임시 디버깅 라우트 추가
-router.get('/debug-data', (req, res) => {
-  const { token } = req.query;
-  
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ error: "Invalid token" });
-  }
+      if (isFiveHour) {
+        const d = new Date(createdAt);
+        const dayKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+        const key = `${userId}|${dayKey}|${text}`;
+        if (milestoneSeen.has(key)) continue;
+        milestoneSeen.add(key);
+      }
 
-  const data = loadData();
-  
-  // 데이터 구조 분석
-  const analysis = Object.entries(data).map(([userId, user]) => ({
-    userId,
-    hasSessions: !!user.sessions,
-    sessionCount: user.sessions ? user.sessions.length : 0,
-    sessions: user.sessions || []
-  }));
+      out.push({
+        ...raw,
+        text,
+        createdAt
+      });
 
-  res.json(analysis);
-});
+      if (out.length >= 400) break;
+    }
 
-
-
-
-
-
-router.get('/save-feed', (req, res) => {
-console.log(req.query);
-
-
-let { token, nickname, memo } = req.query;
-
-if (Array.isArray(token)) {
-  token = token[0];
-}
-
- if (token !== process.env.ADMIN_TOKEN) {
-  return res.status(403).json({ error: "invalid token" });
-}
-
-  if (!nickname || !memo) {
-    return res.status(400).json({ error: "missing params" });
+    return out;
   }
 
-  const data = loadData();
+  function dedupeManualSessionsInPlace(user, thresholdMs = 10000) {
+    const sessions = Array.isArray(user?.sessions) ? user.sessions : [];
+    const manualRows = sessions
+      .map((s, idx) => ({ s, idx }))
+      .filter(({ s }) => s?.manual === true || s?.source === 'manual')
+      .map(({ s, idx }) => {
+        const st = typeof s?.start === 'number' ? s.start : new Date(s?.start).getTime();
+        return { idx, st, sec: secondsOf(s) };
+      })
+      .filter((x) => Number.isFinite(x.st) && x.sec > 0)
+      .sort((a, b) => a.st - b.st);
 
-  if (!data.users) data.users = {};
-  if (!data.feed) data.feed = [];
+    const removeSet = new Set();
+    for (let i = 1; i < manualRows.length; i++) {
+      const prev = manualRows[i - 1];
+      const cur = manualRows[i];
+      if (prev.sec === cur.sec && Math.abs(cur.st - prev.st) <= thresholdMs) {
+        removeSet.add(cur.idx);
+      }
+    }
+    if (removeSet.size === 0) return false;
 
-  // 🔥 nickname → userId 찾기
-  const userEntry = Object.entries(data.users).find(
-  ([id, user]) =>
-    user.nickname === nickname ||
-    user.name === nickname
-);
- if (!userEntry) {
-  console.log("유저 못 찾음. users:", data.users);
-  return res.status(400).json({ error: "user not found" });
-}
-  const userId = userEntry[0];
+    user.sessions = sessions.filter((_, idx) => !removeSet.has(idx));
+    user.totalSeconds = aggregateTotalSeconds(user);
+    return true;
+  }
 
-  data.feed.unshift({
-    id: Date.now(),
-    userId,
-    nickname,
-    text: memo,
-    createdAt: Date.now()
+  router.get('/today', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    try {
+      const data = readData();
+      const users = {};
+
+      for (const [userId, user] of Object.entries(data.users)) {
+        users[userId] = {
+          id: userId,
+          name: userNameOf(user, userId),
+          avatar: user?.avatar || null,
+          online: !!user?.currentStart,
+          currentStart: user?.currentStart || null,
+          sessions: Array.isArray(user?.sessions) ? user.sessions : [],
+          seconds: Number(user?.seconds || 0),
+          totalSeconds: aggregateTotalSeconds(user),
+          goalSec: Number(user?.goalSec || 0),
+          memo: user?.memo || '',
+          freeGoals: Array.isArray(user?.freeGoals) ? user.freeGoals : [],
+          studyRecords: Array.isArray(user?.studyRecords) ? user.studyRecords : []
+        };
+      }
+
+      const normalizedFeed = normalizeFeed(data.feed);
+      if (normalizedFeed.length !== (Array.isArray(data.feed) ? data.feed.length : 0)) {
+        data.feed = normalizedFeed;
+        saveData(data);
+      }
+      res.json({ users, feed: normalizedFeed });
+    } catch (err) {
+      console.error('/today error', err);
+      res.status(500).json({ error: 'server error' });
+    }
   });
 
-  saveData(data);
+  router.get('/weekly', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
 
+    try {
+      const data = readData();
+      const byDay = new Map();
 
-  res.json({ ok: true });
-});
+      for (const [userId, user] of Object.entries(data.users)) {
+        const name = userNameOf(user, userId);
+        const avatar = user?.avatar || null;
+        const sessions = aggregateSessions(user?.sessions);
 
+        sessions.forEach((s) => {
+          const startMs = typeof s.start === 'number' ? s.start : new Date(s.start).getTime();
+          if (!Number.isFinite(startMs)) return;
+          const dayKey = new Date(startMs).toISOString().slice(0, 10);
+          const seconds = secondsOf(s);
 
+          if (!byDay.has(dayKey)) {
+            byDay.set(dayKey, { dayKey, totalSeconds: 0, users: [] });
+          }
 
-router.get("/delete-feed", (req, res) => {
+          const day = byDay.get(dayKey);
+          day.totalSeconds += seconds;
 
-  let { token, id, nickname } = req.query;
+          const existing = day.users.find((u) => u.id === userId);
+          if (existing) {
+            existing.seconds += seconds;
+          } else {
+            day.users.push({ id: userId, name, avatar, seconds });
+          }
+        });
+      }
 
-  if (Array.isArray(token)) token = token[0];
+      const days = Array.from(byDay.values()).sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+      res.json({ days });
+    } catch (err) {
+      console.error('/weekly error', err);
+      res.status(500).json({ error: 'server error' });
+    }
+  });
 
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ error: "invalid token" });
-  }
+  router.get('/dashboard', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
 
-  const idNum = Number(id);
-  const data = loadData();
+    const data = readData();
+    const users = Object.entries(data.users).map(([userId, user]) => ({
+      id: userId,
+      name: userNameOf(user, userId),
+      avatar: user?.avatar || null,
+      totalSeconds: aggregateTotalSeconds(user),
+      goalSec: Number(user?.goalSec || 0),
+      online: !!user?.currentStart,
+      sessions: Array.isArray(user?.sessions) ? user.sessions : []
+    }));
 
-  if (!data.feed) data.feed = [];
+    res.json({ users });
+  });
 
-  data.feed = data.feed.filter(item =>
-    !(item.id === idNum && item.nickname === nickname)
-  );
+  router.get('/users-lite', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+    const data = readData();
+    const users = Object.entries(data.users).map(([userId, user]) => ({
+      id: userId,
+      name: userNameOf(user, userId),
+      avatar: user?.avatar || null,
+      online: !!user?.currentStart
+    }));
+    res.json({ users });
+  });
 
-  saveData(data);
+  router.get('/days', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
 
-  res.json({ success: true });
-});
+    try {
+      const data = readData();
+      const byDay = new Map();
 
+      for (const [userId, user] of Object.entries(data.users)) {
+        const name = userNameOf(user, userId);
+        const avatar = user?.avatar || null;
+        const sessions = aggregateSessions(user?.sessions);
 
+        sessions.forEach((s) => {
+          const startMs = typeof s.start === 'number' ? s.start : new Date(s.start).getTime();
+          if (!Number.isFinite(startMs)) return;
+          const dayKey = new Date(startMs).toISOString().slice(0, 10);
+          const seconds = secondsOf(s);
 
+          if (!byDay.has(dayKey)) {
+            byDay.set(dayKey, { dayKey, totalSeconds: 0, users: [] });
+          }
 
+          const day = byDay.get(dayKey);
+          day.totalSeconds += seconds;
 
+          const existing = day.users.find((u) => u.id === userId);
+          if (existing) {
+            existing.seconds += seconds;
+          } else {
+            day.users.push({ id: userId, name, avatar, seconds });
+          }
+        });
+      }
 
-return router; 
+      const days = Array.from(byDay.values()).sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+      res.json({ days });
+    } catch (err) {
+      console.error('/days error', err);
+      res.status(500).json({ error: 'server error' });
+    }
+  });
 
+  router.post('/delete-session', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
 
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const userId = String(payload.userId || '');
+    const index = Number(payload.index);
 
-}
+    const data = readData();
+    const user = data.users[userId];
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+    const sessions = Array.isArray(user.sessions) ? user.sessions : [];
+    if (!Number.isInteger(index) || index < 0 || index >= sessions.length) {
+      return res.status(404).json({ ok: false, error: 'Invalid index' });
+    }
+
+    sessions.splice(index, 1);
+    user.sessions = sessions;
+    user.totalSeconds = aggregateTotalSeconds(user);
+    saveData(data);
+
+    res.json({ ok: true });
+  });
+
+  router.post('/edit-session', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const userId = String(payload.userId || '');
+    const index = Number(payload.index);
+    const newSeconds = Number(payload.newSeconds);
+
+    const data = readData();
+    const user = data.users[userId];
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+    const sessions = Array.isArray(user.sessions) ? user.sessions : [];
+    if (!Number.isInteger(index) || index < 0 || index >= sessions.length) {
+      return res.status(404).json({ ok: false, error: 'Invalid index' });
+    }
+
+    if (!Number.isFinite(newSeconds) || newSeconds <= 0) {
+      return res.status(400).json({ ok: false, error: 'Invalid newSeconds' });
+    }
+
+    sessions[index].seconds = newSeconds;
+    sessions[index].lastEdit = payload.editTime || new Date().toISOString();
+    user.sessions = sessions;
+    user.totalSeconds = aggregateTotalSeconds(user);
+    saveData(data);
+
+    res.json({ ok: true });
+  });
+
+  router.get('/mypage', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const data = readData();
+    const users = Object.entries(data.users).map(([userId, user]) => ({
+      id: userId,
+      name: userNameOf(user, userId),
+      avatar: user?.avatar || null,
+      sessions: Array.isArray(user?.sessions) ? user.sessions : [],
+      totalSeconds: aggregateTotalSeconds(user),
+      goalSec: Number(user?.goalSec || 0),
+      memo: user?.memo || '',
+      freeGoals: Array.isArray(user?.freeGoals) ? user.freeGoals : [],
+      studyRecords: Array.isArray(user?.studyRecords) ? user.studyRecords : []
+    }));
+
+    res.json(users);
+  });
+
+  router.get('/manual-data', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const data = readData();
+    const targetUserId = String(req.query?.userId || '').trim();
+    const entries = targetUserId ? [[targetUserId, data.users[targetUserId]]] : Object.entries(data.users);
+    let changed = false;
+
+    const users = entries
+      .filter(([_, user]) => !!user)
+      .map(([userId, user]) => {
+      if (dedupeManualSessionsInPlace(user)) changed = true;
+      return {
+      id: userId,
+      name: userNameOf(user, userId),
+      avatar: user?.avatar || null,
+      sessions: (Array.isArray(user?.sessions) ? user.sessions : [])
+        .map((s, idx) => ({ s, idx }))
+        .filter(({ s }) => s?.manual === true || s?.source === 'manual')
+        .map(({ s, idx }) => ({ ...s, _index: idx, seconds: secondsOf(s) }))
+        .filter((s) => Number(s.seconds) > 0),
+      totalSeconds: aggregateTotalSeconds(user)
+    };
+    });
+
+    if (changed) saveData(data);
+
+    res.json(users);
+  });
+
+  router.post('/manual-data', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const userId = String(payload.userId || '');
+    const minutes = Number(payload.minutes);
+
+    if (!userId || !Number.isFinite(minutes) || minutes <= 0) {
+      return res.status(400).json({ ok: false, error: 'Invalid userId/minutes' });
+    }
+
+    const data = readData();
+    if (!data.users[userId]) {
+      data.users[userId] = {
+        nickname: userId,
+        avatar: null,
+        sessions: [],
+        totalSeconds: 0
+      };
+    }
+
+    const user = data.users[userId];
+    if (!Array.isArray(user.sessions)) user.sessions = [];
+
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    const seconds = Math.floor(minutes * 60);
+
+    const manualSessions = user.sessions.filter((s) => s && (s.manual === true || s.source === 'manual'));
+    const duplicated = manualSessions.some((s) => {
+      const sec = Number(s?.seconds || 0);
+      const st = typeof s?.start === 'number' ? s.start : new Date(s?.start).getTime();
+      if (!Number.isFinite(st)) return false;
+      return sec === seconds && Math.abs(st - nowMs) <= 10000;
+    });
+
+    if (duplicated) {
+      return res.json({ ok: true, deduped: true });
+    }
+
+    user.sessions.push({ start: now, end: now, seconds, manual: true, source: 'manual' });
+    user.totalSeconds = aggregateTotalSeconds(user);
+
+    saveData(data);
+    res.json({ ok: true });
+  });
+
+  router.post('/memo', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const userId = String(payload.userId || '');
+    const memo = String(payload.memo || '');
+
+    const data = readData();
+    if (!data.users[userId]) return res.status(404).json({ error: 'user not found' });
+
+    data.users[userId].memo = memo;
+    saveData(data);
+    res.json({ success: true });
+  });
+
+  router.get('/save-memo', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const userId = String(req.query.userId || '');
+    const memo = String(req.query.memo || '');
+
+    const data = readData();
+    if (!userId || !data.users[userId]) {
+      return res.status(404).json({ error: 'user not found or invalid id' });
+    }
+
+    data.users[userId].memo = memo;
+    saveData(data);
+    res.json({ success: true });
+  });
+
+  router.get('/debug-data', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const data = readData();
+    const analysis = Object.entries(data.users).map(([userId, user]) => ({
+      userId,
+      hasSessions: Array.isArray(user.sessions),
+      sessionCount: Array.isArray(user.sessions) ? user.sessions.length : 0,
+      sessions: Array.isArray(user.sessions) ? user.sessions : []
+    }));
+
+    res.json(analysis);
+  });
+
+  router.get('/save-feed', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const nickname = String(req.query.nickname || '');
+    const memo = String(req.query.memo || '');
+    const data = readData();
+
+    const userEntry = Object.entries(data.users).find(([id, user]) => {
+      const name = userNameOf(user, id);
+      return name === nickname || user?.name === nickname || user?.nickname === nickname;
+    });
+
+    if (!userEntry) return res.status(400).json({ error: 'user not found' });
+
+    const userId = userEntry[0];
+    const normalizedMemo = memo.trim();
+    if (!normalizedMemo || /^undefined$/i.test(normalizedMemo)) {
+      return res.status(400).json({ error: 'empty memo' });
+    }
+
+    const now = Date.now();
+    const isFiveHour = /오늘\s*5시간\s*달성/.test(normalizedMemo);
+    if (isFiveHour) {
+      const already = (Array.isArray(data.feed) ? data.feed : []).some((f) => {
+        const sameUser = String(f?.userId || '') === String(userId);
+        const sameText = String(f?.text || '') === normalizedMemo;
+        if (!sameUser || !sameText) return false;
+        const t = Number(f?.createdAt || 0);
+        if (!Number.isFinite(t) || t <= 0) return false;
+        return now - t < 24 * 60 * 60 * 1000;
+      });
+      if (already) {
+        return res.json({ ok: true, deduped: true });
+      }
+    }
+
+    data.feed.unshift({
+      id: Date.now(),
+      userId,
+      nickname,
+      text: normalizedMemo,
+      createdAt: now
+    });
+
+    saveData(data);
+    res.json({ ok: true });
+  });
+
+  router.get('/delete-feed', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: 'invalid token' });
+
+    const idNum = Number(req.query.id);
+    const nickname = String(req.query.nickname || '');
+
+    const data = readData();
+    data.feed = data.feed.filter((item) => {
+      if (item.id !== idNum) return true;
+      if (!nickname) return false;
+      return item.nickname !== nickname;
+    });
+
+    saveData(data);
+    res.json({ success: true });
+  });
+
+  router.post('/feed-like', (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ ok: false, error: 'invalid token' });
+
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const feedId = Number(payload.feedId);
+    const actor = String(payload.userId || payload.nickname || 'anonymous');
+
+    if (!Number.isFinite(feedId)) {
+      return res.status(400).json({ ok: false, error: 'invalid feedId' });
+    }
+
+    const data = readData();
+    const item = (data.feed || []).find((f) => Number(f.id) === feedId);
+    if (!item) return res.status(404).json({ ok: false, error: 'feed not found' });
+
+    const likedBy = Array.isArray(item.likedBy) ? item.likedBy.map(String) : [];
+    const idx = likedBy.indexOf(actor);
+    let liked = false;
+
+    if (idx >= 0) {
+      likedBy.splice(idx, 1);
+      liked = false;
+    } else {
+      likedBy.push(actor);
+      liked = true;
+    }
+
+    item.likedBy = likedBy;
+    item.likes = likedBy.length;
+
+    saveData(data);
+    res.json({ ok: true, likes: item.likes, liked });
+  });
+
+  return router;
+};

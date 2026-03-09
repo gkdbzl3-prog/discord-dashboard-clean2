@@ -1,5 +1,5 @@
-const params = new URLSearchParams(window.location.search);
-window.token = params.get("token");
+﻿const params = new URLSearchParams(window.location.search);
+window.token = params.get("token") || localStorage.getItem("adminToken");
 
 console.log("token:", window.token);
 
@@ -52,30 +52,57 @@ window.API = window.API || {};
 window.ADMIN_TOKEN = "쪼쪼쪼각할모방";
 
 window.API.fetch = async function (url) {
+  const rawToken = window.token || localStorage.getItem("adminToken") || "";
+  const token =
+    rawToken && rawToken !== "null" && rawToken !== "undefined"
+      ? rawToken
+      : "";
 
-  const res = await fetch(
-    `${url}?token=${window.ADMIN_TOKEN}`
-  );
+  const urlWithToken = token
+    ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
+    : url;
+
+  const res = await fetch(urlWithToken);
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("API 오류:", text);
-    throw new Error("API failed");
+    console.error(`API 오류 [${res.status}] ${urlWithToken}:`, text);
+    throw new Error(`API failed (${res.status})`);
   }
 
   return res.json();
 };
 
 window.API.post = async function(url, body) {
+  const rawToken = window.token || localStorage.getItem("adminToken") || "";
+  const token =
+    rawToken && rawToken !== "null" && rawToken !== "undefined"
+      ? rawToken
+      : "";
 
+  const urlWithToken = token
+    ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
+    : url;
 
-  const res = await fetch(`${url}?token=${window.token}`, {
+  const res = await fetch(urlWithToken, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
 
-  return await res.json();
+  const text = await res.text();
+  let json;
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch (e) {
+    throw new Error(`POST ${url} invalid JSON response: ${text.slice(0, 120)}`);
+  }
+
+  if (!res.ok) {
+    throw new Error(`POST ${url} failed (${res.status}): ${json.error || text}`);
+  }
+
+  return json;
 };
 
 window.currentUserId = null;
@@ -119,7 +146,35 @@ const list = Object.entries(rawUsers)
     totalSeconds: user.totalSeconds || 0,
     currentStart: user.currentStart || null
   }));
+
+  window.usersCache = list.reduce((acc, user) => {
+    acc[String(user.id)] = user;
+    return acc;
+  }, {});
+
+  return window.usersCache;
 }
+
+window.loadUsersLite = async function () {
+  const data = await window.API.fetch("/users-lite");
+  const DEFAULT_AVATAR = "https://cdn.discordapp.com/embed/avatars/0.png";
+  const rawUsers = Array.isArray(data?.users) ? data.users : [];
+
+  window.usersCache = rawUsers.reduce((acc, user) => {
+    if (!user?.id || user.id === "users") return acc;
+    acc[String(user.id)] = {
+      id: String(user.id),
+      name: user.name || "이름없음",
+      nickname: user.name || "이름없음",
+      avatar: user.avatar || DEFAULT_AVATAR,
+      currentStart: user.online ? Date.now() : null,
+      sessions: []
+    };
+    return acc;
+  }, {});
+
+  return window.usersCache;
+};
 
 
 
@@ -186,11 +241,6 @@ window.saveMemoToServer = async function(userId, text) {
   } catch (e) {
     console.error("저장 실패:", e);
   }
-
-await window.API.fetch(
-  `/save-memo?memo=${encodeURIComponent(memoText)}`
-);
-
 };
 
 
@@ -222,12 +272,19 @@ const fabMenu = document.getElementById("fab-menu");
 
   window.showToday();
 
+    const closeMemoModal = () => {
+      if (!memoModal) return;
+      memoModal.classList.remove("show");
+      memoModal.style.display = "none";
+    };
+
+
 
     // FAB 메인 토글
     if (fabMain) {
         fabMain.addEventListener("click", (e) => {
             e.stopPropagation();
-            fabContainer.classList.toggle("open");
+            if (fabContainer) fabContainer.classList.toggle("open");
         });
     }
 
@@ -248,32 +305,32 @@ const fabMenu = document.getElementById("fab-menu");
         });
     }
 
-    // 전역 클릭 (닫기 로직)
+  
     document.addEventListener("click", (e) => {
-        // FAB 닫기
+        const mainBtn = e.target.closest("#fabMain");
+        if (mainBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById("fab-menu")?.classList.toggle("open");
+            return;
+        }
+
+        // FAB ??
         if (fabContainer && !e.target.closest(".fab-container")) {
             fabContainer.classList.remove("open");
         }
-        // 메모장 닫기 (배경 클릭 시)
+    
         if (e.target === memoModal) {
-            memoModal.classList.remove("show");
-            setTimeout(() => { memoModal.style.display = "none"; }, 200);
+            closeMemoModal();
         }
     });
 
-
-
-
-   if (saveBtn) {
-        saveBtn.addEventListener("click", () => {
-            if (window.saveSimpleMemo) window.saveSimpleMemo();
-            // 저장 후 닫기 처리
-            memoModal.classList.remove("show");
-            setTimeout(() => { memoModal.style.display = "none"; }, 200);
+    if (saveBtn) {
+        saveBtn.addEventListener("click", async () => {
+            if (window.saveSimpleMemo) await window.saveSimpleMemo();
+            closeMemoModal();
         });
     }
-
-
 
     if (minInput && minusBtn && plusBtn) {
         minusBtn.onclick = () => {
@@ -285,25 +342,32 @@ const fabMenu = document.getElementById("fab-menu");
             minInput.value = v + 1;
         };
     }
+  if (fabMemo) {
+    fabMemo.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.saveSimpleMemo();
+        closeMemoModal();
+      }
+    });
+  }
 
-
-
-  if (fabMemo) fabMemo.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  if (fabEdit) {
+    fabEdit.addEventListener("click", async (e) => {
       e.stopPropagation();
-      window.saveSimpleMemo();
-    }
-  });
-
-if (fabEdit) fabEdit.addEventListener("click", (e) => {
-  e.stopPropagation();   // 🔥 핵심
-  e.preventDefault();
-  window.showManualModal();
-});
-
-
-  if (fabOverview) {
+      e.preventDefault();
+      try {
+        if (typeof window.showManualModal === "function") {
+          await window.showManualModal();
+        }
+      } catch (err) {
+        console.error("fabEdit open failed:", err);
+        if (window.showToast) window.showToast("Manual 창 열기 실패", "error");
+      }
+    });
+  }
+if (fabOverview) {
     fabOverview.addEventListener("click", () => {
       window.showTotal("weekly");
       fabMenu.classList.remove("open");
@@ -417,4 +481,46 @@ window.showInputModal = function (message, onConfirm) {
       okBtn.click();
     }
   });
+};
+
+
+window.splitUserSessions = function (user) {
+  const allSessions = Array.isArray(user?.sessions) ? user.sessions : [];
+
+  const manualSessions = allSessions.filter(
+    s => s?.manual === true || s?.source === "manual"
+  );
+
+  const eventSessions = allSessions.filter(
+    s => s?.source === "camera_event"
+  );
+
+  const autoSplitSessions = allSessions.filter(
+    s => s?.source === "auto_split"
+  );
+  const legacySessions = allSessions.filter(
+    s => !s?.source && s?.manual !== true
+  );
+
+  return {
+    allSessions,
+    manualSessions,
+    eventSessions,
+    autoSplitSessions,
+    legacySessions,
+
+    // 메인 통계용: 다 포함
+    mainSessions: [
+      ...legacySessions,
+      ...autoSplitSessions,
+      ...eventSessions,
+      ...manualSessions
+    ],
+
+    // 상세 / 캘린더 상세용: 수동 + 이벤트만
+    detailSessions: [
+      ...eventSessions,
+      ...manualSessions
+    ]
+  };
 };

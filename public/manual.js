@@ -1,11 +1,10 @@
-
+﻿
 
 if (!window.token) {
   window.token =
     new URLSearchParams(location.search).get("token") ||
     localStorage.getItem("adminToken");
 }
-
 
 
 
@@ -25,6 +24,12 @@ window.formatTimeHM = function(totalSeconds) {
 };
 
 window.showManualModal = async function() {
+  window.token =
+    window.token ||
+    localStorage.getItem("adminToken") ||
+    window.ADMIN_TOKEN ||
+    "";
+  if (window.token) localStorage.setItem("adminToken", window.token);
 
 if (typeof window.stopLiveCounter === "function") window.stopLiveCounter();
   if (window.liveCounter) {
@@ -33,14 +38,18 @@ if (typeof window.stopLiveCounter === "function") window.stopLiveCounter();
   }
     // 토큰 체크
     if (!window.token) {
-        window.showToast("토큰이 없습니다", "error");
-        return;
+        console.warn("manual modal: token missing, continue without token");
     }
 
-    // 유저 목록 로드
-    if (!window.usersCache || Object.keys(window.usersCache).length === 0) {
-        await window.loadUsers();
-    }
+    const preloadPromise = (async () => {
+      if (!window.usersCache || Object.keys(window.usersCache).length === 0) {
+        if (typeof window.loadUsersLite === "function") {
+          await window.loadUsersLite();
+        } else {
+          await window.loadUsers();
+        }
+      }
+    })();
 
     let overlay = document.getElementById("modal-overlay");
 
@@ -51,7 +60,18 @@ if (typeof window.stopLiveCounter === "function") window.stopLiveCounter();
         document.body.appendChild(overlay);
     }
 
-const users = Object.values(window.usersCache || {});
+const getUsers = () => Object.entries(window.usersCache || {})
+  .map(([key, u]) => {
+    const safe = u || {};
+    const id = String(safe.id ?? safe.userId ?? key ?? "");
+    const labelRaw = safe.nickname ?? safe.name ?? safe.username ?? id;
+    return {
+      ...safe,
+      id,
+      label: String(labelRaw || "Unknown").trim()
+    };
+  })
+  .filter((u) => u.id && u.id !== "users");
     
     overlay.innerHTML = `
         <div class="modal-content">
@@ -59,22 +79,21 @@ const users = Object.values(window.usersCache || {});
 
             <form id="manualForm" class="manual-form">
                 <select id="userSelect" class="modal-input">
-                   <option value="" disabled selected hidden>유저 선택 (닉네임)</option>
-                    ${users.map(u => `<option value="${u.id}">${u.name}</option>`).join("")}
+                   <option value="" disabled selected hidden>Select user</option>
                 </select>
-                
+
                 <div class="number-control">
-                    <button type="button" class="num-btn minus">−</button>
+                    <button type="button" class="num-btn minus">-</button>
                     <input type="number" id="manualMinutes" min="1" value="1" />
                     <button type="button" class="num-btn plus">+</button>
                 </div>
 
                 <button type="submit" class="modal-primary-btn">
-                    저장하기
+                   저장
                 </button>
 
                 <button type="button" id="loadHistoryBtn" class="modal-secondary-btn">
-                    📜 저장 기록 보기
+                    저장기록
                 </button>
 
                 <div id="manualHistory" class="modal-history"></div>
@@ -103,20 +122,55 @@ const users = Object.values(window.usersCache || {});
     };
 
     // ===== 히스토리 로드 버튼 =====
+    const getSessionMinutes = (session) => {
+      const sec = Number(session?.seconds);
+      if (Number.isFinite(sec) && sec > 0) return Math.floor(sec / 60);
+
+      const startMs = typeof session?.start === "number" ? session.start : Date.parse(session?.start);
+      const endMs = typeof session?.end === "number" ? session.end : Date.parse(session?.end);
+
+      if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+        return Math.max(0, Math.floor((endMs - startMs) / 60000));
+      }
+      return 0;
+    };
+
+    const userSelect = document.getElementById("userSelect");
+    if (userSelect) {
+      const renderUserOptions = () => {
+        const users = getUsers();
+        const prev = userSelect.value;
+        userSelect.innerHTML = '<option value="" disabled selected>닉네임</option>';
+        userSelect.style.color = "#1a1a1a";
+        users.forEach((u) => {
+          const option = document.createElement("option");
+          option.value = String(u.id ?? "");
+          option.textContent = String(u.label || "Unknown");
+          userSelect.appendChild(option);
+        });
+        if (prev) userSelect.value = prev;
+      };
+      renderUserOptions();
+      preloadPromise.then(renderUserOptions).catch(() => {});
+
+      userSelect.addEventListener("change", () => {
+        userSelect.style.color = "#1a1a1a";
+      });
+    }
+
  document.getElementById("loadHistoryBtn").onclick = async () => {
 
   const userId = document.getElementById("userSelect").value;
+  const historyBox = document.getElementById("manualHistory");
 
   if (!userId) {
     window.showToast("유저를 먼저 선택해주세요", "error");
     return;
   }
-
-  console.log("📌 히스토리 로드 시작... 유저ID:", userId);
-
   try {
 
-const data = await window.API.fetch('/manual-data');
+const data = await window.API.fetch(`/manual-data?userId=${encodeURIComponent(userId)}`);
+window.manualDataCache = data;
 
 const user = data.find(u =>
   String(u.id) === String(userId)
@@ -128,28 +182,33 @@ if (!user) {
 }
 
 const sessions = user.sessions || [];
-
-const historyBox = document.getElementById("manualHistory");
-console.log(historyBox.children);
-console.log("렌더 직전 sessions:", sessions);
 if (sessions.length === 0) {
-  historyBox.innerHTML = "저장 기록 없음";
+  historyBox.style.display = "block";
+  historyBox.innerHTML = "No manual records";
   return;
 }
-historyBox.style.display = "block";
-historyBox.innerHTML = sessions.map((session, index) => {
-  const minutes = Math.floor((session.seconds || 0) / 60);
 
+const itemsHtml = sessions
+  .map((session, index) => ({
+    session,
+    realIndex: Number.isInteger(session?._index) ? session._index : index,
+    minutes: getSessionMinutes(session)
+  }))
+  .filter((x) => x.minutes > 0)
+  .map(({ session, realIndex, minutes }) => {
   return `
     <div class="history-item">
       <div>${minutes}분</div>
       <div>
-        <button onclick="window.editManualSession('${userId}', ${index})">수정</button>
-        <button onclick="window.deleteManualSession('${userId}', ${index})">삭제</button>
+        <button type="button" onclick="window.editManualSession('${userId}', ${realIndex})">수정</button>
+        <button type="button" onclick="window.deleteManualSession('${userId}', ${realIndex})">삭제</button>
       </div>
     </div>
   `;
-}).join("");
+  }).join("");
+
+historyBox.style.display = "block";
+historyBox.innerHTML = itemsHtml || "No manual records";
   } catch (err) {
     console.error("히스토리 로드 실패:", err);
     window.showToast("히스토리를 불러올 수 없습니다", "error");
@@ -165,7 +224,6 @@ historyBox.innerHTML = sessions.map((session, index) => {
         submitBtn.style.background = '#a855f7';
         submitBtn.style.transform = 'translateY(0)';
     });
-console.log("clicked history");
     // ===== 폼 제출 =====
     document.getElementById("manualForm").onsubmit = async (e) => {
         e.preventDefault();
@@ -200,21 +258,17 @@ console.log("clicked history");
             console.log("📬 Manual 추가 결과:", result);
 
             if (res.ok && result.ok) {
-                window.showToast("✅ 저장 완료!");
+                window.showToast(result.deduped ? "저장 취소" : "✅ 저장 완료!");
                 
                 // 유저 캐시 새로고침
                 await window.loadUsers();
-                
-                if (res.ok && result.ok) {
-  window.showToast("✅ 저장 완료!");
-  await window.loadUsers();
+                window.manualDataCache = null;
 
-  // 히스토리가 이미 열려 있을 때만 갱신
-  const historyBox = document.getElementById("manualHistory");
-  if (historyBox.style.display === "block") {
-    document.getElementById("loadHistoryBtn").click();
-  }
-}
+                // 히스토리가 이미 열려 있을 때만 갱신
+                const historyBox = document.getElementById("manualHistory");
+                if (historyBox && historyBox.style.display === "block") {
+                  document.getElementById("loadHistoryBtn").click();
+                }
             } else {
                 window.showToast("❌ 저장 실패: " + (result.error || "알 수 없는 오류"), "error");
             }
@@ -233,7 +287,7 @@ console.log("clicked history");
             }
         }, 200);
 
-startLiveCounter();
+
     };
 
     // 닫기 버튼
@@ -263,9 +317,13 @@ startLiveCounter();
     };
     document.addEventListener("keydown", handleEsc);
 
-    // 모달 열기
+    // 모달 먼저 열고 데이터는 비동기 로드
     overlay.style.display = 'flex';
     setTimeout(() => overlay.classList.add("show"), 10);
+
+    preloadPromise.catch((err) => {
+      console.error("manual preload failed:", err);
+    });
 };
 
 
@@ -278,7 +336,7 @@ startLiveCounter();
 // 삭제 함수
 window.deleteManualSession = async function (userId, index) {
 
-  if (!window.showToast("정말 삭제할까요?")) return;
+  if (!confirm("정말 삭제할까요?")) return;
 
   const res = await fetch("/delete-session", {
     method: "POST",
@@ -295,6 +353,7 @@ window.deleteManualSession = async function (userId, index) {
 if (res.ok && result.ok) {
   window.showToast("🗑 삭제 완료");
   await window.loadUsers();
+                window.manualDataCache = null;
 
   const historyBox = document.getElementById("manualHistory");
   if (historyBox.style.display === "block") {
@@ -307,6 +366,20 @@ if (res.ok && result.ok) {
 
 }
 
+window.renderDaySessions = function (sessions = [], expanded = false) {
+  const visible = expanded ? sessions : sessions.slice(0, 5);
+
+  return `
+    <div class="day-session-list">
+      ${visible.map(s => `<div class="day-session-item">...</div>`).join("")}
+      ${sessions.length > 5 ? `
+        <button class="session-toggle-btn" onclick="window.toggleDaySessions()">
+          ${expanded ? "접기" : `세션 ${sessions.length - 5}개 더보기`}
+        </button>
+      ` : ""}
+    </div>
+  `;
+};
 
 window.editManualSession = async function (userId, index) {
 if (!userId) {
@@ -315,6 +388,10 @@ if (!userId) {
 }
   const newMin = prompt("수정할 시간 (분):");
   if (!newMin || isNaN(newMin)) return;
+if (newMin === null) {
+  window.showToast("수정취소");
+  return;
+}
 
   const res = await fetch("/edit-session", {
     method: "POST",
@@ -334,6 +411,7 @@ if (!userId) {
   window.showToast("✏️ 수정 완료!");
 
   await window.loadUsers();
+                window.manualDataCache = null;
   document.getElementById("loadHistoryBtn").click();
   } else {
     alert("수정 실패");
@@ -361,5 +439,3 @@ window.openMemoModal = function () {
   memoInput.value = localStorage.getItem("simpleMemo") || "";
   document.getElementById("memoModal").style.display = "flex";
 }
-
-

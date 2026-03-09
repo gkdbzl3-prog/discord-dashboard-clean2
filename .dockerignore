@@ -1,0 +1,10 @@
+# flyctl launch added from .gitignore
+**\node_modules
+**\.env
+**\data.json
+
+# flyctl launch added from discord-dashboard-clean2\.gitignore
+discord-dashboard-clean2\**\node_modules
+discord-dashboard-clean2\**\.env
+discord-dashboard-clean2\**\data.json
+fly.toml
