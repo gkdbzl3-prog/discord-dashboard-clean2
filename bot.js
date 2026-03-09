@@ -1,8 +1,6 @@
 ﻿require("dotenv").config();
 
 const express = require("express");
-
-
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -22,9 +20,9 @@ app.get("/", (req, res) => {
   res.send("dashboard running");
 });
 
-app.listen(process.env.PORT || 8080)
+app.get('/favicon.ico', (req, res) => res.status(204));
 
-console.log("BOT STARTED");
+app.use(express.json());
 
 
 
@@ -34,6 +32,15 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const createAdminRouter = require('./routes/admin');
 const { loadData, saveData } = require('./data/store');
 let data = loadData();
+
+app.listen(PORT, () => {
+  console.log(`Web server running on port ${PORT}`);
+  console.log("BOT STARTED");
+});
+
+
+
+
 app.use(express.json());
 
 app.get("/save-memo", (req, res) => {
@@ -468,7 +475,9 @@ client.on("voiceStateUpdate", (oldState, newState) => {
       if (!user.eventStart) user.eventStart = now;
       saveData(dataLatest);
     }
-     logCh?.send(`📷 ${usertag} 캠 ON`);
+     logCh?.send(`📷 ${usertag} 캠 ON
+스터디 기록은 여기서 볼 수 있어요
+https://zzozzozzo.fly.dev/`);
   }
 
   if (oldVideo && !newVideo && isInStudy) {

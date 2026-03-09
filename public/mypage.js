@@ -2832,7 +2832,7 @@ window.placeCaretAtEnd = function(el) {
 window.getDayStudySeconds = function(sessions = [], year, month, day) {
 
   if (!Array.isArray(sessions)) return 0;
-  const baseSessions = window.getAggregateSessionList(sessions);
+  const baseSessions = sessions;
 
   const { start, end } = window.getDayRange(year, month, day);
 
@@ -2841,9 +2841,17 @@ window.getDayStudySeconds = function(sessions = [], year, month, day) {
   for (const s of baseSessions) {
 
     const sStart = window.normalizeTime(s.start);
-    const sEnd   = window.normalizeTime(s.end);
+    let sEnd   = window.normalizeTime(s.end);
+    const sec = Number(s?.seconds || 0);
 
-    if (!sStart || !sEnd) continue;
+    if (!sStart) continue;
+    if (!sEnd || sEnd <= sStart) {
+      if (Number.isFinite(sec) && sec > 0) {
+        sEnd = sStart + sec * 1000;
+      } else {
+        continue;
+      }
+    }
 
     total += window.getOverlapSeconds(
       sStart,

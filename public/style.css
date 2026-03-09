@@ -4956,7 +4956,7 @@ border:none;
 padding:6px 12px;
 
 border-radius:8px;
-
+color: var(--text);
 cursor:pointer;
 text-align: center;
 
@@ -5334,4 +5334,178 @@ color:var(--text-muted);
 margin-top:20px;
 margin-bottom:8px;
 letter-spacing:.08em;
+}
+/* ===== MyPage Mobile Fix (final override) ===== */
+@media (max-width: 768px) {
+  body.mypage .page-wrapper {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  body.mypage .mypage-card {
+    padding: 14px;
+    border-radius: 16px;
+    margin-top: 8px;
+  }
+
+  body.mypage .profile-card,
+  body.mypage .attendance-block,
+  body.mypage .study-note-block,
+  body.mypage .goal-card,
+  body.mypage .free-goals-card {
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  body.mypage .profile-name {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  body.mypage .block-title {
+    font-size: 15px;
+    letter-spacing: 0;
+  }
+
+  body.mypage .goals-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  body.mypage .attendance-quick-stats {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  body.mypage .stat-pill {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+
+  body.mypage .monthly-summary {
+    font-size: 13px;
+    padding: 12px;
+  }
+
+  body.mypage .calendar-container {
+    margin: 10px 0;
+  }
+
+  body.mypage .calendar-grid {
+    gap: 6px;
+    padding: 8px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  body.mypage .calendar-day {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  body.mypage .calendar-date {
+    font-size: 12px;
+  }
+
+  body.mypage .calendar-detail {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  body.mypage .monthly-hint {
+    font-size: 12px;
+    margin: 10px 0 0;
+  }
+
+  body.mypage .study-note-block {
+    padding: 14px;
+  }
+
+  body.mypage .subject-palette {
+    gap: 8px;
+    padding: 4px 2px 8px;
+  }
+
+  body.mypage .subject-palette-btn,
+  body.mypage .subject-add-btn {
+    min-width: auto;
+    height: 34px;
+    font-size: 12px;
+    padding: 0 10px;
+    border-radius: 10px;
+  }
+
+  body.mypage .active-subject,
+  body.mypage #activeSubject {
+    gap: 6px;
+    margin: 8px 0;
+  }
+
+  body.mypage .active-subject-chip,
+  body.mypage .active-subject-tag {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+
+  body.mypage .memo-editor {
+    min-height: 96px;
+    font-size: 13px;
+    padding: 12px;
+  }
+
+  body.mypage .note-save-btn {
+    width: 100%;
+    height: 40px;
+    margin-top: 8px;
+  }
+
+  body.mypage .record-list {
+    max-height: 320px;
+    gap: 8px;
+  }
+
+  body.mypage .record-item {
+    padding: 10px;
+  }
+
+  body.mypage .record-content {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  body.mypage .record-time {
+    font-size: 11px;
+  }
+
+  body.mypage .free-goal-add {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  body.mypage .goal-input {
+    min-width: 0;
+    width: 100%;
+    font-size: 13px;
+  }
+
+  body.mypage .goal-add-btn {
+    white-space: nowrap;
+    padding: 0 12px;
+  }
+
+  body.mypage .free-goal-item {
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  body.mypage .goal-label {
+    font-size: 13px;
+    line-height: 1.35;
+    word-break: break-word;
+  }
 }

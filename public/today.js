@@ -222,15 +222,35 @@ window.updateOnlineStatus = function(users) {
 };;
 
 window.getTodaySeconds = function (user) {
+  if (!user) return 0;
 
   const now = Date.now();
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const sessionsForTotal = window.getAggregateSessions(user.sessions || []);
-  let todaySeconds = sessionsForTotal
-    .filter(s => new Date(s.start) >= today)
-    .reduce((sum, s) => sum + (s.seconds || 0), 0);
+  const rawSessions = Array.isArray(user.sessions) ? user.sessions : [];
+  const todaySessions = rawSessions.filter((s) => {
+    const st = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
+    return Number.isFinite(st) && st >= today.getTime();
+  });
+
+  const hasAutoSplitToday = todaySessions.some((s) => s?.source === "auto_split");
+  const secondsOf = (s) => {
+    const sec = Number(s?.seconds || 0);
+    if (Number.isFinite(sec) && sec > 0) return Math.floor(sec);
+    const st = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
+    const en = typeof s?.end === "number" ? s.end : Date.parse(s?.end);
+    if (Number.isFinite(st) && Number.isFinite(en) && en > st) {
+      return Math.floor((en - st) / 1000);
+    }
+    return 0;
+  };
+
+  let todaySeconds = todaySessions.reduce((sum, s) => {
+    const src = s?.source || (s?.manual === true ? "manual" : "legacy");
+    if (src === "camera_event" && hasAutoSplitToday) return sum;
+    return sum + secondsOf(s);
+  }, 0);
 
  
   if (user.currentStart && window.isUserOnline(user)) {
@@ -349,20 +369,17 @@ window.formatTime = function (seconds) {
 
 
 window.updateOnlineStatus = function(users){
-
-  Object.values(users).forEach(user => {
-
-    const level = getUserLevel(user.totalSeconds);
-
-    const el = document.querySelector(`[data-user="${user.id}"]`);
-
-    if(!el) return;
-
-    el.querySelector(".level-label").innerText = level.label;
-
+  const list = Array.isArray(users) ? users : Object.values(users || {});
+  list.forEach((user) => {
+    const card = document.querySelector(`[data-id="${user?.id}"]`);
+    if (!card) return;
+    const dot = card.querySelector(".online-dot");
+    if (!dot) return;
+    const onlineNow = window.isUserOnline(user);
+    dot.classList.toggle("online", onlineNow);
+    dot.classList.toggle("offline", !onlineNow);
   });
-
-}
+};
 
 
 
