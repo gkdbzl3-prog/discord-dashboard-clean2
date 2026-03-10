@@ -1,0 +1,114 @@
+{
+  "generatedAt": "2026-03-09T14:55:00.365Z",
+  "uniqueSessions": 23,
+  "days": [
+    {
+      "day": "2026-01-29",
+      "totalHours": 5.35,
+      "users": [
+        {
+          "userId": "1146001494307524638",
+          "name": "gyul000_00827",
+          "sessions": 3,
+          "hours": 5.27
+        },
+        {
+          "userId": "743880211547816046",
+          "name": "ryuri0115",
+          "sessions": 7,
+          "hours": 0.08
+        }
+      ]
+    },
+    {
+      "day": "2026-01-30",
+      "totalHours": 6.57,
+      "users": [
+        {
+          "userId": "743880211547816046",
+          "name": "ryuri0115",
+          "sessions": 1,
+          "hours": 6.57
+        }
+      ]
+    },
+    {
+      "day": "2026-01-31",
+      "totalHours": 17.16,
+      "users": [
+        {
+          "userId": "1146001494307524638",
+          "name": "gyul000_00827",
+          "sessions": 1,
+          "hours": 8
+        },
+        {
+          "userId": "1384786633693462549",
+          "name": "sea.4m.e",
+          "sessions": 1,
+          "hours": 8
+        },
+        {
+          "userId": "743880211547816046",
+          "name": "ryuri0115",
+          "sessions": 1,
+          "hours": 1.16
+        }
+      ]
+    },
+    {
+      "day": "2026-02-01",
+      "totalHours": 9.75,
+      "users": [
+        {
+          "userId": "1146001494307524638",
+          "name": "gyul000_00827",
+          "sessions": 1,
+          "hours": 4.79
+        },
+        {
+          "userId": "743880211547816046",
+          "name": "ryuri0115",
+          "sessions": 1,
+          "hours": 2.65
+        },
+        {
+          "userId": "507177245648093185",
+          "name": "ex7307",
+          "sessions": 1,
+          "hours": 2.31
+        }
+      ]
+    },
+    {
+      "day": "2026-02-02",
+      "totalHours": 17.39,
+      "users": [
+        {
+          "userId": "476226483703250956",
+          "name": "wisdomrang",
+          "sessions": 2,
+          "hours": 7.81
+        },
+        {
+          "userId": "743880211547816046",
+          "name": "ryuri0115",
+          "sessions": 2,
+          "hours": 5.59
+        },
+        {
+          "userId": "1146001494307524638",
+          "name": "gyul000_00827",
+          "sessions": 1,
+          "hours": 2.49
+        },
+        {
+          "userId": "856206410013868053",
+          "name": "yon_dooh_",
+          "sessions": 1,
+          "hours": 1.49
+        }
+      ]
+    }
+  ]
+}

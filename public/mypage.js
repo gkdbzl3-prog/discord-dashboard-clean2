@@ -582,9 +582,9 @@ if (input) {
 const badgeBox = document.getElementById("badgeBox");
 
 if (badgeBox) {
-  badgeBox.innerHTML = badges
-    .map(b => `<span class="badge">${b}</span>`)
-    .join("");
+  badgeBox.innerHTML = badges.length
+    ? badges.map((b) => `<span class="badge">${b}</span>`).join("")
+    : `<span class="badge badge-empty">뱃지 없음</span>`;
 }
 setTimeout(() => {
 const editor = document.getElementById("memoEditor");
@@ -1327,22 +1327,24 @@ window.initCalendarMonthSelect = function(){
 
 };
 
-window.showToast = function(message) {
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.innerText = message;
+if (typeof window.showToast !== "function") {
+  window.showToast = function(message) {
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.innerText = message;
 
-  document.body.appendChild(toast);
+    document.body.appendChild(toast);
 
-  setTimeout(() => {
-    toast.classList.add("show");
-  }, 10);
+    setTimeout(() => {
+      toast.classList.add("show");
+    }, 10);
 
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 300);
-  }, 2000);
-};
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  };
+}
 
 
 
@@ -1804,13 +1806,15 @@ window.getBadges = function(user) {
 
   const badges = [];
 
-  const monthHours = window.getMonthlyHoursFromSessions(
-    window.currentUser?.sessions || []
+  const baseSessions = window.getAggregateSessionList(
+    Array.isArray(user?.sessions) ? user.sessions : []
   );
+  const monthHours = window.getMonthlyHoursFromSessions(baseSessions);
 
 if (monthHours >= 5)  badges.push("📚 5시간 달성");
 if (monthHours >= 20) badges.push("💪 20시간 달성");
 if (monthHours >= 50) badges.push("👑 50시간 달성");
+if (user?.goalBadge) badges.push("🏅 목표 달성왕");
 
   return badges;
 };

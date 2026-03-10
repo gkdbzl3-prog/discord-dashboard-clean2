@@ -1,12 +1,14 @@
 /* eslint-disable no-console */
 const fs = require('fs');
 const path = require('path');
+const { normalizeDataRoot, ensureGuild } = require('../data/guild-data');
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
 
 const DATA_FILE = process.env.DATA_FILE || '/data/data.json';
 const BACKUPS_DIR = process.env.BACKUPS_DIR || '/app/backups';
+const TARGET_GUILD_ID = process.env.GUILD_ID || process.env.DEFAULT_GUILD_ID || 'default';
 
 function loadJson(filePath) {
   try {
@@ -71,7 +73,9 @@ function main() {
     console.error(`[restore] failed to parse DATA_FILE: ${DATA_FILE}`);
     process.exit(1);
   }
-  if (!data.users || typeof data.users !== 'object') data.users = {};
+  const root = normalizeDataRoot(data);
+  const guild = ensureGuild(root, TARGET_GUILD_ID);
+  if (!guild.users || typeof guild.users !== 'object') guild.users = {};
 
   const files = fs.existsSync(BACKUPS_DIR)
     ? fs.readdirSync(BACKUPS_DIR).filter((name) => name.endsWith('.json'))
@@ -94,7 +98,7 @@ function main() {
       const sessions = Array.isArray(backupUser.sessions) ? backupUser.sessions : [];
       if (sessions.length === 0) continue;
 
-      const user = ensureUser(data.users, userId, backupUser);
+      const user = ensureUser(guild.users, userId, backupUser);
       const existingKeys = new Set(
         (Array.isArray(user.sessions) ? user.sessions : [])
           .map((s) => sessionKey(s))
@@ -128,13 +132,14 @@ function main() {
     apply,
     dataFile: DATA_FILE,
     backupsDir: BACKUPS_DIR,
+    guildId: TARGET_GUILD_ID,
     scannedFiles,
     touchedUsers,
     importedSessions
   };
 
   if (apply) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    fs.writeFileSync(DATA_FILE, JSON.stringify(root, null, 2), 'utf8');
     console.log('[restore] applied');
   } else {
     console.log('[restore] dry-run');

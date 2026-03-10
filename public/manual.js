@@ -249,6 +249,7 @@ historyBox.innerHTML = itemsHtml || "No manual records";
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
                     token: window.token,
+                    guildId: window.currentGuildId || localStorage.getItem("guildId") || "",
                     userId, 
                     minutes: Number(minutes) 
                 })
@@ -329,42 +330,92 @@ historyBox.innerHTML = itemsHtml || "No manual records";
 
 
 
-
-
-
-
-// 삭제 함수
 window.deleteManualSession = async function (userId, index) {
 
-  if (!confirm("정말 삭제할까요?")) return;
+  window.showConfirmModal("정말 삭제할까요?", async () => {
 
-  const res = await fetch("/delete-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token: window.token,
-      userId,
-      index
-    })
+    const res = await fetch("/delete-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: window.token,
+        guildId: window.currentGuildId || localStorage.getItem("guildId") || "",
+        userId,
+        index
+      })
+    });
+
+    const result = await res.json();
+
+    if (res.ok && result.ok) {
+
+      window.showToast("🗑 삭제 완료");
+
+      await window.loadUsers();
+      window.manualDataCache = null;
+
+      const historyBox = document.getElementById("manualHistory");
+
+      if (historyBox && historyBox.style.display === "block") {
+        document.getElementById("loadHistoryBtn").click();
+      }
+
+    } else {
+
+      window.showToast("삭제 실패", "error");
+
+    }
+
   });
 
-  const result = await res.json();
+};
 
-if (res.ok && result.ok) {
-  window.showToast("🗑 삭제 완료");
-  await window.loadUsers();
-                window.manualDataCache = null;
 
-  const historyBox = document.getElementById("manualHistory");
-  if (historyBox.style.display === "block") {
-    document.getElementById("loadHistoryBtn").click();
+
+window.editManualSession = function (userId, index) {
+
+  if (!userId) {
+    console.error("userId 없음");
+    return;
   }
 
-} else {
-  window.showToast("삭제 실패", "error");
-}
+  window.showInputModal("수정할 시간 (분):", async (newMin) => {
 
-}
+    const res = await fetch("/edit-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: window.token,
+        guildId: window.currentGuildId || localStorage.getItem("guildId") || "",
+        userId,
+        index,
+        newSeconds: Number(newMin) * 60,
+        editTime: new Date().toISOString()
+      })
+    });
+
+    const result = await res.json();
+
+    if (res.ok && result.ok) {
+
+      window.showToast("✏️ 수정 완료!");
+
+      await window.loadUsers();
+      window.manualDataCache = null;
+
+      const btn = document.getElementById("loadHistoryBtn");
+      if (btn) btn.click();
+
+    } else {
+
+      window.showToast("수정 실패", "error");
+
+    }
+
+  });
+
+};
+
 
 window.renderDaySessions = function (sessions = [], expanded = false) {
   const visible = expanded ? sessions : sessions.slice(0, 5);
@@ -379,43 +430,6 @@ window.renderDaySessions = function (sessions = [], expanded = false) {
       ` : ""}
     </div>
   `;
-};
-
-window.editManualSession = async function (userId, index) {
-if (!userId) {
-  console.error("userId 없음");
-  return;
-}
-  const newMin = prompt("수정할 시간 (분):");
-  if (!newMin || isNaN(newMin)) return;
-if (newMin === null) {
-  window.showToast("수정취소");
-  return;
-}
-
-  const res = await fetch("/edit-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token: window.token,
-      userId,
-      index,
-      newSeconds: Number(newMin) * 60,
-      editTime: new Date().toISOString()
-    })
-  });
-
-  const result = await res.json();
-
- if (res.ok && result.ok) {
-  window.showToast("✏️ 수정 완료!");
-
-  await window.loadUsers();
-                window.manualDataCache = null;
-  document.getElementById("loadHistoryBtn").click();
-  } else {
-    alert("수정 실패");
-  }
 };
 
 window.confirmEdit = function(message, onConfirm) {
@@ -439,3 +453,53 @@ window.openMemoModal = function () {
   memoInput.value = localStorage.getItem("simpleMemo") || "";
   document.getElementById("memoModal").style.display = "flex";
 }
+
+
+window.showConfirmModal = function(message, onConfirm) {
+
+  const overlay = document.createElement("div");
+  overlay.className = "app-overlay";
+
+  overlay.innerHTML = `
+    <div class="modal-box">
+
+      <div class="modal-title">${message}</div>
+
+      <div class="modal-buttons">
+        <button class="btn-cancel">취소</button>
+        <button class="btn-confirm">확인</button>
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const cancelBtn = overlay.querySelector(".btn-cancel");
+  const okBtn = overlay.querySelector(".btn-confirm");
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener("keydown", escHandler);
+  };
+
+  cancelBtn.onclick = close;
+
+  okBtn.onclick = () => {
+    onConfirm();
+    close();
+  };
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+
+  const escHandler = (e) => {
+    if (e.key === "Escape") close();
+  };
+
+  setTimeout(() => {
+    document.addEventListener("keydown", escHandler);
+  }, 0);
+
+};

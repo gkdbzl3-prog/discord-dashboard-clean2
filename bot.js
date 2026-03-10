@@ -1,8 +1,16 @@
-﻿require("dotenv").config();
+﻿require("dotenv").config({ override: true });
 
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 8080;
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const createAdminRouter = require('./routes/admin');
+const { loadData, saveData } = require('./data/store');
+const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+let data = loadData();
 
 app.use(express.static("public", {
   setHeaders: (res, filePath) => {
@@ -25,13 +33,24 @@ app.get('/favicon.ico', (req, res) => res.status(204));
 app.use(express.json());
 
 
+const uploadDir = path.join(__dirname, "public", "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, Date.now() + ext);
+  }
+});
 
 
 
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
-const createAdminRouter = require('./routes/admin');
-const { loadData, saveData } = require('./data/store');
-let data = loadData();
 
 app.listen(PORT, () => {
   console.log(`Web server running on port ${PORT}`);
@@ -39,108 +58,6 @@ app.listen(PORT, () => {
 });
 
 
-
-
-app.use(express.json());
-
-app.get("/save-memo", (req, res) => {
-  const { memo } = req.query;
-
-feed.push({
-  type: "memo",
-  text: memo,
-  createdAt: Date.now()
-});
-
-  res.json({ ok: true });
-});
-app.get('/favicon.ico', (req, res) => res.status(204));
-
-
-
-app.post("/manual", (req, res) => {
-  const { userId, minutes } = req.body;
-
-  const latest = loadData();
-  const user = latest.users[userId];
-
-  if (!user) return res.json({ ok: false });
-
-  user.sessions ??= [];
-
-  const now = Date.now();
-  const seconds = Math.floor(Number(minutes) * 60);
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return res.status(400).json({ ok: false, error: "invalid minutes" });
-  }
-
-  const manualSessions = user.sessions.filter((s) => s && (s.manual === true || s.source === "manual"));
-  const duplicated = manualSessions.some((s) => {
-    const sec = Number(s?.seconds || 0);
-    const st = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
-    if (!Number.isFinite(st)) return false;
-    return sec === seconds && Math.abs(st - now) <= 10000;
-  });
-  if (duplicated) {
-    return res.json({ ok: true, deduped: true });
-  }
-
-  user.sessions.push({
-    start: now - seconds * 1000,
-    end: now,
-    seconds,
-    manual: true,
-    source: "manual"
-  });
-
-  user.totalSeconds = aggregateTotalByEventAndManual(user);
-
-  saveData(latest);
-
-  res.json({ ok: true });
-});
-
-app.post("/edit-session", (req, res) => {
-  const { userId, index, newSeconds } = req.body;
-
-  const latest = loadData();
-  const user = latest.users[userId]; // target user
-
-  if (!user) {
-    return res.status(404).json({ ok: false });
-  }
-
-  if (!user.sessions || !user.sessions[index]) {
-    return res.status(400).json({ ok: false });
-  }
-
-  user.sessions[index].seconds = Number(newSeconds);
-  user.sessions[index].editTime = Date.now();
-  user.totalSeconds = aggregateTotalByEventAndManual(user);
-
-  saveData(latest);
-
-  res.json({ ok: true });
-});
-
-app.post("/delete-session", (req, res) => {
-  const { userId, index } = req.body;
-
-  const latest = loadData();
-  const user = latest.users[userId];
-
-  if (!user) return res.status(404).json({ ok: false });
-
-  if (!user.sessions || !user.sessions[index]) {
-    return res.status(400).json({ ok: false });
-  }
-
-  user.sessions.splice(index, 1);
-  user.totalSeconds = aggregateTotalByEventAndManual(user);
-  saveData(latest);
-
-  res.json({ ok: true });
-});
 
 
 const client = new Client({
@@ -156,28 +73,16 @@ const client = new Client({
   partials: [Partials.GuildMember]
 });
 
-
-(async () => {
-  try {
-    await client.login(process.env.DISCORD_TOKEN)
-    console.log("Discord bot logged in")
-  } catch (err) {
-    console.error("Bot login failed:", err)
-  }
-})();
-
-
 // Register admin routes after client is created
 app.use('/', createAdminRouter(client));
 
 
-function ensureUserExists(data, member) {
-  if (!data.users) data.users = {};
-
+function ensureUserExists(guildData, member) {
+  if (!guildData.users) guildData.users = {};
   const userId = member.id;
 
-  if (!data.users[userId]) {
-    data.users[userId] = {
+  if (!guildData.users[userId]) {
+    guildData.users[userId] = {
       id: userId,
       nickname: member.displayName || member.user.username,
       username: member.user.username,
@@ -191,14 +96,21 @@ function ensureUserExists(data, member) {
       eventStart: null
     };
 
-    console.log("🆕 신규 유저 생성:", userId);
+    console.log("[NEW USER] created:", userId);
   }
 
-  if (data.users[userId].eventStart === undefined) {
-    data.users[userId].eventStart = null;
+  if (guildData.users[userId].eventStart === undefined) {
+    guildData.users[userId].eventStart = null;
   }
 
-  return data.users[userId];
+  return guildData.users[userId];
+}
+
+function withGuildDataById(dataRoot, guildId) {
+  const data = normalizeDataRoot(dataRoot || {});
+  const gid = String(guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default");
+  const guild = ensureGuild(data, gid);
+  return { data, guildId: gid, guild };
 }
 
 function secondsOfSession(s) {
@@ -232,58 +144,54 @@ function markDirty() {
 
 
 client.on('clientReady', async () => {
-const STUDY_VC_ID = process.env.STUDY_VC_ID;
+  const STUDY_VC_ID = process.env.STUDY_VC_ID;
+  const now = Date.now();
+  data = normalizeDataRoot(loadData());
 
-if (!STUDY_VC_ID) {
-  console.log("STUDY_VC_ID not set, skipping channel fetch");
-  return;
-}
-
-const channel = await client.channels.fetch(STUDY_VC_ID);
-
-const now = Date.now();
-  if (!channel) return;
- 
-  Object.values(data.users).forEach((u) => {
-    if (!u) return;
-    u.currentStart = null;
-    u.eventStart = null;
+  Object.values(data.guilds || {}).forEach((g) => {
+    Object.values(g?.users || {}).forEach((u) => {
+      if (!u) return;
+      u.currentStart = null;
+      u.eventStart = null;
+    });
   });
 
 client.on("error", err => {
   console.error("Discord Client Error:", err);
 });
 
-
-channel.members.forEach(member => {
-  if (member.user.bot) return;
-  const user = ensureUserExists(data, member);
-  if (member.voice.selfVideo) {
-    user.currentStart = now;
-    user.eventStart = now;
-    console.log("재시작 동기화 → 온라인:", member.user.username);
+if (STUDY_VC_ID) {
+  try {
+    const channel = await client.channels.fetch(STUDY_VC_ID);
+    if (channel?.guild?.id) {
+      const { guild } = withGuildDataById(data, channel.guild.id);
+      if (!guild.settings.studyVcId) guild.settings.studyVcId = STUDY_VC_ID;
+      channel.members.forEach((member) => {
+        if (member.user.bot) return;
+        const user = ensureUserExists(guild, member);
+        if (member.voice.selfVideo) {
+          user.currentStart = now;
+          user.eventStart = now;
+          console.log("?ъ떆???숆린?????⑤씪??", member.user.username);
+        }
+      });
+    }
+  } catch (err) {
+    console.error("clientReady study channel sync failed:", err?.message || err);
   }
-});
+}
 
-
-
-   console.log('👾봇 로그인 완료!');
-
-  const guild = client.guilds.cache.first();
-  if (!guild) return;
-
-  await guild.members.fetch();
-
-  guild.members.cache.forEach(member => {
-    const userId = member.id;
-
-   
-
-const user = ensureUserExists(data, member);
-user.avatar = member.user.displayAvatarURL?.() || null;
-    data.users[userId].nickname = member.displayName;
-  });
-
+   console.log("[READY] bot login complete");
+  for (const guild of client.guilds.cache.values()) {
+    await guild.members.fetch();
+    const { guild: guildData } = withGuildDataById(data, guild.id);
+    guild.members.cache.forEach((member) => {
+      const user = ensureUserExists(guildData, member);
+      user.avatar = member.user.displayAvatarURL?.() || null;
+      user.nickname = member.displayName;
+      user.username = member.user.username;
+    });
+  }
 
   saveData(data);
 
@@ -329,7 +237,7 @@ function computeTodayWeekAll(user) {
   const now = Date.now();
   const todayStart = kstStartOfTodayMs(now);
 
-  const day = new Date(now).getDay(); // 0=??
+  const day = new Date(now).getDay(); // 0=Sunday
   const diff = day === 0 ? 6 : day - 1;
   const weekStart = todayStart - diff * DAY_MS;
 
@@ -353,55 +261,56 @@ for (const s of user.sessions || []) {
 
 }
 
+
 client.on("presenceUpdate", (oldPresence, newPresence) => {
   if (!newPresence || !newPresence.member) return;
 
   const member = newPresence.member;
+  const guildId = member.guild?.id;
+  if (!guildId) return;
 
-  const data = loadData();
-
-  const user = ensureUserExists(data, member);
+  const root = normalizeDataRoot(loadData());
+  const { data, guild } = withGuildDataById(root, guildId);
+  const user = ensureUserExists(guild, member);
 
   // Keep latest profile fields in sync
   user.nickname = member.displayName || member.user.username;
   user.username = member.user.username;
   user.avatar = member.user.displayAvatarURL?.() || null;
 
-markDirty();
+  markDirty();
+  saveData(data);
 });
 
 
 
 setInterval(() => {
 
-  const data = loadData(); // reload latest data every tick
+  const data = normalizeDataRoot(loadData()); // reload latest data every tick
   const now = Date.now();
 
-  for (const userId in data.users) {
+  for (const [guildId, guild] of Object.entries(data.guilds || {})) {
+    for (const userId in (guild.users || {})) {
+      const user = guild.users[userId];
+      if (!user || !user.currentStart) continue;
 
-    const user = data.users[userId];
-    if (!user || !user.currentStart) continue;
+      const duration = Math.floor((now - user.currentStart) / 1000);
 
-    const duration = Math.floor((now - user.currentStart) / 1000);
+      if (duration >= 30) {
+        user.sessions ??= [];
 
-    if (duration >= 30) {
+        user.sessions.unshift({
+          start: user.currentStart,
+          end: now,
+          seconds: duration,
+          source: "auto_split"
+        });
 
-      user.sessions ??= [];
-
-      user.sessions.unshift({
-        start: user.currentStart,
-        end: now,
-        seconds: duration,
-        source: "auto_split"
-      });
-
-      user.totalSeconds = aggregateTotalByEventAndManual(user);
-
-      user.currentStart = now;
-
-      saveData(data);
-
-      console.log("✅ 자동 분할 저장 완료!", userId, duration);
+        user.totalSeconds = aggregateTotalByEventAndManual(user);
+        user.currentStart = now;
+        saveData(data);
+        console.log("? ?먮룞 遺꾪븷 ????꾨즺!", guildId, userId, duration);
+      }
     }
   }
 
@@ -411,18 +320,22 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const userId = newState.id;
   const member = newState.member || oldState.member;
   if (!member) return;
-  const dataLatest = loadData();
-  const user = ensureUserExists(dataLatest, member);
+  const guildId = newState.guild?.id || oldState.guild?.id;
+  if (!guildId) return;
+  const root = normalizeDataRoot(loadData());
+  const { data: dataLatest, guild } = withGuildDataById(root, guildId);
+  const user = ensureUserExists(guild, member);
 
-  const STUDY_VC_ID = process.env.STUDY_VC_ID;
-  const wasInStudy = oldState.channelId === STUDY_VC_ID;
-  const isInStudy = newState.channelId === STUDY_VC_ID;
+  const STUDY_VC_ID = guild.settings.studyVcId || process.env.STUDY_VC_ID;
+  const wasInStudy = !!STUDY_VC_ID && oldState.channelId === STUDY_VC_ID;
+  const isInStudy = !!STUDY_VC_ID && newState.channelId === STUDY_VC_ID;
   const oldVideo = !!oldState.selfVideo;
   const newVideo = !!newState.selfVideo;
   const now = Date.now();
 
   const usertag = member?.displayName || member?.user?.username || "unknown";
-  const logCh = client.channels.cache.get(process.env.LOG_CHANNEL_ID);
+  const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
+  const logCh = client.channels.cache.get(logChannelId);
 
   const closeCurrentSession = () => {
     if (!user.currentStart && !user.eventStart) return;
@@ -475,14 +388,13 @@ client.on("voiceStateUpdate", (oldState, newState) => {
       if (!user.eventStart) user.eventStart = now;
       saveData(dataLatest);
     }
-     logCh?.send(`📷 ${usertag} 캠 ON
-스터디 기록은 여기서 볼 수 있어요
-https://zzozzozzo.fly.dev/`);
+     logCh?.send(`[CAM ON] ${usertag}` + "\n" +
+"Study log: https://zzozzozzo.fly.dev/");
   }
 
   if (oldVideo && !newVideo && isInStudy) {
     closeCurrentSession();
-   logCh?.send(`📷 ${usertag} 캠 OFF`);
+   logCh?.send(`[CAM OFF] ${usertag}`);
   }
 
 
@@ -498,17 +410,19 @@ client.on('messageCreate', async (msg) => {
 
   const content = msg.content.trim();
   const userId = msg.author.id;
-
-  const user = data.users[userId];
+  const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
+  const root = normalizeDataRoot(loadData());
+  const { data: latestData, guild } = withGuildDataById(root, guildId);
+  const user = guild.users[userId];
   if (!user) return;
 
   if (content === '!help') {
     await msg.reply(
-  '📘 **스터디 봇 사용법**\n\n' +
-      '⏰ `!time`\n' +
-      '📅 `!today`\n' +
-      '📆 `!week`\n' +
-      '🎯 `!goal 3h`\n'
+  "**Study Bot Commands**\n\n" +
+      "- `!time`\n" +
+      "- `!today`\n" +
+      "- `!week`\n" +
+      "- `!goal 3h`\n"
     );
     return;
   }
@@ -517,23 +431,23 @@ client.on('messageCreate', async (msg) => {
     const { todaysec, weekSec, allSec } = computeTodayWeekAll(user);
 
     await msg.reply(
-      `🕒 ${user.nickname || msg.author.username}\n` +
-      `- 오늘: ${formatSeconds(todaysec)}\n` +
-      `- 이번주: ${formatSeconds(weekSec)}\n` +
-      `- 누적: ${formatSeconds(allSec)}`
+      `User: ${user.nickname || msg.author.username}\n` +
+      `- Today: ${formatSeconds(todaysec)}\n` +
+      `- This week: ${formatSeconds(weekSec)}\n` +
+      `- Total: ${formatSeconds(allSec)}`
     );
     return;
   }
 
   if (content === '!today') {
     const { todaysec } = computeTodayWeekAll(user);
-    await msg.reply(`📅 오늘 공부: ${formatSeconds(todaysec)}`);
+    await msg.reply(`Today: ${formatSeconds(todaysec)}`);
     return;
   }
 
   if (content === '!week') {
     const { weekSec } = computeTodayWeekAll(user);
-    await msg.reply(`📆 이번 주: ${formatSeconds(weekSec)}`);
+    await msg.reply(`This week: ${formatSeconds(weekSec)}`);
     return;
   }
 
@@ -542,19 +456,21 @@ client.on('messageCreate', async (msg) => {
     const sec = parseGoalToSeconds(value);
 
     if (sec === null) {
-      await msg.reply('형식: !goal 3h / !goal 150m / !goal off');
+      await msg.reply('?뺤떇: !goal 3h / !goal 150m / !goal off');
       return;
     }
 
     user.goaltodaysec = sec;
-    saveData(data);
+    saveData(latestData);
 
-   await msg.reply('✅ 목표 설정 완료');
+   await msg.reply('? 紐⑺몴 ?ㅼ젙 ?꾨즺');
     return;
   }
 
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => console.log("Discord bot logged in"))
+  .catch((err) => console.error("Bot login failed:", err));
 
 

@@ -393,7 +393,371 @@ window.updateOnlineStatus = function(users){
   });
 };
 
+window.imageZoomState = {
+  scale: 1,
+  x: 0,
+  y: 0,
+  dragging: false,
+  startX: 0,
+  startY: 0,
+  lastTouchDistance: null
+};
 
+window.applyImageTransform = function () {
+  const img = document.getElementById("imageModalImg");
+  if (!img) return;
+
+  const { scale, x, y } = window.imageZoomState;
+  img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+};
+
+window.resetImageZoom = function () {
+  window.imageZoomState = {
+    scale: 1,
+    x: 0,
+    y: 0,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    lastTouchDistance: null
+  };
+  window.applyImageTransform();
+};
+
+window.openImageModal = function (src) {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal || !img) return;
+
+  img.src = src;
+  modal.classList.add("show");
+  window.resetImageZoom();
+};
+
+window.closeImageModal = function () {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal || !img) return;
+
+  modal.classList.remove("show");
+  img.src = "";
+  window.resetImageZoom();
+};
+
+window.getTouchDistance = function (touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+// 피드 이미지 클릭 시 열기
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("imageModal");
+  const closeBtn = document.getElementById("imageModalClose");
+
+  if (e.target.classList.contains("feed-image")) {
+    window.openImageModal(e.target.src);
+    return;
+  }
+
+  if (e.target === modal || e.target === closeBtn) {
+    window.closeImageModal();
+  }
+});
+
+// ESC 닫기
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    window.closeImageModal();
+  }
+});
+
+// 마우스 휠 줌
+document.addEventListener("wheel", (e) => {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal?.classList.contains("show") || !img) return;
+  if (e.target !== img) return;
+
+  e.preventDefault();
+
+  const state = window.imageZoomState;
+  const delta = e.deltaY < 0 ? 0.12 : -0.12;
+  state.scale = Math.min(4, Math.max(1, state.scale + delta));
+
+  if (state.scale === 1) {
+    state.x = 0;
+    state.y = 0;
+  }
+
+  window.applyImageTransform();
+}, { passive: false });
+
+// 마우스 드래그 시작
+document.addEventListener("mousedown", (e) => {
+  const img = document.getElementById("imageModalImg");
+  if (!img) return;
+  if (e.target !== img) return;
+  if (window.imageZoomState.scale <= 1) return;
+
+  const state = window.imageZoomState;
+  state.dragging = true;
+  state.startX = e.clientX - state.x;
+  state.startY = e.clientY - state.y;
+  img.classList.add("dragging");
+});
+
+// 마우스 드래그 이동
+document.addEventListener("mousemove", (e) => {
+  const state = window.imageZoomState;
+  if (!state.dragging) return;
+
+  state.x = e.clientX - state.startX;
+  state.y = e.clientY - state.startY;
+  window.applyImageTransform();
+});
+
+// 마우스 드래그 종료
+document.addEventListener("mouseup", () => {
+  const img = document.getElementById("imageModalImg");
+  window.imageZoomState.dragging = false;
+  img?.classList.remove("dragging");
+});
+
+// 터치 시작
+document.addEventListener("touchstart", (e) => {
+  const img = document.getElementById("imageModalImg");
+  const modal = document.getElementById("imageModal");
+  if (!modal?.classList.contains("show") || !img) return;
+  if (e.target !== img) return;
+
+  const state = window.imageZoomState;
+
+  if (e.touches.length === 2) {
+    state.lastTouchDistance = window.getTouchDistance(e.touches);
+  }
+
+  if (e.touches.length === 1 && state.scale > 1) {
+    state.dragging = true;
+    state.startX = e.touches[0].clientX - state.x;
+    state.startY = e.touches[0].clientY - state.y;
+  }
+}, { passive: false });
+
+// 터치 이동: 핀치 줌 + 드래그
+document.addEventListener("touchmove", (e) => {
+  const img = document.getElementById("imageModalImg");
+  const modal = document.getElementById("imageModal");
+  if (!modal?.classList.contains("show") || !img) return;
+  if (e.target !== img) return;
+
+  const state = window.imageZoomState;
+
+  // 핀치 줌
+  if (e.touches.length === 2) {
+    e.preventDefault();
+
+    const distance = window.getTouchDistance(e.touches);
+
+    if (state.lastTouchDistance) {
+      const diff = (distance - state.lastTouchDistance) / 180;
+      state.scale = Math.min(4, Math.max(1, state.scale + diff));
+
+      if (state.scale === 1) {
+        state.x = 0;
+        state.y = 0;
+      }
+
+      window.applyImageTransform();
+    }
+
+    state.lastTouchDistance = distance;
+    return;
+  }
+
+  // 한 손 드래그
+  if (e.touches.length === 1 && state.dragging && state.scale > 1) {
+    e.preventDefault();
+
+    state.x = e.touches[0].clientX - state.startX;
+    state.y = e.touches[0].clientY - state.startY;
+    window.applyImageTransform();
+  }
+}, { passive: false });
+
+// 터치 끝
+document.addEventListener("touchend", () => {
+  window.imageZoomState.dragging = false;
+  window.imageZoomState.lastTouchDistance = null;
+});
+
+window.applyImageTransform = function () {
+  const img = document.getElementById("imageModalImg");
+  if (!img) return;
+
+  const { scale, x, y } = window.imageZoomState;
+  img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+};
+
+window.resetImageZoom = function () {
+  window.imageZoomState = {
+    scale: 1,
+    x: 0,
+    y: 0,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    lastTouchDistance: null
+  };
+  window.applyImageTransform();
+};
+
+window.openImageModal = function (src) {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal || !img) return;
+
+  img.src = src;
+  modal.classList.add("show");
+  window.resetImageZoom();
+};
+
+window.closeImageModal = function () {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal || !img) return;
+
+  modal.classList.remove("show");
+  img.src = "";
+  window.resetImageZoom();
+};
+
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("imageModal");
+  const closeBtn = document.getElementById("imageModalClose");
+
+  if (e.target.classList.contains("feed-image")) {
+    window.openImageModal(e.target.src);
+  }
+
+  if (e.target === modal || e.target === closeBtn) {
+    window.closeImageModal();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    window.closeImageModal();
+  }
+});
+
+document.addEventListener("wheel", (e) => {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal?.classList.contains("show") || !img) return;
+  if (e.target !== img) return;
+
+  e.preventDefault();
+
+  const state = window.imageZoomState;
+  const delta = e.deltaY < 0 ? 0.12 : -0.12;
+  state.scale = Math.min(4, Math.max(1, state.scale + delta));
+
+  if (state.scale === 1) {
+    state.x = 0;
+    state.y = 0;
+  }
+
+  window.applyImageTransform();
+}, { passive: false });
+
+document.addEventListener("mousedown", (e) => {
+  const img = document.getElementById("imageModalImg");
+  if (!img) return;
+  if (e.target !== img) return;
+  if (window.imageZoomState.scale <= 1) return;
+
+  const state = window.imageZoomState;
+  state.dragging = true;
+  state.startX = e.clientX - state.x;
+  state.startY = e.clientY - state.y;
+  img.classList.add("dragging");
+});
+
+document.addEventListener("mousemove", (e) => {
+  const state = window.imageZoomState;
+  if (!state.dragging) return;
+
+  state.x = e.clientX - state.startX;
+  state.y = e.clientY - state.startY;
+  window.applyImageTransform();
+});
+
+document.addEventListener("mouseup", () => {
+  const img = document.getElementById("imageModalImg");
+  window.imageZoomState.dragging = false;
+  img?.classList.remove("dragging");
+});
+
+function getTouchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+document.addEventListener("touchstart", (e) => {
+  const img = document.getElementById("imageModalImg");
+  if (!img) return;
+  if (e.target !== img) return;
+
+  if (e.touches.length === 2) {
+    window.imageZoomState.lastTouchDistance = getTouchDistance(e.touches);
+  }
+
+  if (e.touches.length === 1 && window.imageZoomState.scale > 1) {
+    const state = window.imageZoomState;
+    state.dragging = true;
+    state.startX = e.touches[0].clientX - state.x;
+    state.startY = e.touches[0].clientY - state.y;
+  }
+}, { passive: false });
+
+document.addEventListener("touchmove", (e) => {
+  const img = document.getElementById("imageModalImg");
+  const modal = document.getElementById("imageModal");
+  if (!modal?.classList.contains("show") || !img) return;
+  if (e.target !== img) return;
+
+  const state = window.imageZoomState;
+
+  if (e.touches.length === 2) {
+    e.preventDefault();
+
+    const distance = getTouchDistance(e.touches);
+    if (state.lastTouchDistance) {
+      const diff = (distance - state.lastTouchDistance) / 200;
+      state.scale = Math.min(4, Math.max(1, state.scale + diff));
+      if (state.scale === 1) {
+        state.x = 0;
+        state.y = 0;
+      }
+      window.applyImageTransform();
+    }
+    state.lastTouchDistance = distance;
+  }
+
+  if (e.touches.length === 1 && state.dragging && state.scale > 1) {
+    e.preventDefault();
+    state.x = e.touches[0].clientX - state.startX;
+    state.y = e.touches[0].clientY - state.startY;
+    window.applyImageTransform();
+  }
+}, { passive: false });
+
+document.addEventListener("touchend", () => {
+  window.imageZoomState.dragging = false;
+  window.imageZoomState.lastTouchDistance = null;
+});
 
 window.renderFeed = function(feed) {
 
@@ -410,11 +774,21 @@ window.renderFeed = function(feed) {
     "https://cdn.discordapp.com/embed/avatars/0.png";
 
   const html = feed.map(item => {
+const imageHtml = item.image
+  ? `<img class="feed-image" src="${item.image}" alt="memo image">`
+  : "";
+
   if (!item || typeof item !== "object") return "";
 
-  const user = window.usersCache[String(item.userId)];
-
-    if (!user) return "";
+  const user = window.usersCache[String(item.userId)] || {
+    id: String(item.userId || ""),
+    nickname: item.nickname || "이름없음",
+    name: item.nickname || "이름없음",
+    avatar: DEFAULT_AVATAR,
+    totalSeconds: 0,
+    sessions: [],
+    feedCount: 0
+  };
 
     const rawName = user.nickname || item.nickname || "이름없음";
     const nickname = String(rawName || "")
@@ -473,6 +847,7 @@ const bioText = `
           </div>
 
           <div class="feed-text">${safeText || "(내용 없음)"}</div>
+ ${imageHtml}
         </div>
       </div>
 
@@ -535,19 +910,115 @@ if (e.target.closest(".feed-like")) {
 
 
 });
+const fileInput = document.getElementById("fabMemoImage");
+const preview = document.getElementById("memoPreview");
+const fileNameEl = document.getElementById("memoFileName");
 
+if (fileInput && preview) {
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (!file) {
+      preview.removeAttribute("src");
+      preview.style.display = "none";
+      if (fileNameEl) fileNameEl.textContent = "선택된 파일 없음";
+      return;
+    }
+
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = "block";
+    if (fileNameEl) fileNameEl.textContent = file.name || "선택된 파일 없음";
+  });
+}
 
 }
 
-window.createFeed = async function(text){
-  const nickname = window.currentNickname || localStorage.getItem("nickname") || "unknown";
-  await window.API.fetch(
-    `/save-feed?nickname=${encodeURIComponent(nickname)}&memo=${encodeURIComponent(text || "")}`
-  );
+window.createFeed = async function (text) {
+  const nickname =
+    window.currentNickname ||
+    localStorage.getItem("nickname") ||
+    "unknown";
+
+  const imageInput = document.getElementById("fabMemoImage");
+  const imageFile = imageInput?.files?.[0];
+
+  if (!text?.trim() && !imageFile) return;
+
+  const formData = new FormData();
+  formData.append("userId", window.currentUserId || "");
+  formData.append("nickname", nickname);
+  formData.append("memo", text || "");
+
+  if (imageFile) {
+    formData.append("image", imageFile);
+  }
+
+  const token = window.token || localStorage.getItem("adminToken") || "";
+  const guildId = window.currentGuildId || localStorage.getItem("guildId") || "";
+  let url = `/save-feed${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  if (guildId) {
+    url += `${url.includes("?") ? "&" : "?"}guildId=${encodeURIComponent(guildId)}`;
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: formData
+  });
+
+  const responseText = await res.text();
+  let result = {};
+  try {
+    result = responseText ? JSON.parse(responseText) : {};
+  } catch (e) {
+    console.error("피드 저장 실패(응답 파싱):", responseText);
+    return;
+  }
+
+  if (!res.ok || !result.ok) {
+    console.error("피드 저장 실패:", res.status, result);
+    return;
+  }
+
+  if (imageInput) imageInput.value = "";
 
   window.loadFeed();
-
 };
+
+window.openImageModal = function(src) {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal || !img) return;
+
+  img.src = src;
+  modal.classList.add("show");
+};
+
+window.closeImageModal = function() {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("imageModalImg");
+  if (!modal || !img) return;
+
+  modal.classList.remove("show");
+  img.src = "";
+};
+
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("imageModal");
+  const closeBtn = document.getElementById("imageModalClose");
+
+  if (e.target.classList.contains("feed-image")) {
+    window.openImageModal(e.target.src);
+  }
+
+  if (e.target === modal || e.target === closeBtn) {
+    window.closeImageModal();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    window.closeImageModal();
+  }
+});
 
 window.loadFeed = async function(){
   const data = await window.API.fetch("/today");
@@ -768,6 +1239,9 @@ window.showMemo = function () {
 
 
   memoInput.value = "";
+  if (typeof window.updateSimpleMemoCount === "function") {
+    window.updateSimpleMemoCount();
+  }
 
   setTimeout(() => {
     memoInput.focus();
@@ -792,34 +1266,78 @@ window.closeMemo = function () {
 
 
 
-window.saveSimpleMemo = async function() {
-
+window.saveSimpleMemo = async function () {
   const memoInput = document.getElementById("simpleMemo");
+  const imageInput = document.getElementById("fabMemoImage");
+  const preview = document.getElementById("memoPreview");
+  const fileNameEl = document.getElementById("memoFileName");
+
   if (!memoInput) return;
 
   const memoText = memoInput.value.trim();
-  if (!memoText) return;
+  const imageFile = imageInput?.files?.[0];
 
-  const memoModal = document.getElementById("memoModal");
+  if (!memoText && !imageFile) return;
 
-  const nickname = window.currentNickname || localStorage.getItem("nickname") || "unknown";
-  await window.API.fetch(
-    `/save-feed?nickname=${encodeURIComponent(nickname)}&memo=${encodeURIComponent(memoText)}`
-  );
+  const formData = new FormData();
+  formData.append("userId", window.currentUserId || "");
+  formData.append("nickname", window.currentNickname || "");
+  formData.append("memo", memoText);
 
-  memoInput.value = "";
-
-  if (memoModal) {
-    memoModal.classList.remove("show");
-    memoModal.style.display = "none";
+  if (imageFile) {
+    formData.append("image", imageFile);
   }
 
-  
+  const token = window.token || localStorage.getItem("adminToken") || "";
+  const guildId = window.currentGuildId || localStorage.getItem("guildId") || "";
+  let url = `/save-feed${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  if (guildId) {
+    url += `${url.includes("?") ? "&" : "?"}guildId=${encodeURIComponent(guildId)}`;
+  }
 
+  const res = await fetch(url, {
+    method: "POST",
+    body: formData
+  });
+
+  const responseText = await res.text();
+  let result = {};
+  try {
+    result = responseText ? JSON.parse(responseText) : {};
+  } catch (e) {
+    console.error("save-feed parse failed:", responseText);
+    return;
+  }
+
+  if (!res.ok || !result.ok) {
+    console.error("save-feed failed:", res.status, result);
+    return;
+  }
+
+  memoInput.value = "";
+  if (imageInput) {
+    imageInput.value = "";
+  }
+  if (preview) {
+    preview.removeAttribute("src");
+    preview.style.display = "none";
+  }
+  if (fileNameEl) {
+    fileNameEl.textContent = "선택된 파일 없음";
+  }
 
   setTimeout(() => {
     window.showToday();
   }, 0);
+};
+
+
+window.updateSimpleMemoCount = function () {
+  const memoInput = document.getElementById("simpleMemo");
+  const countEl = document.getElementById("memoCount");
+  if (!memoInput || !countEl) return;
+  const len = String(memoInput.value || "").length;
+  countEl.textContent = `${len} / 300`;
 };
 
 

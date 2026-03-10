@@ -1,6 +1,7 @@
 ﻿// data/store.js
 const fs = require('fs');
 const path = require('path');
+const { normalizeDataRoot } = require('./guild-data');
 const DATA_FILE = process.env.DATA_FILE
   ? path.resolve(process.env.DATA_FILE)
   : path.join(process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname, 'data.json');
@@ -56,19 +57,20 @@ function releaseLock() {
 function loadData() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
-      return { users: {}, feed: [] };
+      return normalizeDataRoot({});
     }
 
     const content = fs.readFileSync(DATA_FILE, 'utf8');
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    return normalizeDataRoot(parsed);
   } catch (e) {
     console.error('[loadData]', e);
-    return { users: {}, feed: [] };
+    return normalizeDataRoot({});
   }
 }
 
 function saveData(data) {
-  const payload = JSON.stringify(data, null, 2);
+  const payload = JSON.stringify(normalizeDataRoot(data), null, 2);
   const maxRetries = 6;
 
   try {

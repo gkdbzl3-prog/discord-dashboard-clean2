@@ -1,5 +1,14 @@
 ﻿const params = new URLSearchParams(window.location.search);
 window.token = params.get("token") || localStorage.getItem("adminToken");
+window.currentGuildId =
+  params.get("guildId") ||
+  localStorage.getItem("guildId") ||
+  window.currentGuildId ||
+  "";
+if (window.currentGuildId === "default") {
+  window.currentGuildId = "";
+  localStorage.removeItem("guildId");
+}
 
 console.log("token:", window.token);
 
@@ -45,32 +54,45 @@ window.formatTimeAgo = function (dateString) {
     return `${Math.floor(days / 7)}주 전`;
 }
 
-
 window.API = window.API || {};
-
-
 window.ADMIN_TOKEN = "쪼쪼쪼각할모방";
 
-window.API.fetch = async function (url) {
+window.API.fetch = async function (url, options = {}) {
   const rawToken = window.token || localStorage.getItem("adminToken") || "";
   const token =
     rawToken && rawToken !== "null" && rawToken !== "undefined"
       ? rawToken
       : "";
+  const guildId = window.currentGuildId || localStorage.getItem("guildId") || "";
 
-  const urlWithToken = token
-    ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
-    : url;
+  let finalUrl = url;
+  if (token) {
+    finalUrl += `${finalUrl.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
+  }
+  if (guildId) {
+    finalUrl += `${finalUrl.includes("?") ? "&" : "?"}guildId=${encodeURIComponent(guildId)}`;
+  }
 
-  const res = await fetch(urlWithToken);
-
+  const res = await fetch(finalUrl, options);
   if (!res.ok) {
     const text = await res.text();
-    console.error(`API 오류 [${res.status}] ${urlWithToken}:`, text);
+    console.error(`API 오류 [${res.status}] ${finalUrl}:`, text);
     throw new Error(`API failed (${res.status})`);
   }
 
-  return res.json();
+  const json = await res.json();
+  if (json?.guildId) {
+    window.currentGuildId = String(json.guildId);
+    localStorage.setItem("guildId", window.currentGuildId);
+  }
+
+const accessKey = window.currentGuildAccessKey || "";
+if (accessKey) {
+  finalUrl += `${finalUrl.includes("?") ? "&" : "?"}accessKey=${encodeURIComponent(accessKey)}`;
+}
+
+
+  return json;
 };
 
 window.API.post = async function(url, body) {
@@ -79,15 +101,22 @@ window.API.post = async function(url, body) {
     rawToken && rawToken !== "null" && rawToken !== "undefined"
       ? rawToken
       : "";
+  const guildId = window.currentGuildId || localStorage.getItem("guildId") || "";
 
-  const urlWithToken = token
+  let urlWithToken = token
     ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
     : url;
+  if (guildId) {
+    urlWithToken += `${urlWithToken.includes("?") ? "&" : "?"}guildId=${encodeURIComponent(guildId)}`;
+  }
 
   const res = await fetch(urlWithToken, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify({
+      ...(body || {}),
+      guildId: guildId || body?.guildId || ""
+    })
   });
 
   const text = await res.text();
@@ -102,10 +131,15 @@ window.API.post = async function(url, body) {
     throw new Error(`POST ${url} failed (${res.status}): ${json.error || text}`);
   }
 
+  if (json?.guildId) {
+    window.currentGuildId = String(json.guildId);
+    localStorage.setItem("guildId", window.currentGuildId);
+  }
   return json;
 };
-
-window.currentUserId = null;
+const baseGuildId = window.currentGuildId || localStorage.getItem("guildId") || "";
+window.currentGuildAccessKey =
+  localStorage.getItem(`guildAccessKey:${baseGuildId}`) || "";
 
 // 🔥 앱 시작 시 한 번만 실행
 const toastRoot = document.createElement("div");
@@ -114,7 +148,34 @@ document.documentElement.appendChild(toastRoot);
 
 
 
+window.loadGuilds = async function () {
+  const res = await window.API.fetch("/admin/guilds");
+  const guilds = res.guilds || [];
 
+  const select = document.getElementById("guildSelect");
+  if (!select) return;
+
+  select.innerHTML = guilds.map(g => `
+    <option value="${g.id}">${g.name}</option>
+  `).join("");
+
+  const savedGuildId = window.currentGuildId || localStorage.getItem("guildId");
+  const firstGuildId = savedGuildId && guilds.find(g => g.id === savedGuildId)
+    ? savedGuildId
+    : guilds[0]?.id;
+
+  if (firstGuildId) {
+    window.currentGuildId = firstGuildId;
+    select.value = firstGuildId;
+    localStorage.setItem("guildId", firstGuildId);
+  }
+
+  select.onchange = function () {
+    window.currentGuildId = this.value;
+    localStorage.setItem("guildId", this.value);
+    window.showToday();
+  };
+};
 
 
 window.loadUsers = async function () {
@@ -234,8 +295,7 @@ window.showMyPage = function (userId) {
 window.saveMemoToServer = async function(userId, text) {
   if (!userId || userId === 'undefined') return;
   try {
-    // API.fetch가 자동으로 token을 붙여주는지 확인하세요. 
-    // 안 붙여준다면 뒤에 &token=${window.token} 을 수동으로 붙여야 합니다.
+  
     await window.API.fetch(`/save-memo?userId=${userId}&memo=${encodeURIComponent(text)}`);
     console.log("메모가 서버에 저장되었습니다.");
   } catch (e) {
@@ -269,8 +329,35 @@ const fabMenu = document.getElementById("fab-menu");
     const minInput = document.querySelector("#manualMinutes");
     const minusBtn = document.querySelector(".minus-btn");
     const plusBtn = document.querySelector(".plus-btn");
+    const simpleMemoInput = document.getElementById("simpleMemo");
 
-  window.showToday();
+    const safeShowToday = async () => {
+      if (typeof window.showToday === "function") {
+        return window.showToday();
+      }
+      console.warn("showToday not ready yet");
+      return null;
+    };
+
+  if (typeof window.loadGuilds === "function") {
+    try {
+      await window.loadGuilds();
+    } catch (e) {
+      console.error("guild list load failed:", e);
+    }
+  }
+  await safeShowToday();
+
+    if (simpleMemoInput) {
+      simpleMemoInput.addEventListener("input", () => {
+        if (typeof window.updateSimpleMemoCount === "function") {
+          window.updateSimpleMemoCount();
+        }
+      });
+      if (typeof window.updateSimpleMemoCount === "function") {
+        window.updateSimpleMemoCount();
+      }
+    }
 
     const closeMemoModal = () => {
       if (!memoModal) return;
@@ -382,7 +469,7 @@ document.addEventListener("click", async (e) => {
   await window.API.fetch(`/delete-feed?id=${id}`);
 
 
-  await window.showToday();
+  await safeShowToday();
 
 });
 
@@ -392,7 +479,7 @@ document.querySelectorAll(".user-card").forEach(card => {
   card.addEventListener("click", () => {
     const nickname = card.dataset.nickname;
     window.currentNickname = nickname;
-    window.showToday();
+    safeShowToday();
   });
 });
 
@@ -411,6 +498,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.getElementById("recordInput")?.setAttribute("spellcheck", "false");
 document.getElementById("memo-editor")?.setAttribute("spellcheck", "false");
+
+
+window.addEventListener("DOMContentLoaded", () => {
+  window.loadGuilds?.();
+});
 
 });
 
@@ -471,9 +563,10 @@ window.showInputModal = function (message, onConfirm) {
     overlay.remove();
   };
 
-  cancelBtn.onclick = () => {
-    overlay.remove();
-  };
+cancelBtn.onclick = () => {
+  overlay.remove();
+  document.removeEventListener("keydown", escHandler);
+};
 
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -481,7 +574,23 @@ window.showInputModal = function (message, onConfirm) {
       okBtn.click();
     }
   });
+
+setTimeout(() => {
+
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      overlay.remove();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+
+  document.addEventListener("keydown", escHandler);
+
+}, 0);
+
 };
+
+
 
 
 window.splitUserSessions = function (user) {

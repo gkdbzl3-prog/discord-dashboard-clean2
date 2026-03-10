@@ -52,13 +52,15 @@ const progress = Math.min((totalHours / targetHours) * 100, 100).toFixed(0);
       const days = rawData.days || [];
       const max = Math.max(...days.map(d => Number(d.totalSeconds || 0)), 1);
       bars = days.map((d) => {
-        const percent = Math.round((Number(d.totalSeconds || 0) / max) * 100);
+        const seconds = Number(d.totalSeconds || 0);
+        const rawPercent = Math.round((seconds / max) * 100);
+        const percent = seconds > 0 ? Math.max(rawPercent, 4) : 0;
        return `
 <div class="week-bar">
 
   <div class="week-bar-fill"
        data-percent="${percent}"
-       title="${(Number(d.totalSeconds || 0)/3600).toFixed(1)}h">
+       title="${(seconds/3600).toFixed(1)}h">
   </div>
 
   <div class="bar-label">${(d.dayKey || "").slice(5)}</div>
