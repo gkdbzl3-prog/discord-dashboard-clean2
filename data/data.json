@@ -40969,6 +40969,36 @@
           "avatar": "https://cdn.discordapp.com/embed/avatars/3.png",
           "sessions": [
             {
+              "start": 1773141535781,
+              "end": 1773141595935,
+              "seconds": 60,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141475723,
+              "end": 1773141535781,
+              "seconds": 60,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141445696,
+              "end": 1773141475723,
+              "seconds": 30,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141415690,
+              "end": 1773141445696,
+              "seconds": 30,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141355715,
+              "end": 1773141415690,
+              "seconds": 59,
+              "source": "auto_split"
+            },
+            {
               "start": 1773141296430,
               "end": 1773141355715,
               "seconds": 59,
@@ -43697,7 +43727,7 @@
           "studyRecords": [],
           "freeGoals": [],
           "monthGoalHours": 40,
-          "currentStart": 1773141355715,
+          "currentStart": 1773141595935,
           "eventStart": 1773139283940
         },
         "743880211547816046": {
@@ -43706,6 +43736,36 @@
           "username": "ryuri0115",
           "avatar": "https://cdn.discordapp.com/avatars/743880211547816046/11c4715db26adaf95d6ce315987fdb88.webp",
           "sessions": [
+            {
+              "start": 1773141535781,
+              "end": 1773141595935,
+              "seconds": 60,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141475723,
+              "end": 1773141535781,
+              "seconds": 60,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141445696,
+              "end": 1773141475723,
+              "seconds": 30,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141415690,
+              "end": 1773141445696,
+              "seconds": 30,
+              "source": "auto_split"
+            },
+            {
+              "start": 1773141355715,
+              "end": 1773141415690,
+              "seconds": 59,
+              "source": "auto_split"
+            },
             {
               "start": 1773141296430,
               "end": 1773141355715,
@@ -47941,7 +48001,7 @@
           "studyRecords": [],
           "freeGoals": [],
           "monthGoalHours": 40,
-          "currentStart": 1773141355715,
+          "currentStart": 1773141595935,
           "eventStart": 1773139283940
         },
         "449875548139945984": {
