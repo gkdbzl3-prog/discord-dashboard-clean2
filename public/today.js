@@ -203,13 +203,14 @@ window.getTodaySeconds = function (user) {
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const rawSessions = Array.isArray(user.sessions) ? user.sessions : [];
+  const rawSessions = window.getAggregateSessions(
+    Array.isArray(user.sessions) ? user.sessions : []
+  );
   const todaySessions = rawSessions.filter((s) => {
     const st = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
     return Number.isFinite(st) && st >= today.getTime();
   });
 
-  const hasAutoSplitToday = todaySessions.some((s) => s?.source === "auto_split");
   const secondsOf = (s) => {
     const sec = Number(s?.seconds || 0);
     if (Number.isFinite(sec) && sec > 0) return Math.floor(sec);
@@ -221,11 +222,7 @@ window.getTodaySeconds = function (user) {
     return 0;
   };
 
-  let todaySeconds = todaySessions.reduce((sum, s) => {
-    const src = s?.source || (s?.manual === true ? "manual" : "legacy");
-    if (src === "camera_event" && hasAutoSplitToday) return sum;
-    return sum + secondsOf(s);
-  }, 0);
+  let todaySeconds = todaySessions.reduce((sum, s) => sum + secondsOf(s), 0);
 
  
   if (user.currentStart && window.isUserOnline(user)) {
@@ -782,8 +779,9 @@ window.saveSimpleMemo = async function() {
 
   const memoModal = document.getElementById("memoModal");
 
+  const nickname = window.currentNickname || localStorage.getItem("nickname") || "unknown";
   await window.API.fetch(
-    `/save-feed?nickname=${window.currentNickname}&memo=${encodeURIComponent(memoText)}`
+    `/save-feed?nickname=${encodeURIComponent(nickname)}&memo=${encodeURIComponent(memoText)}`
   );
 
   memoInput.value = "";
