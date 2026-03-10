@@ -203,14 +203,13 @@ window.getTodaySeconds = function (user) {
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const rawSessions = window.getAggregateSessions(
-    Array.isArray(user.sessions) ? user.sessions : []
-  );
+  const rawSessions = Array.isArray(user.sessions) ? user.sessions : [];
   const todaySessions = rawSessions.filter((s) => {
     const st = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
     return Number.isFinite(st) && st >= today.getTime();
   });
 
+  const hasAutoSplitToday = todaySessions.some((s) => s?.source === "auto_split");
   const secondsOf = (s) => {
     const sec = Number(s?.seconds || 0);
     if (Number.isFinite(sec) && sec > 0) return Math.floor(sec);
@@ -222,7 +221,11 @@ window.getTodaySeconds = function (user) {
     return 0;
   };
 
-  let todaySeconds = todaySessions.reduce((sum, s) => sum + secondsOf(s), 0);
+  let todaySeconds = todaySessions.reduce((sum, s) => {
+    const src = s?.source || (s?.manual === true ? "manual" : "legacy");
+    if (src === "camera_event" && hasAutoSplitToday) return sum;
+    return sum + secondsOf(s);
+  }, 0);
 
  
   if (user.currentStart && window.isUserOnline(user)) {
@@ -237,7 +240,27 @@ window.getTodaySeconds = function (user) {
 
 window.getLiveTotalSeconds = function (user) {
   if (!user) return 0;
-  let total = Number(user.totalSeconds || 0);
+  const rawSessions = Array.isArray(user.sessions) ? user.sessions : [];
+  const hasAutoSplit = rawSessions.some((s) => s?.source === "auto_split");
+  const secondsOf = (s) => {
+    const sec = Number(s?.seconds || 0);
+    if (Number.isFinite(sec) && sec > 0) return Math.floor(sec);
+    const st = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
+    const en = typeof s?.end === "number" ? s.end : Date.parse(s?.end);
+    if (Number.isFinite(st) && Number.isFinite(en) && en > st) {
+      return Math.floor((en - st) / 1000);
+    }
+    return 0;
+  };
+
+  let total = rawSessions.reduce((sum, s) => {
+    const src = s?.source || (s?.manual === true ? "manual" : "legacy");
+    if (src === "camera_event" && hasAutoSplit) return sum;
+    return sum + secondsOf(s);
+  }, 0);
+  if (!Number.isFinite(total) || total <= 0) {
+    total = Number(user.totalSeconds || 0);
+  }
   if (!Number.isFinite(total) || total < 0) total = 0;
 
   if (window.isUserOnline(user)) {
