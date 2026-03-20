@@ -485,6 +485,44 @@ router.get("/today", (req, res) => {
     res.json(users);
   });
 
+  router.post("/save-user-data", (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: "invalid token" });
+
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const userId = String(payload.userId || "").trim();
+    if (!userId) return res.status(400).json({ ok: false, error: "missing userId" });
+
+    const { data, guild } = readContext(req);
+    const user = guild.users?.[userId];
+    if (!user) return res.status(404).json({ ok: false, error: "user not found" });
+
+    if (payload.freeGoals !== undefined) {
+      user.freeGoals = Array.isArray(payload.freeGoals) ? payload.freeGoals : [];
+    }
+
+    if (payload.studyRecords !== undefined) {
+      user.studyRecords = Array.isArray(payload.studyRecords) ? payload.studyRecords : [];
+    }
+
+    if (payload.goalSec !== undefined) {
+      const nextGoalSec = Number(payload.goalSec);
+      if (Number.isFinite(nextGoalSec) && nextGoalSec >= 0) {
+        user.goalSec = Math.floor(nextGoalSec);
+      }
+    }
+
+    if (payload.monthGoalHours !== undefined) {
+      const nextMonthGoalHours = Number(payload.monthGoalHours);
+      if (Number.isFinite(nextMonthGoalHours) && nextMonthGoalHours > 0) {
+        user.monthGoalHours = Math.floor(nextMonthGoalHours);
+      }
+    }
+
+    user.totalSeconds = aggregateTotalSeconds(user);
+    saveData(data);
+    res.json({ ok: true });
+  });
+
   router.get("/manual-data", (req, res) => {
     if (isTokenInvalid(req)) return res.status(403).json({ error: "invalid token" });
 

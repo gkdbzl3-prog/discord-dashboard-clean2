@@ -89,18 +89,27 @@ function ensureUserExists(guildData, member) {
       avatar: member.user.displayAvatarURL?.() || null,
       sessions: [],
       totalSeconds: 0,
+      goalSec: 0,
       studyRecords: [],
       freeGoals: [],
       monthGoalHours: 40,
       currentStart: null,
-      eventStart: null
+      eventStart: null,
+      cameraOn: false
     };
 
-    console.log("[NEW USER] created:", userId);
+    console.log("🆕 신규 유저 생성:", userId);
   }
 
   if (guildData.users[userId].eventStart === undefined) {
     guildData.users[userId].eventStart = null;
+  }
+  if (guildData.users[userId].cameraOn === undefined) {
+    guildData.users[userId].cameraOn = false;
+  }
+  if (guildData.users[userId].goalSec === undefined) {
+    const h = Number(guildData.users[userId].monthGoalHours || 0);
+    guildData.users[userId].goalSec = Number.isFinite(h) && h > 0 ? Math.floor(h * 3600) : 0;
   }
 
   return guildData.users[userId];
@@ -232,6 +241,26 @@ function formatSeconds(sec) {
   return str.trim();
 }
 
+function parseGoalToSeconds(input) {
+  const raw = String(input || "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "off" || raw === "0" || raw === "none") return 0;
+
+  const hourMatch = raw.match(/(\d+(?:\.\d+)?)\s*h/);
+  const minMatch = raw.match(/(\d+(?:\.\d+)?)\s*m/);
+
+  let seconds = 0;
+  if (hourMatch) seconds += Math.round(Number(hourMatch[1]) * 3600);
+  if (minMatch) seconds += Math.round(Number(minMatch[1]) * 60);
+
+  if (!hourMatch && !minMatch && /^\d+(?:\.\d+)?$/.test(raw)) {
+    seconds = Math.round(Number(raw) * 60);
+  }
+
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return seconds;
+}
+
 function computeTodayWeekAll(user) {
 
   const now = Date.now();
@@ -244,21 +273,127 @@ function computeTodayWeekAll(user) {
   let todaysec = 0;
   let weekSec = 0;
 
+  const sessions = Array.isArray(user?.sessions) ? user.sessions : [];
+  const hasTagged = sessions.some((s) => typeof s?.source === "string");
+  const accepted = hasTagged
+    ? sessions.filter((s) => s?.source === "camera_event" || s?.source === "manual" || s?.manual === true)
+    : sessions;
 
-for (const s of user.sessions || []) {
-  const start = typeof s.start === "number" ? s.start : Date.parse(s.start);
-  const end = typeof s.end === "number" ? s.end : Date.parse(s.end);
-  const overlap = overlapSeconds(start, end, todayStart, todayStart + DAY_MS);
+  for (const s of accepted) {
+    const start = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
+    const end = typeof s?.end === "number" ? s.end : Date.parse(s?.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+    todaysec += overlapSeconds(start, end, todayStart, todayStart + DAY_MS);
+    weekSec += overlapSeconds(start, end, weekStart, weekStart + (7 * DAY_MS));
+  }
 
-}
+  const liveStart = Number(user?.eventStart || user?.currentStart || 0);
+  let liveAll = 0;
+  if (Number.isFinite(liveStart) && liveStart > 0 && liveStart < now) {
+    todaysec += overlapSeconds(liveStart, now, todayStart, todayStart + DAY_MS);
+    weekSec += overlapSeconds(liveStart, now, weekStart, weekStart + (7 * DAY_MS));
+    liveAll = Math.floor((now - liveStart) / 1000);
+  }
+
+  const allSec = Math.max(0, Math.floor(Number(user?.totalSeconds || 0) + liveAll));
 
   return {
     todaysec: Math.floor(todaysec),
     weekSec: Math.floor(weekSec),
-    allSec: user.totalSeconds || 0
+    allSec
 
   };
 
+}
+
+let __liveStateReconciling = false;
+async function reconcileLiveStates() {
+  if (__liveStateReconciling) return;
+  __liveStateReconciling = true;
+
+  try {
+    const root = normalizeDataRoot(loadData());
+    const now = Date.now();
+    let changed = false;
+
+    for (const discordGuild of client.guilds.cache.values()) {
+      const guildId = discordGuild.id;
+      const { guild } = withGuildDataById(root, guildId);
+      const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+
+      try {
+        await discordGuild.members.fetch();
+      } catch (_) {}
+
+      discordGuild.members.cache.forEach((member) => {
+        if (!member || member.user?.bot) return;
+        const user = ensureUserExists(guild, member);
+
+        const inAnyVoice = !!member.voice?.channelId;
+        const camOn = !!member.voice?.selfVideo;
+        const inStudy = studyVcId ? member.voice?.channelId === studyVcId : inAnyVoice;
+        const cameraOnAnyVoice = inAnyVoice && camOn;
+
+        if (user.cameraOn !== cameraOnAnyVoice) {
+          user.cameraOn = cameraOnAnyVoice;
+          changed = true;
+        }
+
+        if (inStudy && camOn) {
+          if (!user.currentStart) {
+            user.currentStart = now;
+            changed = true;
+          }
+          if (!user.eventStart) {
+            user.eventStart = user.currentStart;
+            changed = true;
+          }
+          return;
+        }
+
+        if (user.currentStart || user.eventStart) {
+          user.sessions ??= [];
+
+          if (user.currentStart) {
+            const tailDuration = Math.floor((now - user.currentStart) / 1000);
+            if (tailDuration > 0) {
+              user.sessions.unshift({
+                start: user.currentStart,
+                end: now,
+                seconds: tailDuration,
+                source: "auto_split"
+              });
+            }
+          }
+
+          if (user.eventStart) {
+            const eventDuration = Math.floor((now - user.eventStart) / 1000);
+            if (eventDuration > 0) {
+              user.sessions.unshift({
+                start: user.eventStart,
+                end: now,
+                seconds: eventDuration,
+                source: "camera_event"
+              });
+            }
+          }
+
+          user.totalSeconds = aggregateTotalByEventAndManual(user);
+          user.currentStart = null;
+          user.eventStart = null;
+          changed = true;
+        }
+      });
+    }
+
+    if (changed) {
+      saveData(root);
+    }
+  } catch (err) {
+    console.error("live reconcile failed:", err?.message || err);
+  } finally {
+    __liveStateReconciling = false;
+  }
 }
 
 
@@ -316,6 +451,10 @@ setInterval(() => {
 
 }, 30000);
 
+setInterval(() => {
+  reconcileLiveStates();
+}, 60000);
+
 client.on("voiceStateUpdate", (oldState, newState) => {
   const userId = newState.id;
   const member = newState.member || oldState.member;
@@ -327,15 +466,58 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const user = ensureUserExists(guild, member);
 
   const STUDY_VC_ID = guild.settings.studyVcId || process.env.STUDY_VC_ID;
-  const wasInStudy = !!STUDY_VC_ID && oldState.channelId === STUDY_VC_ID;
-  const isInStudy = !!STUDY_VC_ID && newState.channelId === STUDY_VC_ID;
+  const wasInStudy = STUDY_VC_ID ? oldState.channelId === STUDY_VC_ID : !!oldState.channelId;
+  const isInStudy = STUDY_VC_ID ? newState.channelId === STUDY_VC_ID : !!newState.channelId;
   const oldVideo = !!oldState.selfVideo;
   const newVideo = !!newState.selfVideo;
   const now = Date.now();
 
+  const cameraOnAnyVoice = !!newState.channelId && !!newVideo;
+  if (user.cameraOn !== cameraOnAnyVoice) {
+    user.cameraOn = cameraOnAnyVoice;
+    saveData(dataLatest);
+  }
+
   const usertag = member?.displayName || member?.user?.username || "unknown";
   const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
   const logCh = client.channels.cache.get(logChannelId);
+  const LOG_COOLDOWN_MS = 3000;
+  const logKeyBase = `${guildId}:${userId}`;
+  const stateKey = `${logKeyBase}:state`;
+
+  const shouldSendLog = (type) => {
+    const key = `${logKeyBase}:${type}`;
+    const prev = Number(globalThis.__cameraLogSentAt?.[key] || 0);
+    const current = Date.now();
+    if (current - prev < LOG_COOLDOWN_MS) return false;
+    globalThis.__cameraLogSentAt = globalThis.__cameraLogSentAt || {};
+    globalThis.__cameraLogSentAt[key] = current;
+    return true;
+  };
+
+  const getLastLoggedState = () => {
+    return globalThis.__cameraLastLoggedState?.[stateKey] || null;
+  };
+
+  const setLastLoggedState = (state) => {
+    globalThis.__cameraLastLoggedState = globalThis.__cameraLastLoggedState || {};
+    globalThis.__cameraLastLoggedState[stateKey] = state;
+  };
+
+  const sendOnLog = () => {
+    if (getLastLoggedState() === "on") return;
+    if (!logCh || !shouldSendLog("on")) return;
+    logCh.send(`[CAM ON] ${usertag}` + "\n" +
+"Study log: https://zzozzozzo.fly.dev/");
+    setLastLoggedState("on");
+  };
+
+  const sendOffLog = () => {
+    if (getLastLoggedState() === "off") return;
+    if (!logCh || !shouldSendLog("off")) return;
+    logCh.send(`[CAM OFF] ${usertag}`);
+    setLastLoggedState("off");
+  };
 
   const closeCurrentSession = () => {
     if (!user.currentStart && !user.eventStart) return;
@@ -379,6 +561,7 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   }
 
   if (wasInStudy && !isInStudy) {
+    if (oldVideo) sendOffLog();
     closeCurrentSession();
   }
 
@@ -388,13 +571,12 @@ client.on("voiceStateUpdate", (oldState, newState) => {
       if (!user.eventStart) user.eventStart = now;
       saveData(dataLatest);
     }
-     logCh?.send(`[CAM ON] ${usertag}` + "\n" +
-"Study log: https://zzozzozzo.fly.dev/");
+    sendOnLog();
   }
 
   if (oldVideo && !newVideo && isInStudy) {
     closeCurrentSession();
-   logCh?.send(`[CAM OFF] ${usertag}`);
+    sendOffLog();
   }
 
 
@@ -402,6 +584,27 @@ client.on("voiceStateUpdate", (oldState, newState) => {
 
 
 
+});
+
+client.on("guildMemberAdd", (member) => {
+  if (!member || member.user?.bot) return;
+  const guildId = member.guild?.id;
+  if (!guildId) return;
+
+  const root = normalizeDataRoot(loadData());
+  const { data: latestData, guild } = withGuildDataById(root, guildId);
+  const user = ensureUserExists(guild, member);
+  user.avatar = member.user.displayAvatarURL?.() || null;
+  user.nickname = member.displayName || member.user.username;
+  user.username = member.user.username;
+  saveData(latestData);
+
+  const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
+  const logCh = client.channels.cache.get(logChannelId);
+  const instanceTag = process.env.FLY_APP_NAME
+    ? `[fly:${process.env.FLY_APP_NAME}]`
+    : "[local]";
+  logCh?.send(`👋 ${user.nickname} 새 유저 등록 ${instanceTag}`);
 });
 
 client.on('messageCreate', async (msg) => {
@@ -460,7 +663,10 @@ client.on('messageCreate', async (msg) => {
       return;
     }
 
-    user.goaltodaysec = sec;
+    user.goalSec = sec;
+    if (sec > 0) {
+      user.monthGoalHours = Math.max(1, Math.round(sec / 3600));
+    }
     saveData(latestData);
 
    await msg.reply('✅ 목표 설정 완료');

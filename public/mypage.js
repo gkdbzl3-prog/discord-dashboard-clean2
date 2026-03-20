@@ -411,6 +411,13 @@ const now = new Date();
       <span class="goal-icon">👟</span>
       <h3 class="goal-title">이번 달 목표</h3>
     </div>
+    <img
+      class="month-goal-cat"
+      src="./images/목표고양이.png"
+      alt="목표 고양이"
+      loading="lazy"
+      onerror="this.style.display='none'"
+    >
 
   
 
@@ -427,7 +434,6 @@ const now = new Date();
 
     <div id="weeklyStatusText"></div>
     <div id="weeklyGoalCompareText"></div>
-    <div id="weeklyCardPhoto"></div>
   </div>
 
 
@@ -646,7 +652,6 @@ window.initMemoEditor();
 window.renderTimeGoal(user);
 window.renderMonthlySummary();
 window.renderWeeklyStatus(user);
-window.renderWeeklyCardPhoto(user);
 window.renderFreeGoals();
 window.renderSubjectPalette();
 window.renderSubjectList();
@@ -1742,6 +1747,7 @@ window.saveUserData = async function () {
       },
       body: JSON.stringify({
         userId: window.currentUserId,
+        goalSec: Number(window.currentUser?.goalSec || 0),
         freeGoals: window.currentUser.freeGoals,
         studyRecords: window.currentStudyRecords
       })
@@ -2515,6 +2521,7 @@ window.renderTimeGoal = function(user) {
   
   const goalSec = user.goalSec || 0;
   const totalSec = user.totalSeconds || 0;
+  const goalHoursValue = goalSec > 0 ? Math.max(1, Math.round(goalSec / 3600)) : 40;
   
   if (goalSec === 0) {
     goalBox.innerHTML = `
@@ -2530,6 +2537,24 @@ window.renderTimeGoal = function(user) {
 디스코드에서 <code>!goal 40h</code>을 통해 목표시간을 설정해보세요!
 </div>
 
+</div>
+
+<div class="month-goal-edit-row">
+  <input
+    id="monthGoalHoursInput"
+    class="month-goal-input"
+    type="number"
+    min="1"
+    step="1"
+    value="${goalHoursValue}"
+    placeholder="목표 시간(h)"
+  >
+  <button
+    class="month-goal-save-btn"
+    onclick="window.saveMonthlyGoal()"
+  >
+    저장
+  </button>
 </div>
     `;
     return;
@@ -2571,8 +2596,76 @@ window.renderTimeGoal = function(user) {
           🎉 목표 달성! 축하합니다!
         </div>
       ` : ''}
+
+      <div class="month-goal-edit-row">
+        <input
+          id="monthGoalHoursInput"
+          class="month-goal-input"
+          type="number"
+          min="1"
+          step="1"
+          value="${goalHoursValue}"
+          placeholder="목표 시간(h)"
+        >
+        <button
+          class="month-goal-save-btn"
+          onclick="window.saveMonthlyGoal()"
+        >
+          저장
+        </button>
+      </div>
     </div>
   `;
+};
+
+window.saveMonthlyGoal = async function() {
+  const input = document.getElementById("monthGoalHoursInput");
+  if (!input || !window.currentUser || !window.currentUserId) return;
+
+  const nextHours = Math.floor(Number(input.value || 0));
+  if (!Number.isFinite(nextHours) || nextHours <= 0) {
+    if (typeof window.showToast === "function") {
+      window.showToast("목표 시간을 1 이상으로 입력해줘");
+    }
+    return;
+  }
+
+  const goalSec = nextHours * 3600;
+  window.currentUser.goalSec = goalSec;
+  window.currentUser.monthGoalHours = nextHours;
+
+  try {
+    const payload = {
+      userId: window.currentUserId,
+      goalSec,
+      monthGoalHours: nextHours
+    };
+
+    if (window.API && typeof window.API.fetch === "function") {
+      await window.API.fetch("/save-user-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      const res = await fetch("/save-user-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("save failed");
+    }
+
+    window.renderTimeGoal(window.currentUser);
+    if (typeof window.showToast === "function") {
+      window.showToast("저장 완료");
+    }
+  } catch (e) {
+    console.error("goal save failed", e);
+    if (typeof window.showToast === "function") {
+      window.showToast("저장 실패");
+    }
+  }
 };
 
 // ===== 주간 진행률 렌더링 =====
@@ -2668,27 +2761,6 @@ const statusText = progress >= 100
 </div>
 `;
 };
-
-window.renderWeeklyCardPhoto = function(user) {
-  const photoEl = document.getElementById("weeklyCardPhoto");
-  if (!photoEl) return;
-
-  const photoUrl =
-    user?.weeklyCardImage ||
-    window.WEEKLY_CARD_IMAGE_URL ||
-    "./images/오늘의 공부.png";
-
-  photoEl.innerHTML = `
-    <img
-      class="weekly-card-photo"
-      src="${photoUrl}"
-      alt="weekly photo"
-      loading="lazy"
-      onerror="this.style.display='none'"
-    >
-  `;
-};
-
 
 window.renderFreeGoals = function(){
 
