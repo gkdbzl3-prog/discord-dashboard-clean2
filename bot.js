@@ -676,8 +676,18 @@ client.on('messageCreate', async (msg) => {
 
 });
 
-client.login(process.env.DISCORD_TOKEN)
-  .then(() => console.log("Discord bot logged in"))
-  .catch((err) => console.error("Bot login failed:", err));
+const DISCORD_LOGIN_TOKEN = String(
+  process.env.DISCORD_TOKEN ||
+  process.env.BOT_TOKEN ||
+  ""
+).trim();
+
+if (!DISCORD_LOGIN_TOKEN) {
+  console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
+} else {
+  client.login(DISCORD_LOGIN_TOKEN)
+    .then(() => console.log("Discord bot logged in"))
+    .catch((err) => console.error("Bot login failed:", err));
+}
 
 
