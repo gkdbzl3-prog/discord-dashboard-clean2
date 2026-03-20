@@ -628,7 +628,7 @@ router.get("/today", (req, res) => {
       id: Date.now() + Math.floor(Math.random() * 1000),
       userId,
       nickname,
-      text: `${nickname}님 기록추가 +${addedLabel}`,
+      text: `📑${nickname}님 기록추가 +${addedLabel}`,
       type: "manual_log",
       createdAt: nowMs
     });
