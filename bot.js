@@ -481,6 +481,9 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const usertag = member?.displayName || member?.user?.username || "unknown";
   const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
   const logCh = client.channels.cache.get(logChannelId);
+  const instanceTag = process.env.FLY_APP_NAME
+    ? `[fly:${process.env.FLY_APP_NAME}]`
+    : "[local]";
   const LOG_COOLDOWN_MS = 3000;
   const logKeyBase = `${guildId}:${userId}`;
   const stateKey = `${logKeyBase}:state`;
