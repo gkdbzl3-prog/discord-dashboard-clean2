@@ -507,15 +507,16 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const sendOnLog = () => {
     if (getLastLoggedState() === "on") return;
     if (!logCh || !shouldSendLog("on")) return;
-    logCh.send(`[CAM ON] ${usertag}` + "\n" +
-"Study log: https://zzozzozzo.fly.dev/");
+      logCh.send(`📷 ${usertag} 캠 ON ${instanceTag}
+🧸스터디 기록은 여기서 볼 수 있어요
+https://zzozzozzo.fly.dev/`);
     setLastLoggedState("on");
   };
 
   const sendOffLog = () => {
     if (getLastLoggedState() === "off") return;
     if (!logCh || !shouldSendLog("off")) return;
-    logCh.send(`[CAM OFF] ${usertag}`);
+    logCh.send(`📷 ${usertag} 캠 OFF ${instanceTag}`);
     setLastLoggedState("off");
   };
 
