@@ -10,6 +10,11 @@
   --text: #1a1a1a;
 --text-muted: #6b6b8a;
 --border: #dedee0b7;
+--border-color: #dedee0b7;
+--bg-elevated: #f6f4fb;
+--gradient-primary: linear-gradient(90deg, #a78bfa 0%, #7c3aed 100%);
+--radius-sm: 10px;
+--success: #10b981;
   --muted: #8b8fa3;
 
   --accent: #7c3aed;
@@ -33,6 +38,13 @@ body.dark {
   --line: rgba(124, 58, 237, 0.15);
 
   --text: #ffffff;
+  --text-muted: #b7b3c7;
+  --border: rgba(255, 255, 255, 0.14);
+  --border-color: rgba(255, 255, 255, 0.14);
+  --bg-elevated: #2a2233;
+  --gradient-primary: linear-gradient(90deg, #a78bfa 0%, #7c3aed 100%);
+  --radius-sm: 10px;
+  --success: #34d399;
   --muted: #aaa;
 
   --accent: #8b5cf6;
@@ -5274,6 +5286,7 @@ text-align: center;
   width: 100%;
   height: 24px;
   background: var(--bg-elevated);
+  background: color-mix(in srgb, var(--bg-elevated) 84%, #ffffff 16%);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
@@ -5288,9 +5301,10 @@ text-align: center;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 12px;
+  padding-right: 10px;
   position: relative;
   overflow: hidden;
+  min-width: 0;
 }
 
 .progress-bar-fill::after {

@@ -2519,8 +2519,11 @@ window.renderTimeGoal = function(user) {
   const goalBox = document.getElementById('timeGoalBox');
   if (!goalBox) return;
   
-  const goalSec = user.goalSec || 0;
-  const totalSec = user.totalSeconds || 0;
+  const goalSec = Number(user.goalSec || 0);
+  const monthSec = typeof window.getMonthSeconds === "function"
+    ? Number(window.getMonthSeconds(user) || 0)
+    : Number(user.totalSeconds || 0);
+  const totalSec = Number.isFinite(monthSec) ? Math.max(0, monthSec) : 0;
   const goalHoursValue = goalSec > 0 ? Math.max(1, Math.round(goalSec / 3600)) : 40;
   
   if (goalSec === 0) {
@@ -2560,9 +2563,12 @@ window.renderTimeGoal = function(user) {
     return;
   }
   
-  const goalHours = Math.floor(goalSec / 3600);
+  const goalHours = Math.max(1, Math.floor(goalSec / 3600));
   const currentHours = (totalSec / 3600).toFixed(1);
-  const percentage = Math.min((totalSec / goalSec) * 100, 100).toFixed(0);
+  const percentNum = goalSec > 0
+    ? Math.max(0, Math.min(100, Math.round((totalSec / goalSec) * 100)))
+    : 0;
+  const percentage = String(percentNum);
   const remaining = Math.max(goalSec - totalSec, 0);
   const remainingHours = (remaining / 3600).toFixed(1);
   
@@ -2591,7 +2597,7 @@ window.renderTimeGoal = function(user) {
         </div>
       </div>
       
-      ${percentage >= 100 ? `
+      ${percentNum >= 100 ? `
         <div class="goal-achievement">
           🎉 목표 달성! 축하합니다!
         </div>
