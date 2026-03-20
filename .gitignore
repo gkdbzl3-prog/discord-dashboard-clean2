@@ -2,4 +2,5 @@
 node_modules
 data/data.json
 *.log
-public/uploads
+public/uploads/
+secret.txt
