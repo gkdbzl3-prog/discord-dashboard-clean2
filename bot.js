@@ -482,8 +482,8 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
   const logCh = client.channels.cache.get(logChannelId);
   const instanceTag = process.env.FLY_APP_NAME
-    ? `[fly:${process.env.FLY_APP_NAME}]`
-    : "[local]";
+    ? ` [fly:${process.env.FLY_APP_NAME}]`
+    : "";
   const LOG_COOLDOWN_MS = 3000;
   const logKeyBase = `${guildId}:${userId}`;
   const stateKey = `${logKeyBase}:state`;
@@ -510,7 +510,7 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const sendOnLog = () => {
     if (getLastLoggedState() === "on") return;
     if (!logCh || !shouldSendLog("on")) return;
-      logCh.send(`📷 ${usertag} 캠 ON ${instanceTag}
+      logCh.send(`📷 ${usertag} 캠 ON${instanceTag}
 🧸스터디 기록은 여기서 볼 수 있어요
 https://zzozzozzo.fly.dev/`);
     setLastLoggedState("on");
@@ -519,7 +519,7 @@ https://zzozzozzo.fly.dev/`);
   const sendOffLog = () => {
     if (getLastLoggedState() === "off") return;
     if (!logCh || !shouldSendLog("off")) return;
-    logCh.send(`📷 ${usertag} 캠 OFF ${instanceTag}`);
+    logCh.send(`📷 ${usertag} 캠 OFF${instanceTag}`);
     setLastLoggedState("off");
   };
 
@@ -606,9 +606,9 @@ client.on("guildMemberAdd", (member) => {
   const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
   const logCh = client.channels.cache.get(logChannelId);
   const instanceTag = process.env.FLY_APP_NAME
-    ? `[fly:${process.env.FLY_APP_NAME}]`
-    : "[local]";
-  logCh?.send(`👋 ${user.nickname} 새 유저 등록 ${instanceTag}`);
+    ? ` [fly:${process.env.FLY_APP_NAME}]`
+    : "";
+  logCh?.send(`👋 ${user.nickname} 새 유저 등록${instanceTag}`);
 });
 
 client.on('messageCreate', async (msg) => {
