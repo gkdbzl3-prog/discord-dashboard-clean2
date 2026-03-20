@@ -146,6 +146,15 @@ function isGuildAccessInvalid(req, guild) {
     return 0;
   }
 
+  function formatManualAddedLabel(seconds) {
+    const totalMin = Math.max(0, Math.floor(Number(seconds || 0) / 60));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0 && m > 0) return `${h}시간 ${m}분`;
+    if (h > 0 && m === 0) return `${h}시간`;
+    return `${totalMin}분`;
+  }
+
   function formatDayKeyLocal(ms) {
     const d = new Date(ms);
     const y = d.getFullYear();
@@ -611,6 +620,18 @@ router.get("/today", (req, res) => {
       editTime: now
     });
     user.totalSeconds = aggregateTotalSeconds(user);
+
+    guild.feed ??= [];
+    const nickname = userNameOf(user, userId);
+    const addedLabel = formatManualAddedLabel(seconds);
+    guild.feed.unshift({
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      userId,
+      nickname,
+      text: `${nickname}님 기록추가 +${addedLabel}`,
+      type: "manual_log",
+      createdAt: nowMs
+    });
 
     saveData(data);
     res.json({ ok: true });
