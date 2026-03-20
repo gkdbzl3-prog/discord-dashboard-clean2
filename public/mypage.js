@@ -426,6 +426,8 @@ const now = new Date();
     </div>
 
     <div id="weeklyStatusText"></div>
+    <div id="weeklyGoalCompareText"></div>
+    <div id="weeklyCardPhoto"></div>
   </div>
 
 
@@ -644,6 +646,7 @@ window.initMemoEditor();
 window.renderTimeGoal(user);
 window.renderMonthlySummary();
 window.renderWeeklyStatus(user);
+window.renderWeeklyCardPhoto(user);
 window.renderFreeGoals();
 window.renderSubjectPalette();
 window.renderSubjectList();
@@ -1757,7 +1760,7 @@ window.saveUserData = async function () {
 
 window.renderWeeklyGoalCompare = function(user){
 
-const el = document.getElementById("weeklyStatusText");
+const el = document.getElementById("weeklyGoalCompareText");
 if(!el) return;
 
 const goal = user.monthGoalHours || 40;
@@ -2592,6 +2595,7 @@ window.renderWeeklyStatus = function(user) {
   const dailyAvg = (weekTotal / 7 / 3600).toFixed(1);
   
   // 일별 분포 계산
+  const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const dailyData = [];
   for (let i = 6; i >= 0; i--) {
     const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
@@ -2601,7 +2605,8 @@ window.renderWeeklyStatus = function(user) {
       .reduce((sum, s) => sum + (s.seconds || 0), 0);
     
     dailyData.push({
-      date: day.getDate(),
+      label: dayNames[day.getDay()],
+      hoursText: (daySeconds / 3600).toFixed(1),
       hours: (daySeconds / 3600).toFixed(1),
       percentage: Math.min((daySeconds / 14400) * 100, 100) // 4시간 기준
     });
@@ -2652,8 +2657,9 @@ const statusText = progress >= 100
 
     ${dailyData.map(d => `
       <div class="chart-bar">
+        <span class="chart-bar-hour">${d.hoursText}h</span>
         <div class="chart-bar-fill" style="height:${d.percentage}%"></div>
-        <span class="chart-bar-label">${d.date}</span>
+        <span class="chart-bar-label">${d.label}</span>
       </div>
     `).join("")}
 
@@ -2661,6 +2667,26 @@ const statusText = progress >= 100
 
 </div>
 `;
+};
+
+window.renderWeeklyCardPhoto = function(user) {
+  const photoEl = document.getElementById("weeklyCardPhoto");
+  if (!photoEl) return;
+
+  const photoUrl =
+    user?.weeklyCardImage ||
+    window.WEEKLY_CARD_IMAGE_URL ||
+    "./images/오늘의 공부.png";
+
+  photoEl.innerHTML = `
+    <img
+      class="weekly-card-photo"
+      src="${photoUrl}"
+      alt="weekly photo"
+      loading="lazy"
+      onerror="this.style.display='none'"
+    >
+  `;
 };
 
 

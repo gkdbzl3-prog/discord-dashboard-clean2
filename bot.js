@@ -172,7 +172,7 @@ if (STUDY_VC_ID) {
         if (member.voice.selfVideo) {
           user.currentStart = now;
           user.eventStart = now;
-          console.log("?ъ떆???숆린?????⑤씪??", member.user.username);
+          console.log("재시작 동기화 → 온라인:", member.user.username);
         }
       });
     }
@@ -181,7 +181,7 @@ if (STUDY_VC_ID) {
   }
 }
 
-   console.log("[READY] bot login complete");
+   console.log("👾봇 로그인 완료!");
   for (const guild of client.guilds.cache.values()) {
     await guild.members.fetch();
     const { guild: guildData } = withGuildDataById(data, guild.id);
@@ -309,7 +309,7 @@ setInterval(() => {
         user.totalSeconds = aggregateTotalByEventAndManual(user);
         user.currentStart = now;
         saveData(data);
-        console.log("? ?먮룞 遺꾪븷 ????꾨즺!", guildId, userId, duration);
+        console.log("✅ 자동 분할 저장 완료!", guildId, userId, duration);
       }
     }
   }
@@ -418,11 +418,11 @@ client.on('messageCreate', async (msg) => {
 
   if (content === '!help') {
     await msg.reply(
-  "**Study Bot Commands**\n\n" +
-      "- `!time`\n" +
-      "- `!today`\n" +
-      "- `!week`\n" +
-      "- `!goal 3h`\n"
+  '📘 **스터디 봇 사용법**\n\n' +
+      '⏰ `!time`\n' +
+      '📅 `!today`\n' +
+      '📆 `!week`\n' +
+      '🎯 `!goal 3h`\n'
     );
     return;
   }
@@ -431,23 +431,23 @@ client.on('messageCreate', async (msg) => {
     const { todaysec, weekSec, allSec } = computeTodayWeekAll(user);
 
     await msg.reply(
-      `User: ${user.nickname || msg.author.username}\n` +
-      `- Today: ${formatSeconds(todaysec)}\n` +
-      `- This week: ${formatSeconds(weekSec)}\n` +
-      `- Total: ${formatSeconds(allSec)}`
+     `🕒 ${user.nickname || msg.author.username}\n` +
+      `- 오늘: ${formatSeconds(todaysec)}\n` +
+      `- 이번주: ${formatSeconds(weekSec)}\n` +
+      `- 누적: ${formatSeconds(allSec)}`
     );
     return;
   }
 
   if (content === '!today') {
     const { todaysec } = computeTodayWeekAll(user);
-    await msg.reply(`Today: ${formatSeconds(todaysec)}`);
+    await msg.reply(`📅 오늘 공부: ${formatSeconds(todaysec)}`);
     return;
   }
 
   if (content === '!week') {
     const { weekSec } = computeTodayWeekAll(user);
-    await msg.reply(`This week: ${formatSeconds(weekSec)}`);
+    await msg.reply(`📆 이번 주: ${formatSeconds(weekSec)}`);
     return;
   }
 
@@ -456,14 +456,14 @@ client.on('messageCreate', async (msg) => {
     const sec = parseGoalToSeconds(value);
 
     if (sec === null) {
-      await msg.reply('?뺤떇: !goal 3h / !goal 150m / !goal off');
+      await msg.reply('형식: !goal 3h / !goal 150m / !goal off');
       return;
     }
 
     user.goaltodaysec = sec;
     saveData(latestData);
 
-   await msg.reply('? 紐⑺몴 ?ㅼ젙 ?꾨즺');
+   await msg.reply('✅ 목표 설정 완료');
     return;
   }
 
