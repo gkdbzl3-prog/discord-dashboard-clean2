@@ -413,7 +413,7 @@ const now = new Date();
     </div>
     <img
       class="month-goal-cat"
-      src="./images/목표고양이.png"
+      src="./images/goal-cat.png"
       alt="목표 고양이"
       loading="lazy"
       onerror="this.style.display='none'"
@@ -2965,3 +2965,4 @@ window.getDayStudySeconds = function(sessions = [], year, month, day) {
 
   return total;
 };
+
