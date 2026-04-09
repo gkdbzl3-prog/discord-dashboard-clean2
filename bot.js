@@ -306,6 +306,82 @@ function computeTodayWeekAll(user) {
 
 }
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const PERIOD_END_SCHEDULE = [
+  { period: 1, end: "09:50" },
+  { period: 2, end: "11:40" },
+  { period: 3, end: "14:40" },
+  { period: 4, end: "16:40" },
+  { period: 5, end: "17:50" },
+  { period: 6, end: "20:40" },
+  { period: 7, end: "22:40" }
+];
+
+function getKstDateParts(now = Date.now()) {
+  const d = new Date(now + KST_OFFSET_MS);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return {
+    dateKey: `${y}-${m}-${day}`,
+    hhmm: `${hh}:${mm}`
+  };
+}
+
+let __periodNoticeTickBusy = false;
+const __periodNoticeSent = new Set();
+
+async function sendPeriodEndNoticeTick() {
+  if (__periodNoticeTickBusy) return;
+  __periodNoticeTickBusy = true;
+
+  try {
+    if (!client.isReady()) return;
+    if (!process.env.FLY_APP_NAME) return; // 로컬 중복 전송 방지
+
+    const { dateKey, hhmm } = getKstDateParts(Date.now());
+    const hit = PERIOD_END_SCHEDULE.find((x) => x.end === hhmm);
+    if (!hit) return;
+
+    const root = normalizeDataRoot(loadData());
+    const guildIds = Object.keys(root?.guilds || {});
+
+    for (const guildId of guildIds) {
+      const { guild } = withGuildDataById(root, guildId);
+      const camChannelId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID;
+      if (!camChannelId) continue;
+
+      const onceKey = `${guildId}:${dateKey}:${hit.period}`;
+      if (__periodNoticeSent.has(onceKey)) continue;
+
+      let ch = client.channels.cache.get(camChannelId);
+      if (!ch) {
+        try {
+          ch = await client.channels.fetch(camChannelId);
+        } catch (_) {
+          ch = null;
+        }
+      }
+      if (!ch || typeof ch.send !== "function") continue;
+
+      await ch.send(`🔔 ${hit.period}교시 종료`);
+      __periodNoticeSent.add(onceKey);
+    }
+
+    // 메모리 누적 방지 (오늘 날짜 키만 유지)
+    const keepPrefix = `:${dateKey}:`;
+    for (const key of Array.from(__periodNoticeSent)) {
+      if (!key.includes(keepPrefix)) __periodNoticeSent.delete(key);
+    }
+  } catch (err) {
+    console.error("period notice tick failed:", err?.message || err);
+  } finally {
+    __periodNoticeTickBusy = false;
+  }
+}
+
 let __liveStateReconciling = false;
 async function reconcileLiveStates() {
   if (__liveStateReconciling) return;
@@ -454,6 +530,10 @@ setInterval(() => {
 setInterval(() => {
   reconcileLiveStates();
 }, 60000);
+
+setInterval(() => {
+  sendPeriodEndNoticeTick();
+}, 20000);
 
 client.on("voiceStateUpdate", (oldState, newState) => {
   const userId = newState.id;
