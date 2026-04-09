@@ -353,7 +353,8 @@ async function sendPeriodEndNoticeTick() {
       const camChannelId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID;
       if (!camChannelId) continue;
 
-      const onceKey = `${guildId}:${dateKey}:${hit.period}`;
+      // 같은 채널을 여러 guild 키(default/실제 guild)에서 참조해도 1번만 전송
+      const onceKey = `${camChannelId}:${dateKey}:${hit.period}`;
       if (__periodNoticeSent.has(onceKey)) continue;
 
       let ch = client.channels.cache.get(camChannelId);
