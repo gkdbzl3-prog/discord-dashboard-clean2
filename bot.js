@@ -308,13 +308,15 @@ function computeTodayWeekAll(user) {
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const PERIOD_END_SCHEDULE = [
-  { period: 1, end: "09:50" },
-  { period: 2, end: "11:40" },
-  { period: 3, end: "14:40" },
-  { period: 4, end: "16:40" },
-  { period: 5, end: "17:50" },
-  { period: 6, end: "20:40" },
-  { period: 7, end: "22:40" }
+  { key: "p1", end: "09:50", message: "🔔 1교시 종료" },
+  { key: "p2", end: "11:40", message: "🔔 2교시 종료" },
+  { key: "lunch", end: "13:00", message: "🔔 점심시간 종료" },
+  { key: "p3", end: "14:40", message: "🔔 3교시 종료" },
+  { key: "p4", end: "16:40", message: "🔔 4교시 종료" },
+  { key: "p5", end: "17:50", message: "🔔 5교시 종료" },
+  { key: "dinner", end: "19:00", message: "🔔 저녁시간 종료" },
+  { key: "p6", end: "20:40", message: "🔔 6교시 종료" },
+  { key: "p7", end: "22:40", message: "🔔 7교시 종료" }
 ];
 
 function getKstDateParts(now = Date.now()) {
@@ -354,7 +356,7 @@ async function sendPeriodEndNoticeTick() {
       if (!camChannelId) continue;
 
       // 같은 채널을 여러 guild 키(default/실제 guild)에서 참조해도 1번만 전송
-      const onceKey = `${camChannelId}:${dateKey}:${hit.period}`;
+      const onceKey = `${camChannelId}:${dateKey}:${hit.key}`;
       if (__periodNoticeSent.has(onceKey)) continue;
 
       let ch = client.channels.cache.get(camChannelId);
@@ -367,7 +369,7 @@ async function sendPeriodEndNoticeTick() {
       }
       if (!ch || typeof ch.send !== "function") continue;
 
-      await ch.send(`🔔 ${hit.period}교시 종료`);
+      await ch.send(hit.message);
       __periodNoticeSent.add(onceKey);
     }
 
