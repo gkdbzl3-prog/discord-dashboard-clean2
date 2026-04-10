@@ -723,6 +723,11 @@ router.post("/save-feed", upload.single("image"), async (req, res) => {
       });
       imagePath = uploaded?.secure_url || null;
     } catch (err) {
+      const isFly = !!process.env.FLY_APP_NAME;
+      if (isFly) {
+        console.error("cloudinary upload failed on fly:", err?.message || err);
+        return res.status(502).json({ ok: false, error: "image upload failed" });
+      }
       console.error("cloudinary upload failed, fallback to local:", err?.message || err);
       imagePath = saveImageToLocal(req.file);
       if (!imagePath) {
