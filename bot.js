@@ -308,6 +308,7 @@ function computeTodayWeekAll(user) {
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const PERIOD_END_SCHEDULE = [
+  { key: "start", end: "09:00", message: "🔔등교완료!\n자리에 착석하셨나요?" },
   { key: "p1", end: "09:50", message: "🔔 1교시 종료" },
   { key: "p2", end: "11:40", message: "🔔 2교시 종료" },
   { key: "lunch", end: "13:00", message: "🔔 점심시간 종료" },
@@ -316,7 +317,7 @@ const PERIOD_END_SCHEDULE = [
   { key: "p5", end: "17:50", message: "🔔 5교시 종료" },
   { key: "dinner", end: "19:00", message: "🔔 저녁시간 종료" },
   { key: "p6", end: "20:40", message: "🔔 6교시 종료" },
-  { key: "p7", end: "22:40", message: "🔔 7교시 종료" }
+  { key: "p7", end: "22:40", message: "🔔7교시 종료 \n수고 많으셨습니다🙌 " }
 ];
 
 function getKstDateParts(now = Date.now()) {
