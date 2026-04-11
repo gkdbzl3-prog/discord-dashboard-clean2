@@ -178,7 +178,8 @@ if (STUDY_VC_ID) {
       channel.members.forEach((member) => {
         if (member.user.bot) return;
         const user = ensureUserExists(guild, member);
-        if (member.voice.selfVideo) {
+        const cameraOrStreamOn = !!member.voice.selfVideo || !!member.voice.streaming;
+        if (cameraOrStreamOn) {
           user.currentStart = now;
           user.eventStart = now;
           console.log("재시작 동기화 → 온라인:", member.user.username);
@@ -410,7 +411,7 @@ async function reconcileLiveStates() {
         const user = ensureUserExists(guild, member);
 
         const inAnyVoice = !!member.voice?.channelId;
-        const camOn = !!member.voice?.selfVideo;
+        const camOn = !!member.voice?.selfVideo || !!member.voice?.streaming;
         const inStudy = studyVcId ? member.voice?.channelId === studyVcId : inAnyVoice;
         const cameraOnAnyVoice = inAnyVoice && camOn;
 
@@ -552,8 +553,8 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   const STUDY_VC_ID = guild.settings.studyVcId || process.env.STUDY_VC_ID;
   const wasInStudy = STUDY_VC_ID ? oldState.channelId === STUDY_VC_ID : !!oldState.channelId;
   const isInStudy = STUDY_VC_ID ? newState.channelId === STUDY_VC_ID : !!newState.channelId;
-  const oldVideo = !!oldState.selfVideo;
-  const newVideo = !!newState.selfVideo;
+  const oldVideo = !!oldState.selfVideo || !!oldState.streaming;
+  const newVideo = !!newState.selfVideo || !!newState.streaming;
   const now = Date.now();
 
   const cameraOnAnyVoice = !!newState.channelId && !!newVideo;
