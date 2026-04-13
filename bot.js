@@ -863,6 +863,14 @@ client.on("interactionCreate", async (interaction) => {
   try {
     if (interaction.isButton()) {
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
+        if (!interaction.deferred && !interaction.replied) {
+          if (interaction.inGuild()) {
+            await interaction.deferReply({ ephemeral: true });
+          } else {
+            await interaction.deferReply();
+          }
+        }
+
         if (interaction.guildId) {
           const root = normalizeDataRoot(loadData());
           const { data: latestData, guild } = withGuildDataById(root, interaction.guildId);
@@ -875,31 +883,31 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
         }
 
-        if (interaction.inGuild()) {
-          await interaction.reply({ content: "조용한 응원을 보냈어 🌿", ephemeral: true });
-        } else {
-          await interaction.reply({ content: "조용한 응원을 보냈어 🌿" });
-        }
+        await interaction.editReply({ content: "조용한 응원을 보냈어 🌿" });
         return;
       }
 
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
+        if (!interaction.deferred && !interaction.replied) {
+          if (interaction.inGuild()) {
+            await interaction.deferReply({ ephemeral: true });
+          } else {
+            await interaction.deferReply();
+          }
+        }
+
         const parts = interaction.customId.split(":");
         const guildId = String(parts[1] || "");
         const targetUserId = String(parts[2] || "");
         const moodKey = String(parts[3] || "");
         const opt = CAM_REVIEW_OPTIONS.find((x) => x.key === moodKey);
         if (!guildId || !targetUserId || !opt) {
-          await interaction.reply({ content: "회고 저장 실패: 잘못된 요청" });
+          await interaction.editReply({ content: "회고 저장 실패: 잘못된 요청" });
           return;
         }
 
         if (interaction.user.id !== targetUserId) {
-          if (interaction.inGuild()) {
-            await interaction.reply({ content: "이 버튼은 본인만 누를 수 있어", ephemeral: true });
-          } else {
-            await interaction.reply({ content: "이 버튼은 본인만 누를 수 있어" });
-          }
+          await interaction.editReply({ content: "이 버튼은 본인만 누를 수 있어" });
           return;
         }
 
@@ -937,16 +945,20 @@ client.on("interactionCreate", async (interaction) => {
         }
         saveData(latestData);
 
-        await interaction.reply({ content: `회고 저장 완료: ${opt.label}` });
+        await interaction.editReply({ content: `회고 저장 완료: ${opt.label}` });
         return;
       }
     }
 
     if (interaction.isChatInputCommand() && interaction.commandName === "응원") {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+
       const guildId = interaction.guildId;
       const discordGuild = interaction.guild;
       if (!guildId || !discordGuild) {
-        await interaction.reply({ content: "서버에서만 사용할 수 있어", ephemeral: true });
+        await interaction.editReply({ content: "서버에서만 사용할 수 있어" });
         return;
       }
 
@@ -968,13 +980,16 @@ client.on("interactionCreate", async (interaction) => {
         .map((m) => m.id);
 
       if (candidates.length === 0) {
-        await interaction.reply({ content: "지금 캠/화면공유 활성화 중인 사람이 없어", ephemeral: true });
+        await interaction.editReply({ content: "지금 캠/화면공유 활성화 중인 사람이 없어" });
         return;
       }
 
       const targetId = pickRandom(candidates);
       const cheer = pickRandom(RANDOM_CHEER_TEXTS) || "조용히 응원 두고 갈게 🙌";
-      await interaction.reply({ content: `🌿 <@${targetId}> ${cheer}` });
+      if (interaction.channel && typeof interaction.channel.send === "function") {
+        await interaction.channel.send(`🌿 <@${targetId}> ${cheer}`);
+      }
+      await interaction.editReply({ content: "응원을 보냈어 🌿" });
       return;
     }
   } catch (err) {
@@ -982,6 +997,10 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction && !interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({ content: "처리 중 오류가 발생했어." });
+      } catch (_) {}
+    } else if (interaction?.deferred && !interaction.replied) {
+      try {
+        await interaction.editReply({ content: "처리 중 오류가 발생했어." });
       } catch (_) {}
     }
   }
