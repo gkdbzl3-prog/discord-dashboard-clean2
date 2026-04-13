@@ -663,6 +663,7 @@ setInterval(() => {
 
   const data = normalizeDataRoot(loadData()); // reload latest data every tick
   const now = Date.now();
+  let changed = false;
 
   for (const [guildId, guild] of Object.entries(data.guilds || {})) {
     for (const userId in (guild.users || {})) {
@@ -683,10 +684,14 @@ setInterval(() => {
 
         user.totalSeconds = aggregateTotalByEventAndManual(user);
         user.currentStart = now;
-        saveData(data);
+        changed = true;
         console.log("✅ 자동 분할 저장 완료!", guildId, userId, duration);
       }
     }
+  }
+
+  if (changed) {
+    saveData(data);
   }
 
 }, 30000);
@@ -865,7 +870,7 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
         if (!interaction.deferred && !interaction.replied) {
           if (interaction.inGuild()) {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferUpdate();
           } else {
             await interaction.deferReply();
           }
@@ -883,17 +888,15 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
         }
 
-        await interaction.editReply({ content: "조용한 응원을 보냈어 🌿" });
+        if (!interaction.inGuild() && interaction.deferred && !interaction.replied) {
+          await interaction.editReply({ content: "조용한 응원을 보냈어 🌿" });
+        }
         return;
       }
 
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
         if (!interaction.deferred && !interaction.replied) {
-          if (interaction.inGuild()) {
-            await interaction.deferReply({ ephemeral: true });
-          } else {
-            await interaction.deferReply();
-          }
+          await interaction.deferUpdate();
         }
 
         const parts = interaction.customId.split(":");
@@ -902,12 +905,16 @@ client.on("interactionCreate", async (interaction) => {
         const moodKey = String(parts[3] || "");
         const opt = CAM_REVIEW_OPTIONS.find((x) => x.key === moodKey);
         if (!guildId || !targetUserId || !opt) {
-          await interaction.editReply({ content: "회고 저장 실패: 잘못된 요청" });
+          try {
+            await interaction.followUp({ content: "회고 저장 실패: 잘못된 요청", ephemeral: true });
+          } catch (_) {}
           return;
         }
 
         if (interaction.user.id !== targetUserId) {
-          await interaction.editReply({ content: "이 버튼은 본인만 누를 수 있어" });
+          try {
+            await interaction.followUp({ content: "이 버튼은 본인만 누를 수 있어", ephemeral: true });
+          } catch (_) {}
           return;
         }
 
@@ -945,7 +952,9 @@ client.on("interactionCreate", async (interaction) => {
         }
         saveData(latestData);
 
-        await interaction.editReply({ content: `회고 저장 완료: ${opt.label}` });
+        try {
+          await interaction.followUp({ content: `회고 저장 완료: ${opt.label}`, ephemeral: true });
+        } catch (_) {}
         return;
       }
     }
