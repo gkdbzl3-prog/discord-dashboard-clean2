@@ -787,7 +787,7 @@ setInterval(() => {
         user.totalSeconds = aggregateTotalByEventAndManual(user);
         user.currentStart = now;
         changed = true;
-        console.log("✅ 자동 분할 저장이 완료되었습니다!", guildId, userId, duration);
+        console.log("✅ 자동 분할 저장이 완료!", guildId, userId, duration);
       }
     }
   }
@@ -972,6 +972,7 @@ client.on("interactionCreate", async (interaction) => {
 
       // ── 조용한 응원 버튼 ──
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
+        console.log("[interaction] quiet_cheer_send", interaction.guildId || "dm");
         // 먼저 ephemeral reply 로 인터랙션을 확실히 응답합니다
         try {
           if (!interaction.deferred && !interaction.replied) {

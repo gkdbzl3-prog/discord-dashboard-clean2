@@ -19,33 +19,28 @@ function isTransientFsError(err) {
   return code === 'UNKNOWN' || code === 'EBUSY' || code === 'EPERM' || code === 'EACCES';
 }
 
-function tryAcquireLock(maxWaitMs = 5000) {
-  const started = Date.now();
-  while (Date.now() - started < maxWaitMs) {
+function tryAcquireLock() {
+  try {
+    const fd = fs.openSync(LOCK_FILE, 'wx');
+    fs.writeFileSync(fd, `${process.pid}:${Date.now()}`, 'utf8');
+    fs.closeSync(fd);
+    return true;
+  } catch (err) {
+    if (String(err?.code) !== 'EEXIST') return false;
+
+    // stale lock cleanup
     try {
-      const fd = fs.openSync(LOCK_FILE, 'wx');
-      fs.writeFileSync(fd, `${process.pid}:${Date.now()}`, 'utf8');
-      fs.closeSync(fd);
-      return true;
-    } catch (err) {
-      if (String(err?.code) !== 'EEXIST') {
-        sleepMs(20);
-        continue;
+      const stat = fs.statSync(LOCK_FILE);
+      if (Date.now() - stat.mtimeMs > 15000) {
+        fs.unlinkSync(LOCK_FILE);
+        const fd = fs.openSync(LOCK_FILE, 'wx');
+        fs.writeFileSync(fd, `${process.pid}:${Date.now()}`, 'utf8');
+        fs.closeSync(fd);
+        return true;
       }
-
-      // stale lock cleanup
-      try {
-        const stat = fs.statSync(LOCK_FILE);
-        if (Date.now() - stat.mtimeMs > 15000) {
-          fs.unlinkSync(LOCK_FILE);
-          continue;
-        }
-      } catch (_) {}
-
-      sleepMs(20);
-    }
+    } catch (_) {}
+    return false;
   }
-  return false;
 }
 
 function releaseLock() {
@@ -71,14 +66,14 @@ function loadData() {
 
 function saveData(data) {
   const payload = JSON.stringify(normalizeDataRoot(data), null, 2);
-  const maxRetries = 6;
+  const maxRetries = 2;
 
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   } catch (_) {}
 
   if (!tryAcquireLock()) {
-    console.error('[saveData] lock timeout:', LOCK_FILE);
+    console.error('[saveData] lock busy (skip):', LOCK_FILE);
     return;
   }
 
@@ -97,8 +92,8 @@ function saveData(data) {
         return;
       }
 
-      // Windows file lock(AV/indexer/other process) 대응: 짧게 대기 후 재시도
-      sleepMs(40 * (attempt + 1));
+      // 짧은 재시도만 수행해 이벤트 루프 장시간 블로킹을 피합니다.
+      sleepMs(10);
     }
   }
 
