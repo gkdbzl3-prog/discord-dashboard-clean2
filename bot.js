@@ -201,6 +201,8 @@ if (STUDY_VC_ID) {
       user.nickname = member.displayName;
       user.username = member.user.username;
     });
+    await ensureQuietCheerPinnedMessage(guild, guildData);
+    await ensureCheerSlashCommand(guild);
   }
 
   saveData(data);
@@ -320,6 +322,163 @@ const PERIOD_END_SCHEDULE = [
   { key: "p6", end: "20:40", message: "🔔 6교시 종료" },
   { key: "p7", end: "22:40", message: "🔔7교시 종료 \n수고 많으셨습니다🙌 " }
 ];
+
+const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중 🔥 조용히 응원을 보내고 싶다면 버튼을 눌러주세요!";
+const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
+const QUIET_CHEER_DROP_TEXT = "누군가 조용히 응원을 두고 갔어요 🌿\n익명 응원 1개 도착\n오늘도 같이 버티는 중이라는 신호가 왔어요";
+const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
+const CAM_REVIEW_OPTIONS = [
+  { key: "great", label: "오늘 만족" },
+  { key: "okay", label: "그럭저럭" },
+  { key: "broken", label: "흐름 끊김" },
+  { key: "sat", label: "그래도 앉음" }
+];
+const RANDOM_CHEER_TEXTS = [
+  "오늘도 묵묵히 쌓는 중 🌿",
+  "지금처럼만 가도 충분히 잘하고 있어",
+  "집중의 흐름 이어가자 🔥",
+  "한 칸씩 전진하는 중, 아주 좋아",
+  "조용히 응원 두고 갈게 🙌"
+];
+
+function pickRandom(list = []) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+async function resolveStudyTextChannel(discordGuild, guildData) {
+  const configuredId =
+    guildData?.settings?.studyTextChannelId ||
+    process.env.STUDY_TEXT_CHANNEL_ID ||
+    null;
+
+  let ch = null;
+  if (configuredId) {
+    ch = discordGuild.channels.cache.get(configuredId) || null;
+    if (!ch) {
+      try {
+        ch = await discordGuild.channels.fetch(configuredId);
+      } catch (_) {
+        ch = null;
+      }
+    }
+  }
+
+  if (!ch) {
+    ch = discordGuild.channels.cache.find((c) =>
+      c && typeof c.name === "string" && c.name.includes("공부해요") && typeof c.send === "function"
+    ) || null;
+  }
+
+  if (!ch || typeof ch.send !== "function" || !ch.messages) return null;
+  return ch;
+}
+
+async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
+  try {
+    const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
+    if (!textChannel) return;
+
+    const payload = {
+      content: QUIET_CHEER_PIN_TEXT,
+      components: [
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 2,
+              custom_id: QUIET_CHEER_BUTTON_ID,
+              label: "🌿 조용한 응원 보내기"
+            }
+          ]
+        }
+      ]
+    };
+
+    guildData.settings ??= {};
+    const savedId = String(guildData.settings.quietCheerMessageId || "");
+    let msg = null;
+
+    if (savedId) {
+      try {
+        msg = await textChannel.messages.fetch(savedId);
+      } catch (_) {
+        msg = null;
+      }
+    }
+
+    if (msg && msg.author?.id === client.user?.id) {
+      await msg.edit(payload);
+      if (!msg.pinned) {
+        try { await msg.pin(); } catch (_) {}
+      }
+      return;
+    }
+
+    const sent = await textChannel.send(payload);
+    guildData.settings.quietCheerMessageId = sent.id;
+    if (!sent.pinned) {
+      try { await sent.pin(); } catch (_) {}
+    }
+  } catch (err) {
+    console.error("ensure quiet cheer message failed:", err?.message || err);
+  }
+}
+
+async function ensureCheerSlashCommand(discordGuild) {
+  try {
+    const desired = {
+      name: "응원",
+      description: "캠 활성화 중인 사람에게 랜덤 응원을 보냅니다."
+    };
+
+    const commands = await discordGuild.commands.fetch();
+    const existing = commands.find((c) => c.name === desired.name);
+    if (!existing) {
+      await discordGuild.commands.create(desired);
+      return;
+    }
+    if (existing.description !== desired.description) {
+      await existing.edit(desired);
+    }
+  } catch (err) {
+    console.error("ensure /응원 failed:", err?.message || err);
+  }
+}
+
+async function promptCamReview(member, guildId) {
+  try {
+    if (!process.env.FLY_APP_NAME) return; // 로컬 중복 방지
+    const root = normalizeDataRoot(loadData());
+    const { data: latestData, guild } = withGuildDataById(root, guildId);
+    const user = ensureUserExists(guild, member);
+
+    const now = Date.now();
+    const prev = Number(user.lastReviewPromptAt || 0);
+    if (now - prev < 120000) return; // 2분 중복 방지
+    user.lastReviewPromptAt = now;
+    saveData(latestData);
+
+    const dm = await member.createDM();
+    await dm.send({
+      content: "캠 종료 체크! 오늘 회고 하나만 눌러줘 🙌",
+      components: [
+        {
+          type: 1,
+          components: CAM_REVIEW_OPTIONS.map((opt) => ({
+            type: 2,
+            style: 2,
+            label: opt.label,
+            custom_id: `${CAM_REVIEW_BUTTON_PREFIX}:${guildId}:${member.id}:${opt.key}`
+          }))
+        }
+      ]
+    });
+  } catch (_) {
+    // DM 차단 등은 조용히 무시
+  }
+}
 
 function getKstDateParts(now = Date.now()) {
   const d = new Date(now + KST_OFFSET_MS);
@@ -652,6 +811,9 @@ https://zzozzozzo.fly.dev/`);
   if (wasInStudy && !isInStudy) {
     if (oldVideo) sendOffLog();
     closeCurrentSession();
+    if (oldVideo) {
+      promptCamReview(member, guildId);
+    }
   }
 
   if (!oldVideo && newVideo && isInStudy) {
@@ -666,6 +828,7 @@ https://zzozzozzo.fly.dev/`);
   if (oldVideo && !newVideo && isInStudy) {
     closeCurrentSession();
     sendOffLog();
+    promptCamReview(member, guildId);
   }
 
 
@@ -693,6 +856,134 @@ client.on("guildMemberAdd", (member) => {
   const shouldEmitDiscordLog = !!process.env.FLY_APP_NAME;
   if (shouldEmitDiscordLog) {
     logCh?.send(`👋 ${user.nickname} 새 유저 등록`);
+  }
+});
+
+client.on("interactionCreate", async (interaction) => {
+  try {
+    if (interaction.isButton()) {
+      if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
+        if (interaction.guildId) {
+          const root = normalizeDataRoot(loadData());
+          const { data: latestData, guild } = withGuildDataById(root, interaction.guildId);
+          guild.settings ??= {};
+          guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
+          saveData(latestData);
+        }
+
+        if (interaction.channel && typeof interaction.channel.send === "function") {
+          await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
+        }
+
+        if (interaction.inGuild()) {
+          await interaction.reply({ content: "조용한 응원을 보냈어 🌿", ephemeral: true });
+        } else {
+          await interaction.reply({ content: "조용한 응원을 보냈어 🌿" });
+        }
+        return;
+      }
+
+      if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
+        const parts = interaction.customId.split(":");
+        const guildId = String(parts[1] || "");
+        const targetUserId = String(parts[2] || "");
+        const moodKey = String(parts[3] || "");
+        const opt = CAM_REVIEW_OPTIONS.find((x) => x.key === moodKey);
+        if (!guildId || !targetUserId || !opt) {
+          await interaction.reply({ content: "회고 저장 실패: 잘못된 요청" });
+          return;
+        }
+
+        if (interaction.user.id !== targetUserId) {
+          if (interaction.inGuild()) {
+            await interaction.reply({ content: "이 버튼은 본인만 누를 수 있어", ephemeral: true });
+          } else {
+            await interaction.reply({ content: "이 버튼은 본인만 누를 수 있어" });
+          }
+          return;
+        }
+
+        const root = normalizeDataRoot(loadData());
+        const { data: latestData, guild } = withGuildDataById(root, guildId);
+        guild.users ??= {};
+        if (!guild.users[targetUserId]) {
+          guild.users[targetUserId] = {
+            id: targetUserId,
+            nickname: interaction.user.username,
+            username: interaction.user.username,
+            avatar: interaction.user.displayAvatarURL?.() || null,
+            sessions: [],
+            totalSeconds: 0,
+            goalSec: 0,
+            studyRecords: [],
+            freeGoals: [],
+            monthGoalHours: 40,
+            currentStart: null,
+            eventStart: null,
+            cameraOn: false
+          };
+        }
+
+        const user = guild.users[targetUserId];
+        user.reviews ??= [];
+        user.reviews.unshift({
+          at: Date.now(),
+          mood: moodKey,
+          label: opt.label,
+          source: "cam_off_prompt"
+        });
+        if (user.reviews.length > 200) {
+          user.reviews = user.reviews.slice(0, 200);
+        }
+        saveData(latestData);
+
+        await interaction.reply({ content: `회고 저장 완료: ${opt.label}` });
+        return;
+      }
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === "응원") {
+      const guildId = interaction.guildId;
+      const discordGuild = interaction.guild;
+      if (!guildId || !discordGuild) {
+        await interaction.reply({ content: "서버에서만 사용할 수 있어", ephemeral: true });
+        return;
+      }
+
+      const root = normalizeDataRoot(loadData());
+      const { guild } = withGuildDataById(root, guildId);
+      const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+
+      try {
+        await discordGuild.members.fetch();
+      } catch (_) {}
+
+      const candidates = discordGuild.members.cache
+        .filter((m) => m && !m.user?.bot)
+        .filter((m) => {
+          const inStudy = studyVcId ? m.voice?.channelId === studyVcId : !!m.voice?.channelId;
+          const active = !!m.voice?.selfVideo || !!m.voice?.streaming;
+          return inStudy && active;
+        })
+        .map((m) => m.id);
+
+      if (candidates.length === 0) {
+        await interaction.reply({ content: "지금 캠/화면공유 활성화 중인 사람이 없어", ephemeral: true });
+        return;
+      }
+
+      const targetId = pickRandom(candidates);
+      const cheer = pickRandom(RANDOM_CHEER_TEXTS) || "조용히 응원 두고 갈게 🙌";
+      await interaction.reply({ content: `🌿 <@${targetId}> ${cheer}` });
+      return;
+    }
+  } catch (err) {
+    console.error("interactionCreate failed:", err?.message || err);
+    if (interaction && !interaction.replied && !interaction.deferred) {
+      try {
+        await interaction.reply({ content: "처리 중 오류가 발생했어." });
+      } catch (_) {}
+    }
   }
 });
 
