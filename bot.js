@@ -1099,6 +1099,8 @@ client.on("interactionCreate", async (interaction) => {
   // safeFollowUp: 안전하게 응답을 보내는 헬퍼
   // ackMode: "update" → deferUpdate 이후, "reply" → deferReply 이후
   // ──────────────────────────────────────────────
+console.log("✅ interactionCreate LIVE 2026-04-14 v1");
+console.log("✅ button clicked:", interaction.customId);
   const safeFollowUp = async (content, ackMode = "update") => {
     try {
       // deferReply 이후엔 editReply로 응답
@@ -1156,6 +1158,7 @@ client.on("interactionCreate", async (interaction) => {
   try {
     // 버튼 처리
     if (interaction.isButton()) {
+ console.log("✅ button clicked:", interaction.customId);
       const ackMode = await safeButtonAck();
 
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
@@ -1184,6 +1187,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
+  console.log("✅ review button route hit:", interaction.customId);
         if (!ENABLE_DM_REVIEW_BUTTON) {
           await safeFollowUp("회고 버튼 기능은 지금 꺼져있어", ackMode);
           return;
