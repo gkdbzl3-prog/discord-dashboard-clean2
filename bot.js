@@ -216,7 +216,6 @@ if (STUDY_VC_ID) {
       user.nickname = member.displayName;
       user.username = member.user.username;
     });
-    await ensureQuietCheerPinnedMessage(guild, guildData);
     await ensureCheerSlashCommand(guild);
   }
 
@@ -416,14 +415,16 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
     if (!textChannel) return;
 
+    const { dateKey } = getKstDateParts(Date.now());
     const count = Number(guildData.settings.quietCheerCount || 0);
     const payload = buildQuietCheerPayload(count);
 
     guildData.settings ??= {};
+    const savedDateKey = String(guildData.settings.quietCheerDateKey || "");
     const savedId = String(guildData.settings.quietCheerMessageId || "");
     let msg = null;
     let matchedMessages = [];
-    if (savedId) {
+    if (savedId && savedDateKey === dateKey) {
       try {
         msg = await textChannel.messages.fetch(savedId);
       } catch (_) {
@@ -452,6 +453,7 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     if (msg && msg.author?.id === client.user?.id) {
       await msg.edit(payload);
       guildData.settings.quietCheerMessageId = msg.id;
+      guildData.settings.quietCheerDateKey = dateKey;
       for (const oldMsg of matchedMessages) {
         if (!oldMsg || oldMsg.id === msg.id) continue;
         try { await oldMsg.delete(); } catch (_) {}
@@ -461,8 +463,49 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
 
     const sent = await textChannel.send(payload);
     guildData.settings.quietCheerMessageId = sent.id;
+    guildData.settings.quietCheerDateKey = dateKey;
   } catch (err) {
     console.error("ensure quiet cheer message failed:", err?.message || err);
+  }
+}
+
+let __quietCheerTickBusy = false;
+const __quietCheerSent = new Set();
+async function sendDailyQuietCheerTick() {
+  if (__quietCheerTickBusy) return;
+  __quietCheerTickBusy = true;
+  try {
+    if (!client.isReady()) return;
+    if (!process.env.FLY_APP_NAME) return;
+
+    const { dateKey, hhmm } = getKstDateParts(Date.now());
+    if (hhmm !== "12:00") return;
+
+    const root = normalizeDataRoot(loadData());
+    root.meta ??= {};
+    root.meta.quietCheerSentByGuild ??= {};
+    let changed = false;
+
+    for (const discordGuild of client.guilds.cache.values()) {
+      const guildId = discordGuild.id;
+      const onceKey = `${guildId}:${dateKey}`;
+      if (__quietCheerSent.has(onceKey)) continue;
+      if (root.meta.quietCheerSentByGuild[guildId] === dateKey) continue;
+
+      const { guild } = withGuildDataById(root, guildId);
+      guild.settings ??= {};
+      guild.settings.quietCheerCount = 0;
+      await ensureQuietCheerPinnedMessage(discordGuild, guild);
+      root.meta.quietCheerSentByGuild[guildId] = dateKey;
+      __quietCheerSent.add(onceKey);
+      changed = true;
+    }
+
+    if (changed) saveData(root);
+  } catch (err) {
+    console.error("daily quiet cheer tick failed:", err?.message || err);
+  } finally {
+    __quietCheerTickBusy = false;
   }
 }
 
@@ -857,6 +900,10 @@ setInterval(() => {
 }, 20000);
 
 setInterval(() => {
+  sendDailyQuietCheerTick();
+}, 20000);
+
+setInterval(() => {
   sendNightlyReviewPromptTick();
 }, 20000);
 
@@ -1083,6 +1130,7 @@ client.on("interactionCreate", async (interaction) => {
       const { data, guild } = withGuildDataById(root, interaction.guildId);
       guild.settings ??= {};
       guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
+      guild.settings.quietCheerDateKey = getKstDateParts(Date.now()).dateKey;
 
       const nextPayload = buildQuietCheerPayload(guild.settings.quietCheerCount);
       try {
