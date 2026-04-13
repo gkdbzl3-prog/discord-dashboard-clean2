@@ -201,7 +201,7 @@ if (STUDY_VC_ID) {
       user.nickname = member.displayName;
       user.username = member.user.username;
     });
-    await ensureQuietCheerPinnedMessage(guild, guildData);
+    await removeQuietCheerPinnedMessages(guild, guildData);
     await ensureCheerSlashCommand(guild);
   }
 
@@ -454,6 +454,45 @@ for (const oldMsg of matchedPinned) {
     }
   } catch (err) {
     console.error("ensure quiet cheer message failed:", err?.message || err);
+  }
+}
+
+async function removeQuietCheerPinnedMessages(discordGuild, guildData) {
+  try {
+    if (!process.env.FLY_APP_NAME) return;
+    const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
+    if (!textChannel) return;
+
+    guildData.settings ??= {};
+    const savedId = String(guildData.settings.quietCheerMessageId || "");
+    if (savedId) {
+      try {
+        const savedMsg = await textChannel.messages.fetch(savedId);
+        if (savedMsg) {
+          try { if (savedMsg.pinned) await savedMsg.unpin(); } catch (_) {}
+          try { await savedMsg.delete(); } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    try {
+      const pinned = await textChannel.messages.fetchPinned();
+      const oldMsgs = pinned.filter((m) => {
+        if (!m || m.author?.id !== client.user?.id) return false;
+        const hasQuietBtn = (m.components || []).some((row) =>
+          (row.components || []).some((c) => c.customId === QUIET_CHEER_BUTTON_ID)
+        );
+        return hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면");
+      });
+      for (const m of oldMsgs) {
+        try { if (m.pinned) await m.unpin(); } catch (_) {}
+        try { await m.delete(); } catch (_) {}
+      }
+    } catch (_) {}
+
+    guildData.settings.quietCheerMessageId = null;
+  } catch (err) {
+    console.error("remove quiet cheer message failed:", err?.message || err);
   }
 }
 
@@ -984,27 +1023,9 @@ client.on("interactionCreate", async (interaction) => {
       await safeAck(false);
 
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
-        console.log("[interaction] quiet_cheer_send", interaction.guildId || "dm");
-
-        if (interaction.guildId) {
-          try {
-            const root = normalizeDataRoot(loadData());
-            const { data: latestData, guild } = withGuildDataById(root, interaction.guildId);
-            guild.settings ??= {};
-            guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
-            saveData(latestData);
-          } catch (e) {
-            console.error("quiet cheer save failed:", e?.message || e);
-          }
-        }
-
         try {
-          if (interaction.channel && typeof interaction.channel.send === "function") {
-            await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
-          }
-        } catch (e) {
-          console.error("quiet cheer channel.send failed:", e?.message || e);
-        }
+          await interaction.followUp({ content: "조용한 응원 버튼 기능은 제거됐어.", ephemeral: true });
+        } catch (_) {}
         return;
       }
 
@@ -1144,11 +1165,7 @@ client.on('messageCreate', async (msg) => {
   const { data: latestData, guild } = withGuildDataById(root, guildId);
 
   if (content === '!응원고정') {
-    guild.settings ??= {};
-    guild.settings.quietCheerMessageId = null;
-    await ensureQuietCheerPinnedMessage(msg.guild, guild);
-    saveData(latestData);
-    await msg.reply('최신 응원 고정메시지 다시 올렸어');
+    await msg.reply('조용한 응원 고정메시지 기능은 제거됐어');
     return;
   }
 
@@ -1161,8 +1178,7 @@ client.on('messageCreate', async (msg) => {
       '⏰ `!time`\n' +
       '📅 `!today`\n' +
       '📆 `!week`\n' +
-      '🎯 `!goal 3h`\n' +
-      '🌿 `!응원고정`\n'
+      '🎯 `!goal 3h`\n'
     );
     return;
   }
