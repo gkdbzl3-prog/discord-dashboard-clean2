@@ -72,7 +72,7 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    // ⚠️ [FIX] DirectMessages intent 추가 — DM에서 !회고테스트 등 메시지 수신에 필요
+    // ⚠️ [FIX] DirectMessages intent 추가 — DM messageCreate/interaction 수신에 필요
     // (버튼 interaction은 intent 없이도 작동하지만, DM messageCreate에는 필요)
     GatewayIntentBits.DirectMessages
   ],
@@ -340,16 +340,9 @@ const PERIOD_END_SCHEDULE = [
 
 const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중 🔥 조용히 응원을 보내고 싶다면 버튼을 눌러주세요!";
 const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
-const QUIET_CHEER_DROP_TEXT = "누군가 조용히 응원을 두고 갔어요 🌿\n익명 응원 1개 도착\n오늘도 같이 버티는 중이라는 신호가 왔어요";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
 const ENABLE_DM_REVIEW_BUTTON = true;
-const ENABLE_NIGHTLY_REVIEW_DM = false;
-const REVIEW_TEST_USER_ID = String(
-  process.env.REVIEW_TEST_USER_ID ||
-  process.env.TEST_DM_USER_ID ||
-  process.env.ADMIN_USER_ID ||
-  "743880211547816046"
-).trim();
+const ENABLE_NIGHTLY_REVIEW_DM = true;
 // customId format:
 // quiet cheer: "quiet_cheer_send"
 // cam review:  "cam_review:<guildId>:<userId>:<moodKey>"
@@ -372,10 +365,21 @@ function pickRandom(list = []) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function isReviewDmTarget(userId) {
-  const uid = String(userId || "").trim();
-  if (!uid || !REVIEW_TEST_USER_ID) return false;
-  return uid === REVIEW_TEST_USER_ID;
+function buildQuietCheerPayload(count) {
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(QUIET_CHEER_BUTTON_ID)
+      .setLabel("🌿 조용한 응원 보내기")
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return {
+    content:
+      "오늘도 각자 자리에서 열심히 하는 중🔥\n" +
+      "조용히 응원을 보내고 싶다면 버튼을 눌러주세요\n\n" +
+      `🌿조용한 응원 ${count}회`,
+    components: [row]
+  };
 }
 
 async function resolveStudyTextChannel(discordGuild, guildData) {
@@ -412,28 +416,13 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
     if (!textChannel) return;
 
-
-const count = Number(guildData.settings.quietCheerCount || 0);
-
-const row = new ActionRowBuilder().addComponents(
-  new ButtonBuilder()
-    .setCustomId(QUIET_CHEER_BUTTON_ID)
-    .setLabel(`"🌿 조용한 응원 보내기"`)
-    .setStyle(ButtonStyle.Secondary)
-);
-
-
-const payload = {
-  content: "오늘도 각자 자리에서 열심히 하는 중🔥\n" +
-  "조용히 응원을 보내고 싶다면 버튼을 눌러주세요\n\n" +
-  `🌿조용한 응원 ${count}회`,
-  components: [row]
-};
+    const count = Number(guildData.settings.quietCheerCount || 0);
+    const payload = buildQuietCheerPayload(count);
 
     guildData.settings ??= {};
     const savedId = String(guildData.settings.quietCheerMessageId || "");
     let msg = null;
-    let matchedPinned = [];
+    let matchedMessages = [];
     if (savedId) {
       try {
         msg = await textChannel.messages.fetch(savedId);
@@ -442,90 +431,38 @@ const payload = {
       }
     }
 
-    // 저장된 ID가 없거나 만료된 경우, 기존 봇 고정 메시지 재사용
     if (!msg) {
       try {
-        const pinned = await textChannel.messages.fetchPinned();
-        matchedPinned = pinned.filter((m) => {
+        const recent = await textChannel.messages.fetch({ limit: 30 });
+        matchedMessages = recent.filter((m) => {
           if (!m || m.author?.id !== client.user?.id) return false;
           const hasQuietBtn = (m.components || []).some((row) =>
             (row.components || []).some((c) => c.customId === QUIET_CHEER_BUTTON_ID)
           );
           return hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면");
         });
-        matchedPinned.sort((a, b) => Number(b.createdTimestamp || 0) - Number(a.createdTimestamp || 0));
-        msg = matchedPinned[0] || null;
+        matchedMessages.sort((a, b) => Number(b.createdTimestamp || 0) - Number(a.createdTimestamp || 0));
+        msg = matchedMessages[0] || null;
       } catch (_) {
         msg = null;
-        matchedPinned = [];
+        matchedMessages = [];
       }
     }
 
     if (msg && msg.author?.id === client.user?.id) {
       await msg.edit(payload);
       guildData.settings.quietCheerMessageId = msg.id;
-      if (!msg.pinned) {
-        try { await msg.pin(); } catch (_) {}
-      }
-for (const oldMsg of matchedPinned) {
+      for (const oldMsg of matchedMessages) {
         if (!oldMsg || oldMsg.id === msg.id) continue;
-        try {
-          await oldMsg.edit({
-            content: "이전 응원 버튼입니다. 최신 고정 메시지를 사용해 주세요.",
-            components: []
-          });
-        } catch (_) {}
-        try { if (oldMsg.pinned) await oldMsg.unpin(); } catch (_) {}
+        try { await oldMsg.delete(); } catch (_) {}
       }
       return;
     }
 
     const sent = await textChannel.send(payload);
     guildData.settings.quietCheerMessageId = sent.id;
-    if (!sent.pinned) {
-      try { await sent.pin(); } catch (_) {}
-    }
   } catch (err) {
     console.error("ensure quiet cheer message failed:", err?.message || err);
-  }
-}
-
-async function removeQuietCheerPinnedMessages(discordGuild, guildData) {
-  try {
-    if (!process.env.FLY_APP_NAME) return;
-    const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
-    if (!textChannel) return;
-
-    guildData.settings ??= {};
-    const savedId = String(guildData.settings.quietCheerMessageId || "");
-    if (savedId) {
-      try {
-        const savedMsg = await textChannel.messages.fetch(savedId);
-        if (savedMsg) {
-          try { if (savedMsg.pinned) await savedMsg.unpin(); } catch (_) {}
-          try { await savedMsg.delete(); } catch (_) {}
-        }
-      } catch (_) {}
-    }
-
-    try {
-      const pinned = await textChannel.messages.fetchPinned();
-      const oldMsgs = pinned.filter((m) => {
-        if (!m || m.author?.id !== client.user?.id) return false;
-        const hasQuietBtn = (m.components || []).some((row) =>
-          (row.components || []).some((c) => c.customId === QUIET_CHEER_BUTTON_ID)
-        );
-        return hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면");
-      });
-      for (const m of oldMsgs) {
-        try { if (m.pinned) await m.unpin(); } catch (_) {}
-        try { await m.delete(); } catch (_) {}
-      }
-    } catch (_) {}
-
-    guildData.settings.quietCheerMessageId = null;
-  } catch (err) {
-    console.error("remove quiet cheer message failed:", err?.message || err);
   }
 }
 
@@ -573,16 +510,11 @@ async function ensureCheerSlashCommand(discordGuild) {
 async function sendReviewPromptDm(
   member,
   guildId,
-  promptText = "오늘 참여한 기록이 있어 🙌 짧게 회고 남겨줘",
-  opts = {}
+  promptText = "오늘 참여한 기록이 있어 🙌 짧게 회고 남겨줘"
 ) {
   try {
-    const force = !!opts.force;
     if (!ENABLE_DM_REVIEW_BUTTON) {
       console.log("⚠️ sendReviewPromptDm: ENABLE_DM_REVIEW_BUTTON is false, skipping");
-      return false;
-    }
-    if (!force && !isReviewDmTarget(member?.id)) {
       return false;
     }
 
@@ -657,7 +589,6 @@ async function sendNightlyReviewPromptTick() {
       }
 
       for (const userId of targets) {
-        if (!isReviewDmTarget(userId)) continue;
         const member = discordGuild.members.cache.get(userId);
         if (!member || member.user?.bot) continue;
 
@@ -1032,20 +963,6 @@ https://zzozzozzo.fly.dev/`);
     saveData(dataLatest);
   };
 
-  const maybeSendCamOffReviewDm = () => {
-    if (!ENABLE_DM_REVIEW_BUTTON) return;
-    if (!isReviewDmTarget(userId)) return;
-    const nowMs = Date.now();
-    const prev = Number(user.lastReviewPromptAt || 0);
-    if (nowMs - prev < 10000) return;
-    user.lastReviewPromptAt = nowMs;
-    user.lastReviewPromptDate = getKstDateParts(nowMs).dateKey;
-    saveData(dataLatest);
-    // collector를 쓰면 프로세스 재시작/메시지 교체 시 수집기가 끊겨 "상호작용 실패"가 나기 쉬워서
-    // 전역 interactionCreate + customId 라우팅 방식으로 처리한다.
-    void sendReviewPromptDm(member, guildId, "캠 종료 체크! 오늘 회고 하나만 눌러줘 🙌");
-  };
-
   if (!wasInStudy && isInStudy && newVideo && !user.currentStart) {
     user.currentStart = now;
     if (!user.eventStart) user.eventStart = now;
@@ -1055,7 +972,6 @@ https://zzozzozzo.fly.dev/`);
   if (wasInStudy && !isInStudy) {
     if (oldVideo) sendOffLog();
     closeCurrentSession();
-    if (oldVideo) maybeSendCamOffReviewDm();
   }
 
   if (!oldVideo && newVideo && isInStudy) {
@@ -1070,7 +986,6 @@ https://zzozzozzo.fly.dev/`);
   if (oldVideo && !newVideo && isInStudy) {
     closeCurrentSession();
     sendOffLog();
-    maybeSendCamOffReviewDm();
   }
 
 
@@ -1158,6 +1073,32 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
+    if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
+      if (!interaction.guildId) {
+        await interaction.editReply("서버에서만 사용할 수 있어");
+        return;
+      }
+
+      const root = normalizeDataRoot(loadData());
+      const { data, guild } = withGuildDataById(root, interaction.guildId);
+      guild.settings ??= {};
+      guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
+
+      const nextPayload = buildQuietCheerPayload(guild.settings.quietCheerCount);
+      try {
+        if (interaction.message && typeof interaction.message.edit === "function") {
+          await interaction.message.edit(nextPayload);
+          guild.settings.quietCheerMessageId = interaction.message.id;
+        }
+      } catch (err) {
+        console.error("❌ quiet cheer update failed:", err?.message || err);
+      }
+
+      saveData(data);
+      await interaction.editReply("조용한 응원을 남겼어 🌿");
+      return;
+    }
+
 
 
   } catch (err) {
@@ -1177,34 +1118,6 @@ client.on('messageCreate', async (msg) => {
 
   const content = msg.content.trim();
   const userId = msg.author.id;
-
-
-   if (content === '!회고테스트') {
-    const guildId =
-        msg.guildId ||
-        process.env.DEFAULT_GUILD_ID ||
-        process.env.GUILD_ID ||
-        "default";
-
-    const ok = await sendReviewPromptDm(
-      msg.author, 
-      guildId,
-      "테스트 회고 DM이야 🙌 버튼 눌러서 확인해줘",
-      { force: true }
-    );
-
-    if (!ok) {
-      try {
-        await msg.author.send('회고 테스트 DM 전송 실패했어. 디엠 허용 설정 확인해줘');
-      } catch (_) {}
-    } else {
-      try {
-        await msg.reply('회고 DM 보냈어');
-      } catch (_) {}
-    }
-    return;
-  }
-
 
 
   const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
@@ -1232,8 +1145,7 @@ client.on('messageCreate', async (msg) => {
       '📅 `!today`\n' +
       '📆 `!week`\n' +
       '🎯 `!goal 3h`\n' +
-      '🌿 `!응원고정`\n' +
-      '🧪 `!회고테스트`\n'
+      '🌿 `!응원고정`\n'
 
     );
     return;
