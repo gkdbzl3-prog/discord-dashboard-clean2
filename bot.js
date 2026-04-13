@@ -1137,12 +1137,23 @@ client.on("interactionCreate", async (interaction) => {
 client.on('messageCreate', async (msg) => {
 
   if (msg.author.bot) return;
+  if (!msg.guild) return;
 
   const content = msg.content.trim();
   const userId = msg.author.id;
   const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
   const root = normalizeDataRoot(loadData());
   const { data: latestData, guild } = withGuildDataById(root, guildId);
+
+  if (content === '!응원고정') {
+    guild.settings ??= {};
+    guild.settings.quietCheerMessageId = null;
+    await ensureQuietCheerPinnedMessage(msg.guild, guild);
+    saveData(latestData);
+    await msg.reply('최신 응원 고정메시지 다시 올렸어');
+    return;
+  }
+
   const user = guild.users[userId];
   if (!user) return;
 
@@ -1152,7 +1163,8 @@ client.on('messageCreate', async (msg) => {
       '⏰ `!time`\n' +
       '📅 `!today`\n' +
       '📆 `!week`\n' +
-      '🎯 `!goal 3h`\n'
+      '🎯 `!goal 3h`\n' +
+      '🌿 `!응원고정`\n'
     );
     return;
   }
