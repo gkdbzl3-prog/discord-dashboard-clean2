@@ -1,5 +1,5 @@
 ﻿require("dotenv").config({ override: true });
-
+console.log("🔥 REAL BOT.JS MARKER 2026-04-14 A");
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -899,7 +899,7 @@ setInterval(() => {
         user.totalSeconds = aggregateTotalByEventAndManual(user);
         user.currentStart = now;
         changed = true;
-        console.log("✅ 자동 분할 저장이 완료!", guildId, userId, duration);
+        console.log("✅ 자동 분할 저장 완료!", guildId, userId, duration);
       }
     }
   }
@@ -1337,7 +1337,7 @@ client.on('messageCreate', async (msg) => {
 
    if (content === '!회고테스트') {
     const guildId =
-      msg.guildId =
+      msg.guildId ||
         msg.guildId ||
         process.env.DEFAULT_GUILD_ID ||
         process.env.GUILD_ID ||
