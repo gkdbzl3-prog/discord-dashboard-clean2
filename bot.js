@@ -335,10 +335,10 @@ const CAM_REVIEW_OPTIONS = [
 ];
 const RANDOM_CHEER_TEXTS = [
   "오늘도 묵묵히 쌓는 중 🌿",
-  "지금처럼만 가도 충분히 잘하고 있어",
-  "집중의 흐름 이어가자 🔥",
-  "한 칸씩 전진하는 중, 아주 좋아",
-  "조용히 응원 두고 갈게 🙌"
+  "지금처럼만 가도 충분히 잘하고 있어요",
+  "집중의 흐름 이어가보자구요🔥",
+  "한 칸씩 전진하는 중, 아주 좋아요",
+  "조용히 응원 두고 갈게요 🙌"
 ];
 
 function pickRandom(list = []) {
@@ -376,6 +376,7 @@ async function resolveStudyTextChannel(discordGuild, guildData) {
 
 async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
   try {
+    if (!process.env.FLY_APP_NAME) return; // 로컬 실행 중 중복 생성 방지
     const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
     if (!textChannel) return;
 
@@ -399,7 +400,7 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     guildData.settings ??= {};
     const savedId = String(guildData.settings.quietCheerMessageId || "");
     let msg = null;
-
+    let matchedPinned = [];
     if (savedId) {
       try {
         msg = await textChannel.messages.fetch(savedId);
@@ -408,10 +409,40 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
       }
     }
 
+    // 저장된 ID가 없거나 만료된 경우, 기존 봇 고정 메시지 재사용
+    if (!msg) {
+      try {
+        const pinned = await textChannel.messages.fetchPinned();
+        matchedPinned = pinned.filter((m) => {
+          if (!m || m.author?.id !== client.user?.id) return false;
+          const hasQuietBtn = (m.components || []).some((row) =>
+            (row.components || []).some((c) => c.customId === QUIET_CHEER_BUTTON_ID)
+          );
+          return hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면");
+        });
+        matchedPinned.sort((a, b) => Number(b.createdTimestamp || 0) - Number(a.createdTimestamp || 0));
+        msg = matchedPinned[0] || null;
+      } catch (_) {
+        msg = null;
+        matchedPinned = [];
+      }
+    }
+
     if (msg && msg.author?.id === client.user?.id) {
       await msg.edit(payload);
+      guildData.settings.quietCheerMessageId = msg.id;
       if (!msg.pinned) {
         try { await msg.pin(); } catch (_) {}
+      }
+for (const oldMsg of matchedPinned) {
+        if (!oldMsg || oldMsg.id === msg.id) continue;
+        try {
+          await oldMsg.edit({
+            content: "이전 응원 버튼이에요. 최신 고정 메시지를 사용해주세요",
+            components: []
+          });
+        } catch (_) {}
+        try { if (oldMsg.pinned) await oldMsg.unpin(); } catch (_) {}
       }
       return;
     }
@@ -447,22 +478,11 @@ async function ensureCheerSlashCommand(discordGuild) {
   }
 }
 
-async function promptCamReview(member, guildId) {
+async function sendReviewPromptDm(member, guildId, promptText = "오늘 참여한 기록이 있어 🙌 회고 하나만 눌러줘") {
   try {
-    if (!process.env.FLY_APP_NAME) return; // 로컬 중복 방지
-    const root = normalizeDataRoot(loadData());
-    const { data: latestData, guild } = withGuildDataById(root, guildId);
-    const user = ensureUserExists(guild, member);
-
-    const now = Date.now();
-    const prev = Number(user.lastReviewPromptAt || 0);
-    if (now - prev < 120000) return; // 2분 중복 방지
-    user.lastReviewPromptAt = now;
-    saveData(latestData);
-
     const dm = await member.createDM();
     await dm.send({
-      content: "캠 종료 체크! 오늘 회고 하나만 눌러줘 🙌",
+      content: promptText,
       components: [
         {
           type: 1,
@@ -479,6 +499,78 @@ async function promptCamReview(member, guildId) {
     // DM 차단 등은 조용히 무시
   }
 }
+let __nightlyReviewTickBusy = false;
+const __nightlyReviewSent = new Set();
+async function sendNightlyReviewPromptTick() {
+  if (__nightlyReviewTickBusy) return;
+  __nightlyReviewTickBusy = true;
+  try {
+    if (!client.isReady()) return;
+    if (!process.env.FLY_APP_NAME) return; // 운영에서만 전송
+
+    const now = Date.now();
+    const { dateKey, hhmm } = getKstDateParts(now);
+    if (hhmm !== "21:00") return;
+
+    const root = normalizeDataRoot(loadData());
+    root.meta ??= {};
+    root.meta.nightlyReviewSentByGuild ??= {};
+    let changed = false;
+
+    for (const discordGuild of client.guilds.cache.values()) {
+      const guildId = discordGuild.id;
+      const onceKey = `${guildId}:${dateKey}`;
+      if (__nightlyReviewSent.has(onceKey)) continue;
+      if (root.meta.nightlyReviewSentByGuild[guildId] === dateKey) continue;
+
+      const { guild } = withGuildDataById(root, guildId);
+      const targets = Object.entries(guild.users || {})
+        .filter(([_, user]) => {
+          if (!user || typeof user !== "object") return false;
+          const todaysec = Number(computeTodayWeekAll(user)?.todaysec || 0);
+          return todaysec > 0 || Number(user.currentStart || 0) > 0;
+        })
+        .map(([userId]) => userId);
+
+      if (targets.length > 0) {
+        try {
+          await discordGuild.members.fetch();
+        } catch (_) {}
+      }
+
+      for (const userId of targets) {
+        const member = discordGuild.members.cache.get(userId);
+        if (!member || member.user?.bot) continue;
+
+        const user = ensureUserExists(guild, member);
+        if (String(user.lastReviewPromptDate || "") === dateKey) continue;
+
+        await sendReviewPromptDm(
+          member,
+          guildId,
+          "오늘 참여한 기록이 있어요 🙌 회고 하나만 눌러주세요"
+        );
+
+        user.lastReviewPromptAt = now;
+        user.lastReviewPromptDate = dateKey;
+        changed = true;
+      }
+
+      root.meta.nightlyReviewSentByGuild[guildId] = dateKey;
+      __nightlyReviewSent.add(onceKey);
+      changed = true;
+    }
+
+    if (changed) {
+      saveData(root);
+    }
+  } catch (err) {
+    console.error("nightly review tick failed:", err?.message || err);
+  } finally {
+    __nightlyReviewTickBusy = false;
+  }
+}
+
 
 function getKstDateParts(now = Date.now()) {
   const d = new Date(now + KST_OFFSET_MS);
@@ -509,7 +601,10 @@ async function sendPeriodEndNoticeTick() {
     if (!hit) return;
 
     const root = normalizeDataRoot(loadData());
+    root.meta ??= {};
+    root.meta.periodNoticeSentByChannel ??= {};
     const guildIds = Object.keys(root?.guilds || {});
+    let changed = false;
 
     for (const guildId of guildIds) {
       const { guild } = withGuildDataById(root, guildId);
@@ -519,6 +614,8 @@ async function sendPeriodEndNoticeTick() {
       // 같은 채널을 여러 guild 키(default/실제 guild)에서 참조해도 1번만 전송
       const onceKey = `${camChannelId}:${dateKey}:${hit.key}`;
       if (__periodNoticeSent.has(onceKey)) continue;
+      const persistedKey = `${camChannelId}:${hit.key}`;
+      if (root.meta.periodNoticeSentByChannel[persistedKey] === dateKey) continue;
 
       let ch = client.channels.cache.get(camChannelId);
       if (!ch) {
@@ -532,12 +629,17 @@ async function sendPeriodEndNoticeTick() {
 
       await ch.send(hit.message);
       __periodNoticeSent.add(onceKey);
+      root.meta.periodNoticeSentByChannel[persistedKey] = dateKey;
+      changed = true;
     }
 
     // 메모리 누적 방지 (오늘 날짜 키만 유지)
     const keepPrefix = `:${dateKey}:`;
     for (const key of Array.from(__periodNoticeSent)) {
       if (!key.includes(keepPrefix)) __periodNoticeSent.delete(key);
+    }
+    if (changed) {
+      saveData(root);
     }
   } catch (err) {
     console.error("period notice tick failed:", err?.message || err);
@@ -663,6 +765,7 @@ setInterval(() => {
 
   const data = normalizeDataRoot(loadData()); // reload latest data every tick
   const now = Date.now();
+  let changed = false;
 
   for (const [guildId, guild] of Object.entries(data.guilds || {})) {
     for (const userId in (guild.users || {})) {
@@ -683,10 +786,14 @@ setInterval(() => {
 
         user.totalSeconds = aggregateTotalByEventAndManual(user);
         user.currentStart = now;
-        saveData(data);
+        changed = true;
         console.log("✅ 자동 분할 저장 완료!", guildId, userId, duration);
       }
     }
+  }
+
+  if (changed) {
+    saveData(data);
   }
 
 }, 30000);
@@ -697,6 +804,10 @@ setInterval(() => {
 
 setInterval(() => {
   sendPeriodEndNoticeTick();
+}, 20000);
+
+setInterval(() => {
+  sendNightlyReviewPromptTick();
 }, 20000);
 
 client.on("voiceStateUpdate", (oldState, newState) => {
@@ -811,9 +922,6 @@ https://zzozzozzo.fly.dev/`);
   if (wasInStudy && !isInStudy) {
     if (oldVideo) sendOffLog();
     closeCurrentSession();
-    if (oldVideo) {
-      promptCamReview(member, guildId);
-    }
   }
 
   if (!oldVideo && newVideo && isInStudy) {
@@ -828,7 +936,6 @@ https://zzozzozzo.fly.dev/`);
   if (oldVideo && !newVideo && isInStudy) {
     closeCurrentSession();
     sendOffLog();
-    promptCamReview(member, guildId);
   }
 
 
@@ -862,15 +969,15 @@ client.on("guildMemberAdd", (member) => {
 client.on("interactionCreate", async (interaction) => {
   try {
     if (interaction.isButton()) {
-      if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
-        if (!interaction.deferred && !interaction.replied) {
-          if (interaction.inGuild()) {
-            await interaction.deferReply({ ephemeral: true });
-          } else {
-            await interaction.deferReply();
-          }
-        }
+      let buttonAcked = false;
+      if (!interaction.deferred && !interaction.replied) {
+        try {
+          await interaction.deferUpdate();
+          buttonAcked = true;
+        } catch (_) {}
+      }
 
+      if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
         if (interaction.guildId) {
           const root = normalizeDataRoot(loadData());
           const { data: latestData, guild } = withGuildDataById(root, interaction.guildId);
@@ -883,31 +990,26 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
         }
 
-        await interaction.editReply({ content: "조용한 응원을 보냈어 🌿" });
         return;
       }
 
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
-        if (!interaction.deferred && !interaction.replied) {
-          if (interaction.inGuild()) {
-            await interaction.deferReply({ ephemeral: true });
-          } else {
-            await interaction.deferReply();
-          }
-        }
-
         const parts = interaction.customId.split(":");
         const guildId = String(parts[1] || "");
         const targetUserId = String(parts[2] || "");
         const moodKey = String(parts[3] || "");
         const opt = CAM_REVIEW_OPTIONS.find((x) => x.key === moodKey);
         if (!guildId || !targetUserId || !opt) {
-          await interaction.editReply({ content: "회고 저장 실패: 잘못된 요청" });
+          try {
+            await interaction.followUp({ content: "회고 저장 실패: 잘못된 요청", ephemeral: true });
+          } catch (_) {}
           return;
         }
 
         if (interaction.user.id !== targetUserId) {
-          await interaction.editReply({ content: "이 버튼은 본인만 누를 수 있어" });
+          try {
+            await interaction.followUp({ content: "이 버튼은 본인만 누를 수 있어", ephemeral: true });
+          } catch (_) {}
           return;
         }
 
@@ -945,9 +1047,21 @@ client.on("interactionCreate", async (interaction) => {
         }
         saveData(latestData);
 
-        await interaction.editReply({ content: `회고 저장 완료: ${opt.label}` });
+        try {
+          await interaction.followUp({ content: `회고 저장 완료: ${opt.label}`, ephemeral: true });
+        } catch (_) {}
         return;
       }
+
+      // 과거/만료 버튼 클릭 시에도 상호작용 실패가 뜨지 않게 응답
+      if (!buttonAcked && !interaction.deferred && !interaction.replied) {
+        if (interaction.inGuild()) {
+          await interaction.reply({ content: "이 버튼은 만료됐어. 새 고정 메시지 버튼을 눌러줘.", ephemeral: true });
+        } else {
+          await interaction.reply({ content: "이 버튼은 만료됐어." });
+        }
+      }
+      return;
     }
 
     if (interaction.isChatInputCommand() && interaction.commandName === "응원") {

@@ -1,3 +1,15 @@
 {
-  "ignore": ["data.json"]
+  "watch": [
+    "bot.js",
+    "routes",
+    "public",
+    "data/guild-data.js",
+    "data/store.js"
+  ],
+  "ext": "js,json",
+  "ignore": [
+    "data/data.json",
+    "public/uploads/*",
+    "backups/*"
+  ]
 }
