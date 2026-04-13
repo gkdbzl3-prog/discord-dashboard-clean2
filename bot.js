@@ -11,6 +11,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 let data = loadData();
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require("discord.js");
 
 app.use(express.static("public", {
   setHeaders: (res, filePath) => {
@@ -87,6 +92,8 @@ client.on("error", err => {
 
 // Register admin routes after client is created
 app.use('/', createAdminRouter(client));
+
+
 
 
 function ensureUserExists(guildData, member) {
@@ -406,22 +413,17 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
     if (!textChannel) return;
 
-    const payload = {
-      content: QUIET_CHEER_PIN_TEXT,
-      components: [
-        {
-          type: 1,
-          components: [
-            {
-              type: 2,
-              style: 2,
-              custom_id: QUIET_CHEER_BUTTON_ID,
-              label: "🌿 조용한 응원 보내기"
-            }
-          ]
-        }
-      ]
-    };
+const row = new ActionRowBuilder().addComponents(
+  new ButtonBuilder()
+    .setCustomId(QUIET_CHEER_BUTTON_ID)
+    .setLabel("🌿 조용한 응원 보내기")
+    .setStyle(ButtonStyle.Secondary)
+);
+
+const payload = {
+  content: QUIET_CHEER_PIN_TEXT,
+  components: [row]
+};
 
     guildData.settings ??= {};
     const savedId = String(guildData.settings.quietCheerMessageId || "");
@@ -587,20 +589,19 @@ async function sendReviewPromptDm(
     }
 
     const dm = await member.createDM();
-    await dm.send({
-      content: promptText,
-      components: [
-        {
-          type: 1,
-          components: CAM_REVIEW_OPTIONS.map((opt) => ({
-            type: 2,
-            style: 2,
-            label: opt.label,
-            custom_id: `${CAM_REVIEW_BUTTON_PREFIX}:${guildId}:${userId}:${opt.key}`
-          }))
-        }
-      ]
-    });
+    const row = new ActionRowBuilder().addComponents(
+  CAM_REVIEW_OPTIONS.map((opt) =>
+    new ButtonBuilder()
+      .setCustomId(`${CAM_REVIEW_BUTTON_PREFIX}:${guildId}:${userId}:${opt.key}`)
+      .setLabel(opt.label)
+      .setStyle(ButtonStyle.Secondary)
+  )
+);
+
+await dm.send({
+  content: promptText,
+  components: [row]
+});
     console.log(`✅ 회고 DM 전송 완료 → userId=${userId}, guildId=${guildId}`);
     return true;
   } catch (err) {
@@ -609,6 +610,7 @@ async function sendReviewPromptDm(
     return false;
   }
 }
+
 let __nightlyReviewTickBusy = false;
 const __nightlyReviewSent = new Set();
 async function sendNightlyReviewPromptTick() {
@@ -1094,13 +1096,21 @@ client.on("guildMemberAdd", (member) => {
   }
 });
 
+
+
 client.on("interactionCreate", async (interaction) => {
   // ──────────────────────────────────────────────
   // safeFollowUp: 안전하게 응답을 보내는 헬퍼
   // ackMode: "update" → deferUpdate 이후, "reply" → deferReply 이후
   // ──────────────────────────────────────────────
 console.log("✅ interactionCreate LIVE 2026-04-14 v1");
-
+ console.log("🔥 INTERACTION RAW:", {
+    type: interaction.type,
+    isButton: interaction.isButton?.(),
+    custom_Id: interaction.customId,
+    guild: interaction.guildId,
+    user: interaction.user?.id
+  });
   const safeFollowUp = async (content, ackMode = "update") => {
     try {
       // deferReply 이후엔 editReply로 응답
