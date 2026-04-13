@@ -1100,7 +1100,7 @@ client.on("interactionCreate", async (interaction) => {
   // ackMode: "update" → deferUpdate 이후, "reply" → deferReply 이후
   // ──────────────────────────────────────────────
 console.log("✅ interactionCreate LIVE 2026-04-14 v1");
-console.log("✅ button clicked:", interaction.customId);
+
   const safeFollowUp = async (content, ackMode = "update") => {
     try {
       // deferReply 이후엔 editReply로 응답
@@ -1132,10 +1132,14 @@ console.log("✅ button clicked:", interaction.customId);
   // 우선 deferUpdate() 시도 → 실패 시 deferReply() fallback
   // ──────────────────────────────────────────────
   const safeButtonAck = async () => {
-    if (interaction.deferred || interaction.replied) return "already";
+    if (interaction.deferred || interaction.replied) {
+      console.log("⚠️ already deferred/replied");
+    return "already";
+    }
 
     try {
       await interaction.deferUpdate();
+      console.log("✅ deferUpdate success");
       return "update";
     } catch (err) {
       console.warn("deferUpdate 실패, deferReply로 fallback:", err?.message || err);
@@ -1147,11 +1151,12 @@ console.log("✅ button clicked:", interaction.customId);
       } else {
         await interaction.deferReply();
       }
+      console.log("✅ deferReply success");
       return "reply";
     } catch (err) {
       console.error("deferReply도 실패 — 상호작용 실패 발생 가능:", err?.message || err);
     }
-
+    console.log("❌ ack failed completely");
     return "none";
   };
 
@@ -1160,7 +1165,7 @@ console.log("✅ button clicked:", interaction.customId);
     if (interaction.isButton()) {
  console.log("✅ button clicked:", interaction.customId);
       const ackMode = await safeButtonAck();
-
+ console.log("✅ ackMode:", ackMode);
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
         if (interaction.guildId) {
           try {
