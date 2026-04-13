@@ -1,5 +1,4 @@
 ﻿require("dotenv").config({ override: true });
-console.log("🔥 REAL BOT.JS MARKER 2026-04-14 A");
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -413,15 +412,21 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
     if (!textChannel) return;
 
+
+const count = Number(guildData.settings.quietCheerCount || 0);
+
 const row = new ActionRowBuilder().addComponents(
   new ButtonBuilder()
     .setCustomId(QUIET_CHEER_BUTTON_ID)
-    .setLabel("🌿 조용한 응원 보내기")
+    .setLabel(`"🌿 조용한 응원 보내기"`)
     .setStyle(ButtonStyle.Secondary)
 );
 
+
 const payload = {
-  content: QUIET_CHEER_PIN_TEXT,
+  content: "오늘도 각자 자리에서 열심히 하는 중🔥\n" +
+  "조용히 응원을 보내고 싶다면 버튼을 눌러주세요\n\n" +
+  `🌿조용한 응원 ${count}회`,
   components: [row]
 };
 
@@ -1098,19 +1103,11 @@ client.on("guildMemberAdd", (member) => {
 
 
 client.on("interactionCreate", async (interaction) => {
-  console.log("🔥 INTERACTION RAW", {
-    type: interaction.type,
-    isButton: typeof interaction.isButton === "function" ? interaction.isButton() : "no-method",
-    customId: interaction.customId,
-    guildId: interaction.guildId,
-    channelType: interaction.channel?.type,
-    userId: interaction.user?.id
-  });
+
 
   try {
     if (!interaction.isButton()) return;
 
-    console.log("🔥 버튼 눌림:", interaction.customId);
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -1133,23 +1130,35 @@ client.on("interactionCreate", async (interaction) => {
       };
 
       const user = guild.users[userId];
+      const labelMap = {
+        great: "오늘 만족",
+        okay: "그럭저럭",
+        broken: "흐름 끊김",
+        sat: "그래도 앉음"
+      }
       user.reviews ??= [];
       user.reviews.unshift({
         at: Date.now(),
-        mood: moodKey
+        dateKey: getKstDateParts(Date.now()).dateKey,
+        mood: moodKey,
+        label: labelMap[moodKey] || moodKey,
+        source: "cam_off_prompt",
+        guildId
       });
 
       saveData(data);
 
+      const latest = user.reviews?.[0];
+      if (
+        latest &&
+        latest.source === "cam_off_prompt" &&
+        latest.dateKey === getKstDateParts(Date.now()).dateKey
+      )
       await interaction.editReply("회고 저장 완료 👍");
       return;
     }
 
-    if (interaction.customId === "quiet_cheer_send") {
-      await interaction.channel.send("🌿 누군가 응원을 남겼어");
-      await interaction.editReply("응원 보냈어 👍");
-      return;
-    }
+
 
   } catch (err) {
     console.error("❌ interactionCreate error:", err);
