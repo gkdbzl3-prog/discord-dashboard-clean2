@@ -1320,21 +1320,41 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.on('messageCreate', async (msg) => {
-  // ─── 디버깅 로그: messageCreate가 발생하는지, content가 비어있는지 확인 ───
-  // MESSAGE CONTENT intent가 Developer Portal에서 꺼져 있으면 msg.content가 "" 빈 문자열임
-  if (!msg.author.bot && msg.guild && msg.content) {
-    console.log(`📨 messageCreate: "${msg.content.slice(0, 30)}" by ${msg.author.username}`);
-  }
-  if (!msg.author.bot && msg.guild && !msg.content) {
-    console.log(`⚠️ messageCreate: content가 비어있음! MESSAGE CONTENT intent가 Developer Portal에서 켜져 있는지 확인하세요. author=${msg.author.username}`);
-  }
-  // ─── 디버깅 로그 끝 ───
-
   if (msg.author.bot) return;
-  if (!msg.guild) return;
 
   const content = msg.content.trim();
   const userId = msg.author.id;
+
+
+   if (content === '!회고테스트') {
+    const guildId =
+      msg.guildId =
+        msg.guildId ||
+        process.env.DEFAULT_GUILD_ID ||
+        process.env.GUILD_ID ||
+        "default";
+
+    const ok = await sendReviewPromptDm(
+      msg.author, 
+      guildId,
+      "테스트 회고 DM이야 🙌 버튼 눌러서 확인해줘",
+      { force: true }
+    );
+
+    if (!ok) {
+      try {
+        await msg.author.send('회고 테스트 DM 전송 실패했어. 디엠 허용 설정 확인해줘');
+      } catch (_) {}
+    } else {
+      try {
+        await msg.reply('회고 DM 보냈어');
+      } catch (_) {}
+    }
+    return;
+  }
+
+
+
   const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
   const root = normalizeDataRoot(loadData());
   const { data: latestData, guild } = withGuildDataById(root, guildId);
@@ -1348,27 +1368,7 @@ client.on('messageCreate', async (msg) => {
     return;
   }
 
-  if (content === '!회고테스트') {
-    console.log(`🧪 !회고테스트 실행 → userId=${userId}, guildId=${guildId}`);
-    const ok = await sendReviewPromptDm(
-      msg.member || msg.author,  // ⚠️ [FIX] GuildMember 우선 사용, 없으면 User fallback
-      guildId,
-      "테스트 회고 DM이야 🙌 버튼 눌러서 확인해줘",
-      { force: true }
-    );
-    try { await msg.delete(); } catch (_) {}
-    if (!ok) {
-      console.log("⚠️ !회고테스트 DM 전송 실패");
-      try {
-        await msg.author.send('회고 테스트 DM 전송 실패했어. 디엠 허용 설정 확인해줘');
-      } catch (dmErr) {
-        console.error("❌ 실패 안내 DM도 전송 불가:", dmErr?.message || dmErr);
-      }
-    } else {
-      console.log("✅ !회고테스트 DM 전송 성공");
-    }
-    return;
-  }
+
 
   const user = guild.users[userId];
   if (!user) return;
