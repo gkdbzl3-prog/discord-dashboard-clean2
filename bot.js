@@ -967,6 +967,18 @@ client.on("guildMemberAdd", (member) => {
 });
 
 client.on("interactionCreate", async (interaction) => {
+  // 헬퍼: 어떤 수단으로든 인터랙션을 확실히 응답(ack)합니다
+  async function safeAck(preferReply) {
+    if (interaction.deferred || interaction.replied) return true;
+    if (preferReply) {
+      try { await interaction.reply({ content: "처리 중…", ephemeral: true }); return true; } catch (_) {}
+    }
+    try { await interaction.deferUpdate(); return true; } catch (_) {}
+    try { await interaction.reply({ content: "처리 중…", ephemeral: true }); return true; } catch (_) {}
+    try { await interaction.deferReply({ ephemeral: true }); return true; } catch (_) {}
+    return false;
+  }
+
   try {
     if (interaction.isButton()) {
 
@@ -974,14 +986,15 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
         console.log("[interaction] quiet_cheer_send", interaction.guildId || "dm");
         // 먼저 ephemeral reply 로 인터랙션을 확실히 응답합니다
+        let quietReplied = false;
         try {
           if (!interaction.deferred && !interaction.replied) {
             await interaction.reply({ content: "응원을 보냈습니다 🌿", ephemeral: true });
+            quietReplied = true;
           }
-        } catch (_) {
-          // reply 실패 시 deferUpdate 로 재시도합니다
-          try { await interaction.deferUpdate(); } catch (_) {}
-        }
+        } catch (_) {}
+        // reply 실패 시 deferUpdate → deferReply 순으로 재시도
+        if (!quietReplied) await safeAck(false);
 
         if (interaction.guildId) {
           const root = normalizeDataRoot(loadData());
@@ -991,20 +1004,30 @@ client.on("interactionCreate", async (interaction) => {
           saveData(latestData);
         }
 
-        if (interaction.channel && typeof interaction.channel.send === "function") {
-          await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
+        try {
+          if (interaction.channel && typeof interaction.channel.send === "function") {
+            await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
+          }
+        } catch (e) {
+          console.error("quiet cheer channel.send failed:", e?.message || e);
         }
 
         return;
       }
 
-      // ── 그 외 버튼: 먼저 deferUpdate ──
-      let buttonAcked = false;
-      if (!interaction.deferred && !interaction.replied) {
+      // ── 그 외 버튼: 먼저 deferUpdate, 실패 시 reply 로 폴백 ──
+      let buttonAcked = interaction.deferred || interaction.replied;
+      if (!buttonAcked) {
         try {
           await interaction.deferUpdate();
           buttonAcked = true;
-        } catch (_) {}
+        } catch (_) {
+          // deferUpdate 실패 시 reply 로 폴백
+          try {
+            await interaction.reply({ content: "처리 중…", ephemeral: true });
+            buttonAcked = true;
+          } catch (_) {}
+        }
       }
 
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
@@ -1069,68 +1092,78 @@ client.on("interactionCreate", async (interaction) => {
 
       // 과거/만료 버튼 클릭 시에도 상호작용 실패가 뜨지 않게 응답
       if (!buttonAcked && !interaction.deferred && !interaction.replied) {
-        if (interaction.inGuild()) {
-          await interaction.reply({ content: "이 버튼은 만료되었습니다. 새 고정 메시지 버튼을 눌러주세요.", ephemeral: true });
-        } else {
-          await interaction.reply({ content: "이 버튼은 만료되었습니다." });
+        try {
+          const msg = interaction.inGuild()
+            ? "이 버튼은 만료되었습니다. 새 고정 메시지 버튼을 눌러주세요."
+            : "이 버튼은 만료되었습니다.";
+          await interaction.reply({ content: msg, ephemeral: true });
+        } catch (_) {}
+      }
+      return;
+    }
+
+    if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === "응원") {
+        if (!interaction.deferred && !interaction.replied) {
+          await interaction.deferReply({ ephemeral: true });
         }
-      }
-      return;
-    }
 
-    if (interaction.isChatInputCommand() && interaction.commandName === "응원") {
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ ephemeral: true });
-      }
+        const guildId = interaction.guildId;
+        const discordGuild = interaction.guild;
+        if (!guildId || !discordGuild) {
+          await interaction.editReply({ content: "서버에서만 사용할 수 있습니다" });
+          return;
+        }
 
-      const guildId = interaction.guildId;
-      const discordGuild = interaction.guild;
-      if (!guildId || !discordGuild) {
-        await interaction.editReply({ content: "서버에서만 사용할 수 있습니다" });
+        const root = normalizeDataRoot(loadData());
+        const { guild } = withGuildDataById(root, guildId);
+        const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+
+        try {
+          await discordGuild.members.fetch();
+        } catch (_) {}
+
+        const candidates = discordGuild.members.cache
+          .filter((m) => m && !m.user?.bot)
+          .filter((m) => {
+            const inStudy = studyVcId ? m.voice?.channelId === studyVcId : !!m.voice?.channelId;
+            const active = !!m.voice?.selfVideo || !!m.voice?.streaming;
+            return inStudy && active;
+          })
+          .map((m) => m.id);
+
+        if (candidates.length === 0) {
+          await interaction.editReply({ content: "지금 캠/화면공유 활성화 중인 사람이 없습니다" });
+          return;
+        }
+
+        const targetId = pickRandom(candidates);
+        const cheer = pickRandom(RANDOM_CHEER_TEXTS) || "조용히 응원 두고 갈게요 🙌";
+        if (interaction.channel && typeof interaction.channel.send === "function") {
+          await interaction.channel.send(`🌿 <@${targetId}> ${cheer}`);
+        }
+        await interaction.editReply({ content: "응원을 보냈습니다 🌿" });
         return;
       }
 
-      const root = normalizeDataRoot(loadData());
-      const { guild } = withGuildDataById(root, guildId);
-      const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
-
-      try {
-        await discordGuild.members.fetch();
-      } catch (_) {}
-
-      const candidates = discordGuild.members.cache
-        .filter((m) => m && !m.user?.bot)
-        .filter((m) => {
-          const inStudy = studyVcId ? m.voice?.channelId === studyVcId : !!m.voice?.channelId;
-          const active = !!m.voice?.selfVideo || !!m.voice?.streaming;
-          return inStudy && active;
-        })
-        .map((m) => m.id);
-
-      if (candidates.length === 0) {
-        await interaction.editReply({ content: "지금 캠/화면공유 활성화 중인 사람이 없습니다" });
-        return;
-      }
-
-      const targetId = pickRandom(candidates);
-      const cheer = pickRandom(RANDOM_CHEER_TEXTS) || "조용히 응원 두고 갈게요 🙌";
-      if (interaction.channel && typeof interaction.channel.send === "function") {
-        await interaction.channel.send(`🌿 <@${targetId}> ${cheer}`);
-      }
-      await interaction.editReply({ content: "응원을 보냈습니다 🌿" });
+      // 알 수 없는 슬래시 커맨드도 반드시 응답
+      await safeAck(true);
       return;
     }
+
+    // ── 그 외 모든 인터랙션 (select menu, modal, autocomplete 등) 반드시 응답 ──
+    await safeAck(true);
+
   } catch (err) {
     console.error("interactionCreate failed:", err?.message || err);
-    if (interaction && !interaction.replied && !interaction.deferred) {
-      try {
-        await interaction.reply({ content: "처리 중 오류가 발생했습니다." });
-      } catch (_) {}
-    } else if (interaction?.deferred && !interaction.replied) {
-      try {
+    // 최후의 수단: 아직 응답하지 않았으면 어떻게든 응답
+    try {
+      if (interaction && !interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: "처리 중 오류가 발생했습니다.", ephemeral: true });
+      } else if (interaction?.deferred && !interaction.replied) {
         await interaction.editReply({ content: "처리 중 오류가 발생했습니다." });
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
   }
 });
 
