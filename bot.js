@@ -327,6 +327,7 @@ const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중
 const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const QUIET_CHEER_DROP_TEXT = "누군가 조용히 응원을 두고 갔어요 🌿\n익명 응원 1개 도착\n오늘도 같이 버티는 중이라는 신호가 왔어요";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
+const ENABLE_DM_REVIEW_BUTTON = false;
 const CAM_REVIEW_OPTIONS = [
   { key: "great", label: "오늘 만족" },
   { key: "okay", label: "그럭저럭" },
@@ -517,9 +518,14 @@ async function ensureCheerSlashCommand(discordGuild) {
   }
 }
 
-async function sendReviewPromptDm(member, guildId, promptText = "오늘 참여한 기록이 있어 🙌 회고 하나만 눌러줘") {
+async function sendReviewPromptDm(member, guildId, promptText = "오늘 참여한 기록이 있어 🙌 짧게 회고 남겨줘") {
   try {
     const dm = await member.createDM();
+    if (!ENABLE_DM_REVIEW_BUTTON) {
+      await dm.send(`${promptText}\n(회고 버튼 기능은 잠시 비활성화 상태야)`);
+      return;
+    }
+
     await dm.send({
       content: promptText,
       components: [
@@ -587,7 +593,7 @@ async function sendNightlyReviewPromptTick() {
         await sendReviewPromptDm(
           member,
           guildId,
-          "오늘 참여한 기록이 있어요 🙌 회고 하나만 눌러주세요"
+          "오늘 참여한 기록이 있어요 🙌 짧게 회고 남겨주세요"
         );
 
         user.lastReviewPromptAt = now;
@@ -1030,6 +1036,13 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
+        if (!ENABLE_DM_REVIEW_BUTTON) {
+          try {
+            await interaction.followUp({ content: "회고 버튼 기능은 지금 잠시 꺼둔 상태야.", ephemeral: true });
+          } catch (_) {}
+          return;
+        }
+
         const parts = interaction.customId.split(":");
         const guildId = String(parts[1] || "");
         const targetUserId = String(parts[2] || "");
