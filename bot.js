@@ -1097,242 +1097,67 @@ client.on("guildMemberAdd", (member) => {
 });
 
 
-
 client.on("interactionCreate", async (interaction) => {
-  // ──────────────────────────────────────────────
-  // safeFollowUp: 안전하게 응답을 보내는 헬퍼
-  // ackMode: "update" → deferUpdate 이후, "reply" → deferReply 이후
-  // ──────────────────────────────────────────────
-console.log("✅ interactionCreate LIVE 2026-04-14 v1");
- console.log("🔥 INTERACTION RAW:", {
+  console.log("🔥 INTERACTION RAW", {
     type: interaction.type,
-    isButton: interaction.isButton?.(),
-    custom_Id: interaction.customId,
-    guild: interaction.guildId,
-    user: interaction.user?.id
+    isButton: typeof interaction.isButton === "function" ? interaction.isButton() : "no-method",
+    customId: interaction.customId,
+    guildId: interaction.guildId,
+    channelType: interaction.channel?.type,
+    userId: interaction.user?.id
   });
-  const safeFollowUp = async (content, ackMode = "update") => {
-    try {
-      // deferReply 이후엔 editReply로 응답
-      if (ackMode === "reply" && interaction.deferred && !interaction.replied) {
-        await interaction.editReply({ content });
-        return;
-      }
-
-      const payload = interaction.inGuild()
-        ? { content, ephemeral: true }
-        : { content };
-
-      // 이미 ack된 상태면 followUp (새 메시지)
-      if (interaction.deferred || interaction.replied) {
-        await interaction.followUp(payload);
-        return;
-      }
-
-      // 아직 ack 안 됐으면 reply
-      await interaction.reply(payload);
-    } catch (err) {
-      // ⚠️ [FIX] 에러 로깅 추가 — 이전엔 catch(_)로 완전히 무시됨
-      console.error("safeFollowUp 실패:", err?.message || err);
-    }
-  };
-
-  // ──────────────────────────────────────────────
-  // safeButtonAck: 3초 안에 반드시 ack하는 헬퍼
-  // 우선 deferUpdate() 시도 → 실패 시 deferReply() fallback
-  // ──────────────────────────────────────────────
-  const safeButtonAck = async () => {
-    if (interaction.deferred || interaction.replied) {
-      console.log("⚠️ already deferred/replied");
-    return "already";
-    }
-
-    try {
-      await interaction.deferUpdate();
-      console.log("✅ deferUpdate success");
-      return "update";
-    } catch (err) {
-      console.warn("deferUpdate 실패, deferReply로 fallback:", err?.message || err);
-    }
-
-    try {
-      if (interaction.inGuild()) {
-        await interaction.deferReply({ ephemeral: true });
-      } else {
-        await interaction.deferReply();
-      }
-      console.log("✅ deferReply success");
-      return "reply";
-    } catch (err) {
-      console.error("deferReply도 실패 — 상호작용 실패 발생 가능:", err?.message || err);
-    }
-    console.log("❌ ack failed completely");
-    return "none";
-  };
 
   try {
-    // 버튼 처리
-    if (interaction.isButton()) {
- console.log("✅ button clicked:", interaction.customId);
-      const ackMode = await safeButtonAck();
- console.log("✅ ackMode:", ackMode);
-      if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
-        if (interaction.guildId) {
-          try {
-            const root = normalizeDataRoot(loadData());
-            const { data: latestData, guild } = withGuildDataById(root, interaction.guildId);
-            guild.settings ??= {};
-            guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
-            saveData(latestData);
-          } catch (e) {
-            console.error("quiet cheer save failed:", e?.message || e);
-          }
-        }
+    if (!interaction.isButton()) return;
 
-        try {
-          if (interaction.channel && typeof interaction.channel.send === "function") {
-            await interaction.channel.send(QUIET_CHEER_DROP_TEXT);
-          }
-        } catch (e) {
-          console.error("quiet cheer channel.send failed:", e?.message || e);
-        }
+    console.log("🔥 버튼 눌림:", interaction.customId);
 
-        await safeFollowUp("조용한 응원을 보냈어 🌿", ackMode);
-        return;
-      }
+    await interaction.deferReply({ ephemeral: true });
 
-      if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
-  console.log("✅ review button route hit:", interaction.customId);
-        if (!ENABLE_DM_REVIEW_BUTTON) {
-          await safeFollowUp("회고 버튼 기능은 지금 꺼져있어", ackMode);
-          return;
-        }
+    if (interaction.customId.startsWith("cam_review:")) {
+      const [_, guildId, userId, moodKey] = interaction.customId.split(":");
 
-        const parts = interaction.customId.split(":");
-        const guildId = String(parts[1] || "");
-        const targetUserId = String(parts[2] || "");
-        const moodKey = String(parts[3] || "");
-        const opt = CAM_REVIEW_OPTIONS.find((x) => x.key === moodKey);
-
-        if (!guildId || !targetUserId || !opt) {
-          await safeFollowUp("회고 저장 실패: 잘못된 요청", ackMode);
-          return;
-        }
-
-        if (interaction.user.id !== targetUserId) {
-          await safeFollowUp("이 버튼은 본인만 누를 수 있어", ackMode);
-          return;
-        }
-
-        const actorUserId = String(interaction.user.id);
-        const root = normalizeDataRoot(loadData());
-        const { data: latestData, guild } = withGuildDataById(root, guildId);
-
-        guild.users ??= {};
-        if (!guild.users[actorUserId]) {
-          guild.users[actorUserId] = {
-            id: actorUserId,
-            nickname: interaction.user.username,
-            username: interaction.user.username,
-            avatar: interaction.user.displayAvatarURL?.() || null,
-            sessions: [],
-            totalSeconds: 0,
-            goalSec: 0,
-            studyRecords: [],
-            freeGoals: [],
-            monthGoalHours: 40,
-            currentStart: null,
-            eventStart: null,
-            cameraOn: false
-          };
-        }
-
-        const user = guild.users[actorUserId];
-        user.reviews ??= [];
-        user.reviews.unshift({
-          at: Date.now(),
-          mood: moodKey,
-          label: opt.label,
-          source: "cam_off_prompt"
-        });
-
-        if (user.reviews.length > 200) {
-          user.reviews = user.reviews.slice(0, 200);
-        }
-
-        saveData(latestData);
-        await safeFollowUp(`회고 저장 완료: ${opt.label}`, ackMode);
-        return;
-      }
-
-      return;
-    }
-
-    // 슬래시 명령어 처리
-    if (interaction.isChatInputCommand() && interaction.commandName === "응원") {
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ ephemeral: true });
-      }
-
-      const guildId = interaction.guildId;
-      const discordGuild = interaction.guild;
-
-      if (!guildId || !discordGuild) {
-        await interaction.editReply({ content: "서버에서만 사용할 수 있어" });
+      if (interaction.user.id !== userId) {
+        await interaction.editReply("이 버튼은 본인만 눌러야 해");
         return;
       }
 
       const root = normalizeDataRoot(loadData());
-      const { guild } = withGuildDataById(root, guildId);
-      const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+      const { data, guild } = withGuildDataById(root, guildId);
 
-      try {
-        await discordGuild.members.fetch();
-      } catch (_) {}
+      guild.users ??= {};
+      guild.users[userId] ??= {
+        id: userId,
+        sessions: [],
+        totalSeconds: 0
+      };
 
-      const candidates = discordGuild.members.cache
-        .filter((m) => m && !m.user?.bot)
-        .filter((m) => {
-          const inStudy = studyVcId ? m.voice?.channelId === studyVcId : !!m.voice?.channelId;
-          const active = !!m.voice?.selfVideo || !!m.voice?.streaming;
-          return inStudy && active;
-        })
-        .map((m) => m.id);
+      const user = guild.users[userId];
+      user.reviews ??= [];
+      user.reviews.unshift({
+        at: Date.now(),
+        mood: moodKey
+      });
 
-      if (candidates.length === 0) {
-        await interaction.editReply({ content: "지금 캠/화면공유 활성화 중인 사람이 없어" });
-        return;
-      }
+      saveData(data);
 
-      const targetId = pickRandom(candidates);
-      const cheer = pickRandom(RANDOM_CHEER_TEXTS) || "조용히 응원 두고 갈게요 🙌";
-
-      if (interaction.channel && typeof interaction.channel.send === "function") {
-        await interaction.channel.send(`🌿 <@${targetId}> ${cheer}`);
-      }
-
-      await interaction.editReply({ content: "응원을 보냈어 🌿" });
+      await interaction.editReply("회고 저장 완료 👍");
       return;
     }
-  } catch (err) {
-    console.error("interactionCreate failed:", err?.message || err);
 
+    if (interaction.customId === "quiet_cheer_send") {
+      await interaction.channel.send("🌿 누군가 응원을 남겼어");
+      await interaction.editReply("응원 보냈어 👍");
+      return;
+    }
+
+  } catch (err) {
+    console.error("❌ interactionCreate error:", err);
     try {
       if (!interaction.replied && !interaction.deferred) {
-        if (interaction.inGuild()) {
-          await interaction.reply({
-            content: "처리 중 오류가 발생했어.",
-            ephemeral: true
-          });
-        } else {
-          await interaction.reply({
-            content: "처리 중 오류가 발생했어."
-          });
-        }
-      } else if (interaction.deferred && !interaction.replied) {
-        await interaction.editReply({
-          content: "처리 중 오류가 발생했어."
-        });
+        await interaction.reply({ content: "처리 중 오류가 발생했어", ephemeral: true });
+      } else {
+        await interaction.editReply("처리 중 오류가 발생했어");
       }
     } catch (_) {}
   }
@@ -1347,7 +1172,6 @@ client.on('messageCreate', async (msg) => {
 
    if (content === '!회고테스트') {
     const guildId =
-      msg.guildId ||
         msg.guildId ||
         process.env.DEFAULT_GUILD_ID ||
         process.env.GUILD_ID ||
