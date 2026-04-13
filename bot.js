@@ -1098,6 +1098,7 @@ client.on("guildMemberAdd", (member) => {
 
 
 client.on("interactionCreate", async (interaction) => {
+<<<<<<< HEAD
   console.log("🔥 INTERACTION RAW", {
     type: interaction.type,
     isButton: typeof interaction.isButton === "function" ? interaction.isButton() : "no-method",
@@ -1107,18 +1108,31 @@ client.on("interactionCreate", async (interaction) => {
     userId: interaction.user?.id
   });
 
+=======
+>>>>>>> origin/main
   try {
     if (!interaction.isButton()) return;
 
     console.log("🔥 버튼 눌림:", interaction.customId);
 
+<<<<<<< HEAD
     await interaction.deferReply({ ephemeral: true });
 
+=======
+    // 응답 안 하면 3초 뒤 "상호작용 실패" 뜸
+    await interaction.deferUpdate();
+
+    // 👉 회고 버튼 처리
+>>>>>>> origin/main
     if (interaction.customId.startsWith("cam_review:")) {
       const [_, guildId, userId, moodKey] = interaction.customId.split(":");
 
       if (interaction.user.id !== userId) {
+<<<<<<< HEAD
         await interaction.editReply("이 버튼은 본인만 눌러야 해");
+=======
+        await interaction.followUp({ content: "이 버튼은 본인만 눌러야 해", ephemeral: true });
+>>>>>>> origin/main
         return;
       }
 
@@ -1134,6 +1148,7 @@ client.on("interactionCreate", async (interaction) => {
 
       const user = guild.users[userId];
       user.reviews ??= [];
+<<<<<<< HEAD
       user.reviews.unshift({
         at: Date.now(),
         mood: moodKey
@@ -1148,11 +1163,39 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction.customId === "quiet_cheer_send") {
       await interaction.channel.send("🌿 누군가 응원을 남겼어");
       await interaction.editReply("응원 보냈어 👍");
+=======
+
+      user.reviews.unshift({
+        at: Date.now(),
+        mood: moodKey
+      });
+
+      saveData(data);
+
+      await interaction.followUp({
+        content: "회고 저장 완료 👍",
+        ephemeral: true
+      });
+
+      return;
+    }
+
+    // 👉 조용한 응원
+    if (interaction.customId === "quiet_cheer_send") {
+      await interaction.channel.send("🌿 누군가 응원을 남겼어");
+
+      await interaction.followUp({
+        content: "응원 보냈어 👍",
+        ephemeral: true
+      });
+
+>>>>>>> origin/main
       return;
     }
 
   } catch (err) {
     console.error("❌ interactionCreate error:", err);
+<<<<<<< HEAD
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: "처리 중 오류가 발생했어", ephemeral: true });
@@ -1160,6 +1203,8 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.editReply("처리 중 오류가 발생했어");
       }
     } catch (_) {}
+=======
+>>>>>>> origin/main
   }
 });
 
