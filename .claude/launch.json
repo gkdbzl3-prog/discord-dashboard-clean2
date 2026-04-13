@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "discord-dashboard-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8080
+    },
+    {
+      "name": "discord-dashboard-start",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["bot.js"],
+      "port": 8080
+    }
+  ]
+}
