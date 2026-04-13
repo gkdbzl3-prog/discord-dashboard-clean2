@@ -66,11 +66,23 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildVoiceStates,
-  GatewayIntentBits.GuildMessages,
-  GatewayIntentBits.MessageContent
-
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    // ⚠️ [FIX] DirectMessages intent 추가 — DM에서 !회고테스트 등 메시지 수신에 필요
+    // (버튼 interaction은 intent 없이도 작동하지만, DM messageCreate에는 필요)
+    GatewayIntentBits.DirectMessages
   ],
-  partials: [Partials.GuildMember]
+  partials: [
+    Partials.GuildMember,
+    // ⚠️ [FIX] DM 채널 파셜 추가 — DM 상호작용을 안정적으로 수신하기 위해 필요
+    Partials.Channel
+  ]
+});
+
+// ⚠️ [FIX] error 핸들러는 ready 안이 아니라 최상위에 등록해야 함.
+// ready 안에 있으면 ready 이벤트 전에 발생하는 에러를 잡지 못함.
+client.on("error", err => {
+  console.error("Discord Client Error:", err);
 });
 
 // Register admin routes after client is created
@@ -152,6 +164,7 @@ function markDirty() {
 }
 
 
+// discord.js v14에서 'clientReady'는 정상 동작 (v15부터 공식 이벤트명)
 client.on('clientReady', async () => {
   const STUDY_VC_ID = process.env.STUDY_VC_ID;
   const now = Date.now();
@@ -164,10 +177,6 @@ client.on('clientReady', async () => {
       u.eventStart = null;
     });
   });
-
-client.on("error", err => {
-  console.error("Discord Client Error:", err);
-});
 
 if (STUDY_VC_ID) {
   try {
@@ -534,6 +543,26 @@ async function ensureCheerSlashCommand(discordGuild) {
   }
 }
 
+// ──────────────────────────────────────────────
+// customId 설계 (봇 재시작 후에도 작동하는 영구적 라우팅)
+// ──────────────────────────────────────────────
+// ● 조용한 응원 버튼:  "quiet_cheer_send"
+//   → 고정, 단일 ID. guildId는 interaction.guildId에서 가져옴.
+//
+// ● 캠 회고 버튼:  "cam_review:<guildId>:<userId>:<moodKey>"
+//   예) "cam_review:123456789:987654321:great"
+//   → guildId: 어느 서버 데이터에 저장할지
+//   → userId:  본인 확인용 (interaction.user.id와 비교)
+//   → moodKey: "great" | "okay" | "broken" | "sat"
+//
+// ※ collector 방식이 실패하는 이유:
+//   - createMessageComponentCollector는 메시지 객체에 바인딩됨
+//   - 봇이 재시작되면 메모리의 collector가 사라져서
+//     이미 보낸 DM의 버튼을 눌러도 아무 핸들러가 없어 "상호작용 실패" 발생
+//   - 전역 interactionCreate + customId 파싱 방식은
+//     봇이 재시작되어도 customId만 파싱하면 되므로 영구 작동
+// ──────────────────────────────────────────────
+
 async function sendReviewPromptDm(
   member,
   guildId,
@@ -542,8 +571,21 @@ async function sendReviewPromptDm(
 ) {
   try {
     const force = !!opts.force;
-    if (!ENABLE_DM_REVIEW_BUTTON) return;
-    if (!force && !isReviewDmTarget(member?.id)) return;
+    if (!ENABLE_DM_REVIEW_BUTTON) {
+      console.log("⚠️ sendReviewPromptDm: ENABLE_DM_REVIEW_BUTTON is false, skipping");
+      return false;
+    }
+    if (!force && !isReviewDmTarget(member?.id)) {
+      return false;
+    }
+
+    // member가 User 객체일 수도 있고 GuildMember일 수도 있음 — 둘 다 createDM() 지원
+    const userId = member.id || member.user?.id;
+    if (!userId) {
+      console.error("⚠️ sendReviewPromptDm: member.id가 없음");
+      return false;
+    }
+
     const dm = await member.createDM();
     await dm.send({
       content: promptText,
@@ -554,14 +596,16 @@ async function sendReviewPromptDm(
             type: 2,
             style: 2,
             label: opt.label,
-            custom_id: `${CAM_REVIEW_BUTTON_PREFIX}:${guildId}:${member.id}:${opt.key}`
+            custom_id: `${CAM_REVIEW_BUTTON_PREFIX}:${guildId}:${userId}:${opt.key}`
           }))
         }
       ]
     });
+    console.log(`✅ 회고 DM 전송 완료 → userId=${userId}, guildId=${guildId}`);
     return true;
-  } catch (_) {
-    // DM 차단 등은 조용히 무시
+  } catch (err) {
+    // ⚠️ [FIX] 에러를 무시하지 않고 로그 출력 — 디버깅에 필수
+    console.error("❌ sendReviewPromptDm 실패:", err?.message || err);
     return false;
   }
 }
@@ -1051,25 +1095,50 @@ client.on("guildMemberAdd", (member) => {
 });
 
 client.on("interactionCreate", async (interaction) => {
+  // ──────────────────────────────────────────────
+  // safeFollowUp: 안전하게 응답을 보내는 헬퍼
+  // ackMode: "update" → deferUpdate 이후, "reply" → deferReply 이후
+  // ──────────────────────────────────────────────
   const safeFollowUp = async (content, ackMode = "update") => {
-    if (ackMode === "reply" && interaction.deferred && !interaction.replied) {
-      try {
+    try {
+      // deferReply 이후엔 editReply로 응답
+      if (ackMode === "reply" && interaction.deferred && !interaction.replied) {
         await interaction.editReply({ content });
         return;
-      } catch (_) {}
+      }
+
+      const payload = interaction.inGuild()
+        ? { content, ephemeral: true }
+        : { content };
+
+      // 이미 ack된 상태면 followUp (새 메시지)
+      if (interaction.deferred || interaction.replied) {
+        await interaction.followUp(payload);
+        return;
+      }
+
+      // 아직 ack 안 됐으면 reply
+      await interaction.reply(payload);
+    } catch (err) {
+      // ⚠️ [FIX] 에러 로깅 추가 — 이전엔 catch(_)로 완전히 무시됨
+      console.error("safeFollowUp 실패:", err?.message || err);
     }
-    const payload = interaction.inGuild()
-      ? { content, ephemeral: true }
-      : { content };
-    if (interaction.deferred || interaction.replied) {
-      try { await interaction.followUp(payload); } catch (_) {}
-      return;
-    }
-    try { await interaction.reply(payload); } catch (_) {}
   };
 
+  // ──────────────────────────────────────────────
+  // safeButtonAck: 3초 안에 반드시 ack하는 헬퍼
+  // 우선 deferUpdate() 시도 → 실패 시 deferReply() fallback
+  // ──────────────────────────────────────────────
   const safeButtonAck = async () => {
     if (interaction.deferred || interaction.replied) return "already";
+
+    try {
+      await interaction.deferUpdate();
+      return "update";
+    } catch (err) {
+      console.warn("deferUpdate 실패, deferReply로 fallback:", err?.message || err);
+    }
+
     try {
       if (interaction.inGuild()) {
         await interaction.deferReply({ ephemeral: true });
@@ -1077,17 +1146,15 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.deferReply();
       }
       return "reply";
-    } catch (_) {}
-    try {
-      await interaction.deferUpdate();
-      return "update";
-    } catch (_) {}
+    } catch (err) {
+      console.error("deferReply도 실패 — 상호작용 실패 발생 가능:", err?.message || err);
+    }
+
     return "none";
   };
 
   try {
-    // collector는 메시지 객체/프로세스 수명에 묶여서 재시작 시 끊기기 쉬움.
-    // 그래서 전역 interactionCreate + customId 라우팅 방식으로 고정 처리.
+    // 버튼 처리
     if (interaction.isButton()) {
       const ackMode = await safeButtonAck();
 
@@ -1127,10 +1194,12 @@ client.on("interactionCreate", async (interaction) => {
         const targetUserId = String(parts[2] || "");
         const moodKey = String(parts[3] || "");
         const opt = CAM_REVIEW_OPTIONS.find((x) => x.key === moodKey);
+
         if (!guildId || !targetUserId || !opt) {
           await safeFollowUp("회고 저장 실패: 잘못된 요청", ackMode);
           return;
         }
+
         if (interaction.user.id !== targetUserId) {
           await safeFollowUp("이 버튼은 본인만 누를 수 있어", ackMode);
           return;
@@ -1139,6 +1208,7 @@ client.on("interactionCreate", async (interaction) => {
         const actorUserId = String(interaction.user.id);
         const root = normalizeDataRoot(loadData());
         const { data: latestData, guild } = withGuildDataById(root, guildId);
+
         guild.users ??= {};
         if (!guild.users[actorUserId]) {
           guild.users[actorUserId] = {
@@ -1166,9 +1236,12 @@ client.on("interactionCreate", async (interaction) => {
           label: opt.label,
           source: "cam_off_prompt"
         });
-        if (user.reviews.length > 200) user.reviews = user.reviews.slice(0, 200);
-        saveData(latestData);
 
+        if (user.reviews.length > 200) {
+          user.reviews = user.reviews.slice(0, 200);
+        }
+
+        saveData(latestData);
         await safeFollowUp(`회고 저장 완료: ${opt.label}`, ackMode);
         return;
       }
@@ -1176,6 +1249,7 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
+    // 슬래시 명령어 처리
     if (interaction.isChatInputCommand() && interaction.commandName === "응원") {
       if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: true });
@@ -1183,6 +1257,7 @@ client.on("interactionCreate", async (interaction) => {
 
       const guildId = interaction.guildId;
       const discordGuild = interaction.guild;
+
       if (!guildId || !discordGuild) {
         await interaction.editReply({ content: "서버에서만 사용할 수 있어" });
         return;
@@ -1212,23 +1287,33 @@ client.on("interactionCreate", async (interaction) => {
 
       const targetId = pickRandom(candidates);
       const cheer = pickRandom(RANDOM_CHEER_TEXTS) || "조용히 응원 두고 갈게요 🙌";
+
       if (interaction.channel && typeof interaction.channel.send === "function") {
         await interaction.channel.send(`🌿 <@${targetId}> ${cheer}`);
       }
+
       await interaction.editReply({ content: "응원을 보냈어 🌿" });
       return;
     }
   } catch (err) {
     console.error("interactionCreate failed:", err?.message || err);
+
     try {
       if (!interaction.replied && !interaction.deferred) {
         if (interaction.inGuild()) {
-          await interaction.reply({ content: "처리 중 오류가 발생했어.", ephemeral: true });
+          await interaction.reply({
+            content: "처리 중 오류가 발생했어.",
+            ephemeral: true
+          });
         } else {
-          await interaction.reply({ content: "처리 중 오류가 발생했어." });
+          await interaction.reply({
+            content: "처리 중 오류가 발생했어."
+          });
         }
       } else if (interaction.deferred && !interaction.replied) {
-        await interaction.editReply({ content: "처리 중 오류가 발생했어." });
+        await interaction.editReply({
+          content: "처리 중 오류가 발생했어."
+        });
       }
     } catch (_) {}
   }
@@ -1255,17 +1340,23 @@ client.on('messageCreate', async (msg) => {
   }
 
   if (content === '!회고테스트') {
+    console.log(`🧪 !회고테스트 실행 → userId=${userId}, guildId=${guildId}`);
     const ok = await sendReviewPromptDm(
-      msg.author,
+      msg.member || msg.author,  // ⚠️ [FIX] GuildMember 우선 사용, 없으면 User fallback
       guildId,
       "테스트 회고 DM이야 🙌 버튼 눌러서 확인해줘",
       { force: true }
     );
     try { await msg.delete(); } catch (_) {}
     if (!ok) {
+      console.log("⚠️ !회고테스트 DM 전송 실패");
       try {
         await msg.author.send('회고 테스트 DM 전송 실패했어. 디엠 허용 설정 확인해줘');
-      } catch (_) {}
+      } catch (dmErr) {
+        console.error("❌ 실패 안내 DM도 전송 불가:", dmErr?.message || dmErr);
+      }
+    } else {
+      console.log("✅ !회고테스트 DM 전송 성공");
     }
     return;
   }
@@ -1282,6 +1373,7 @@ client.on('messageCreate', async (msg) => {
       '🎯 `!goal 3h`\n' +
       '🌿 `!응원고정`\n' +
       '🧪 `!회고테스트`\n'
+
     );
     return;
   }
