@@ -967,6 +967,18 @@ client.on("guildMemberAdd", (member) => {
 });
 
 client.on("interactionCreate", async (interaction) => {
+  // 헬퍼: 어떤 수단으로든 인터랙션을 확실히 응답(ack)합니다
+  async function safeAck(preferReply) {
+    if (interaction.deferred || interaction.replied) return true;
+    if (preferReply) {
+      try { await interaction.reply({ content: "처리 중…", ephemeral: true }); return true; } catch (_) {}
+    }
+    try { await interaction.deferUpdate(); return true; } catch (_) {}
+    try { await interaction.reply({ content: "처리 중…", ephemeral: true }); return true; } catch (_) {}
+    try { await interaction.deferReply({ ephemeral: true }); return true; } catch (_) {}
+    return false;
+  }
+
   try {
     // ── 모든 버튼: 즉시 deferUpdate 로 ack (3초 타임아웃 방지) ──
     if (interaction.isButton()) {
@@ -987,6 +999,19 @@ client.on("interactionCreate", async (interaction) => {
       // ── 조용한 응원 버튼 ──
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
         console.log("[interaction] quiet_cheer_send", interaction.guildId || "dm");
+<<<<<<< HEAD
+=======
+        // 먼저 ephemeral reply 로 인터랙션을 확실히 응답합니다
+        let quietReplied = false;
+        try {
+          if (!interaction.deferred && !interaction.replied) {
+            await interaction.reply({ content: "응원을 보냈습니다 🌿", ephemeral: true });
+            quietReplied = true;
+          }
+        } catch (_) {}
+        // reply 실패 시 deferUpdate → deferReply 순으로 재시도
+        if (!quietReplied) await safeAck(false);
+>>>>>>> origin/main
 
         if (interaction.guildId) {
           try {
@@ -1011,7 +1036,25 @@ client.on("interactionCreate", async (interaction) => {
         return;
       }
 
+<<<<<<< HEAD
       // ── 카메라 회고 버튼 ──
+=======
+      // ── 그 외 버튼: 먼저 deferUpdate, 실패 시 reply 로 폴백 ──
+      let buttonAcked = interaction.deferred || interaction.replied;
+      if (!buttonAcked) {
+        try {
+          await interaction.deferUpdate();
+          buttonAcked = true;
+        } catch (_) {
+          // deferUpdate 실패 시 reply 로 폴백
+          try {
+            await interaction.reply({ content: "처리 중…", ephemeral: true });
+            buttonAcked = true;
+          } catch (_) {}
+        }
+      }
+
+>>>>>>> origin/main
       if (interaction.customId.startsWith(`${CAM_REVIEW_BUTTON_PREFIX}:`)) {
         const parts = interaction.customId.split(":");
         const guildId = String(parts[1] || "");
@@ -1072,11 +1115,26 @@ client.on("interactionCreate", async (interaction) => {
         return;
       }
 
+<<<<<<< HEAD
       // 알 수 없는 버튼 — 이미 deferUpdate 로 ack 됨
       return;
     }
 
     // ── 슬래시 커맨드 ──
+=======
+      // 과거/만료 버튼 클릭 시에도 상호작용 실패가 뜨지 않게 응답
+      if (!buttonAcked && !interaction.deferred && !interaction.replied) {
+        try {
+          const msg = interaction.inGuild()
+            ? "이 버튼은 만료되었습니다. 새 고정 메시지 버튼을 눌러주세요."
+            : "이 버튼은 만료되었습니다.";
+          await interaction.reply({ content: msg, ephemeral: true });
+        } catch (_) {}
+      }
+      return;
+    }
+
+>>>>>>> origin/main
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === "응원") {
         if (!interaction.deferred && !interaction.replied) {
@@ -1121,6 +1179,7 @@ client.on("interactionCreate", async (interaction) => {
         return;
       }
 
+<<<<<<< HEAD
       // 알 수 없는 슬래시 커맨드
       if (!interaction.deferred && !interaction.replied) {
         try { await interaction.reply({ content: "알 수 없는 명령어입니다.", ephemeral: true }); } catch (_) {}
@@ -1137,6 +1196,19 @@ client.on("interactionCreate", async (interaction) => {
 
   } catch (err) {
     console.error("interactionCreate failed:", err?.message || err);
+=======
+      // 알 수 없는 슬래시 커맨드도 반드시 응답
+      await safeAck(true);
+      return;
+    }
+
+    // ── 그 외 모든 인터랙션 (select menu, modal, autocomplete 등) 반드시 응답 ──
+    await safeAck(true);
+
+  } catch (err) {
+    console.error("interactionCreate failed:", err?.message || err);
+    // 최후의 수단: 아직 응답하지 않았으면 어떻게든 응답
+>>>>>>> origin/main
     try {
       if (interaction && !interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: "처리 중 오류가 발생했습니다.", ephemeral: true });
