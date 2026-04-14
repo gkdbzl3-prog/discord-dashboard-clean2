@@ -420,11 +420,10 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     const payload = buildQuietCheerPayload(count);
 
     guildData.settings ??= {};
-    const savedDateKey = String(guildData.settings.quietCheerDateKey || "");
     const savedId = String(guildData.settings.quietCheerMessageId || "");
     let msg = null;
     let matchedMessages = [];
-    if (savedId && savedDateKey === dateKey) {
+    if (savedId) {
       try {
         msg = await textChannel.messages.fetch(savedId);
       } catch (_) {
@@ -1072,6 +1071,34 @@ client.on("interactionCreate", async (interaction) => {
 
     const { MessageFlags } = require("discord.js");
 
+    if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
+      if (!interaction.guildId) {
+        await interaction.reply({ content: "서버에서만 사용할 수 있어", flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      await interaction.deferUpdate();
+
+      const root = normalizeDataRoot(loadData());
+      const { data, guild } = withGuildDataById(root, interaction.guildId);
+      guild.settings ??= {};
+      guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
+      guild.settings.quietCheerDateKey = getKstDateParts(Date.now()).dateKey;
+
+      const nextPayload = buildQuietCheerPayload(guild.settings.quietCheerCount);
+      try {
+        if (interaction.message && typeof interaction.message.edit === "function") {
+          await interaction.message.edit(nextPayload);
+          guild.settings.quietCheerMessageId = interaction.message.id;
+        }
+      } catch (err) {
+        console.error("❌ quiet cheer update failed:", err?.message || err);
+      }
+
+      saveData(data);
+      return;
+    }
+
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     if (interaction.customId.startsWith("cam_review:")) {
@@ -1121,33 +1148,6 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
-      if (!interaction.guildId) {
-        await interaction.editReply("서버에서만 사용할 수 있어");
-        return;
-      }
-
-      const root = normalizeDataRoot(loadData());
-      const { data, guild } = withGuildDataById(root, interaction.guildId);
-      guild.settings ??= {};
-      guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
-      guild.settings.quietCheerDateKey = getKstDateParts(Date.now()).dateKey;
-
-      const nextPayload = buildQuietCheerPayload(guild.settings.quietCheerCount);
-      try {
-        if (interaction.message && typeof interaction.message.edit === "function") {
-          await interaction.message.edit(nextPayload);
-          guild.settings.quietCheerMessageId = interaction.message.id;
-        }
-      } catch (err) {
-        console.error("❌ quiet cheer update failed:", err?.message || err);
-      }
-
-      saveData(data);
-      await interaction.editReply("조용한 응원을 남겼어 🌿");
-      return;
-    }
-
 
 
   } catch (err) {
@@ -1179,7 +1179,6 @@ client.on('messageCreate', async (msg) => {
     guild.settings.quietCheerMessageId = null;
     await ensureQuietCheerPinnedMessage(msg.guild, guild);
     saveData(latestData);
-    await msg.reply('응원 고정메시지 갱신 완료');
     return;
   }
 
