@@ -1070,8 +1070,9 @@ client.on("interactionCreate", async (interaction) => {
   try {
     if (!interaction.isButton()) return;
 
+    const { MessageFlags } = require("discord.js");
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     if (interaction.customId.startsWith("cam_review:")) {
       const [_, guildId, userId, moodKey] = interaction.customId.split(":");
@@ -1151,9 +1152,10 @@ client.on("interactionCreate", async (interaction) => {
 
   } catch (err) {
     console.error("❌ interactionCreate error:", err);
+    const { MessageFlags } = require("discord.js")
     try {
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: "처리 중 오류가 발생했어", ephemeral: true });
+        await interaction.reply({ content: "처리 중 오류가 발생했어", flags: MessageFlags.Ephemeral });
       } else {
         await interaction.editReply("처리 중 오류가 발생했어");
       }
