@@ -358,6 +358,30 @@ const RANDOM_CHEER_TEXTS = [
   "한 칸씩 전진하는 중, 아주 좋아요",
   "조용히 응원 두고 갈게요 🙌"
 ];
+const MALANG_USER_ID = "476226483703250956";
+const MALANG_AWAY_PROMPT_INTERVAL_MS = 30 * 60 * 1000;
+const CLASS_ACTIVE_WINDOWS = [
+  { key: "p1", start: "09:00", end: "09:50" },
+  { key: "p2", start: "10:00", end: "11:40" },
+  { key: "p3", start: "13:00", end: "14:40" },
+  { key: "p4", start: "15:00", end: "16:40" },
+  { key: "p5", start: "17:00", end: "17:50" },
+  { key: "p6", start: "19:00", end: "20:40" },
+  { key: "p7", start: "21:00", end: "22:40" }
+];
+const MALANG_AWAY_PROMPTS = [
+  "말랑님 어디 가셨나요~ 👀",
+  "사라진 말랑님 찾습니다…\n출석체크 하러 왔어요 🙌",
+  "말랑님 자리 비움 감지!\n지금쯤 다시 나타날 시간인데요?",
+  "도망치신 건 아니죠? 👀",
+  "말랑님… 설마 또 딴짓 중?",
+  "잠깐 쉰 거지, 끝난 건 아니지? 😌",
+  "의자와 재회할 시간입니다",
+  "공부하러 돌아올 타이밍~!",
+  "사라진 말랑님 찾습니다~ 👀",
+  "뭐해? 지금 수업중이야! 📚",
+  "오늘도 충분히 잘하고 있어, 조금만 더"
+];
 
 function pickRandom(list = []) {
   if (!Array.isArray(list) || list.length === 0) return null;
@@ -677,6 +701,84 @@ function getKstDateParts(now = Date.now()) {
   };
 }
 
+function hhmmToMinutes(hhmm) {
+  const [hh, mm] = String(hhmm || "00:00").split(":").map(Number);
+  return (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0);
+}
+
+function getCurrentClassWindow(now = Date.now()) {
+  const { hhmm } = getKstDateParts(now);
+  const minutes = hhmmToMinutes(hhmm);
+  return CLASS_ACTIVE_WINDOWS.find((window) => {
+    const start = hhmmToMinutes(window.start);
+    const end = hhmmToMinutes(window.end);
+    return minutes >= start && minutes < end;
+  }) || null;
+}
+
+async function sendMalangAwayPromptTick() {
+  if (!client.isReady()) return;
+  if (!process.env.FLY_APP_NAME) return;
+
+  const now = Date.now();
+  const activeWindow = getCurrentClassWindow(now);
+  const root = normalizeDataRoot(loadData());
+  let changed = false;
+
+  for (const discordGuild of client.guilds.cache.values()) {
+    const { guild } = withGuildDataById(root, discordGuild.id);
+    const member =
+      discordGuild.members.cache.get(MALANG_USER_ID) ||
+      await discordGuild.members.fetch(MALANG_USER_ID).catch(() => null);
+
+    if (!member || member.user?.bot) continue;
+
+    const user = ensureUserExists(guild, member);
+    const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+    const inStudy = studyVcId ? member.voice?.channelId === studyVcId : !!member.voice?.channelId;
+    const camOrStreamOn = !!member.voice?.selfVideo || !!member.voice?.streaming;
+    const activeNow = inStudy && camOrStreamOn;
+
+    if (!activeWindow || activeNow) {
+      if (user.awayPromptInactiveSince || user.lastAwayPromptAt || user.lastAwayPromptWindowKey) {
+        user.awayPromptInactiveSince = null;
+        user.lastAwayPromptAt = null;
+        user.lastAwayPromptWindowKey = null;
+        changed = true;
+      }
+      continue;
+    }
+
+    if (!user.awayPromptInactiveSince || user.lastAwayPromptWindowKey !== activeWindow.key) {
+      user.awayPromptInactiveSince = now;
+      user.lastAwayPromptAt = null;
+      user.lastAwayPromptWindowKey = activeWindow.key;
+      changed = true;
+      continue;
+    }
+
+    const inactiveMs = now - Number(user.awayPromptInactiveSince || 0);
+    if (inactiveMs < MALANG_AWAY_PROMPT_INTERVAL_MS) continue;
+
+    const lastPromptAt = Number(user.lastAwayPromptAt || 0);
+    if (lastPromptAt > 0 && now - lastPromptAt < MALANG_AWAY_PROMPT_INTERVAL_MS) continue;
+
+    try {
+      const dmText =
+        MALANG_AWAY_PROMPTS[Math.floor(Math.random() * MALANG_AWAY_PROMPTS.length)];
+      await member.send(dmText);
+      user.lastAwayPromptAt = now;
+      changed = true;
+    } catch (err) {
+      console.error("malang away prompt failed:", err?.message || err);
+    }
+  }
+
+  if (changed) {
+    saveData(root);
+  }
+}
+
 let __periodNoticeTickBusy = false;
 const __periodNoticeSent = new Set();
 
@@ -906,6 +1008,10 @@ setInterval(() => {
   sendNightlyReviewPromptTick();
 }, 20000);
 
+setInterval(() => {
+  sendMalangAwayPromptTick();
+}, 60000);
+
 client.on("voiceStateUpdate", (oldState, newState) => {
   const userId = newState.id;
   const member = newState.member || oldState.member;
@@ -927,6 +1033,15 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   if (user.cameraOn !== cameraOnAnyVoice) {
     user.cameraOn = cameraOnAnyVoice;
     saveData(dataLatest);
+  }
+
+  if (userId === MALANG_USER_ID && cameraOnAnyVoice && isInStudy) {
+    if (user.awayPromptInactiveSince || user.lastAwayPromptAt || user.lastAwayPromptWindowKey) {
+      user.awayPromptInactiveSince = null;
+      user.lastAwayPromptAt = null;
+      user.lastAwayPromptWindowKey = null;
+      saveData(dataLatest);
+    }
   }
 
   const usertag = member?.displayName || member?.user?.username || "unknown";
