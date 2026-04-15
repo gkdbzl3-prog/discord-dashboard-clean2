@@ -340,6 +340,7 @@ const PERIOD_END_SCHEDULE = [
 const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중 🔥 조용히 응원을 보내고 싶다면 버튼을 눌러주세요!";
 const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
+const MALANG_AWAY_PAUSE_PREFIX = "malang_away_pause";
 const ENABLE_DM_REVIEW_BUTTON = true;
 const ENABLE_NIGHTLY_REVIEW_DM = true;
 // customId format:
@@ -351,6 +352,15 @@ const CAM_REVIEW_OPTIONS = [
   { key: "broken", label: "흐름 끊김" },
   { key: "sat", label: "그래도 앉음" }
 ];
+
+function buildMalangAwayPauseRow(guildId, dateKey) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${MALANG_AWAY_PAUSE_PREFIX}:${guildId}:${MALANG_USER_ID}:${dateKey}`)
+      .setLabel("오늘은 쉬겠습니다")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
 const RANDOM_CHEER_TEXTS = [
   "오늘도 묵묵히 쌓는 중 🌿",
   "지금처럼만 가도 충분히 잘하고 있어요",
@@ -721,6 +731,7 @@ async function sendMalangAwayPromptTick() {
   if (!process.env.FLY_APP_NAME) return;
 
   const now = Date.now();
+  const { dateKey } = getKstDateParts(now);
   const activeWindow = getCurrentClassWindow(now);
   const root = normalizeDataRoot(loadData());
   let changed = false;
@@ -734,6 +745,8 @@ async function sendMalangAwayPromptTick() {
     if (!member || member.user?.bot) continue;
 
     const user = ensureUserExists(guild, member);
+    if (String(user.awayPromptSkipDate || "") === dateKey) continue;
+
     const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
     const inStudy = studyVcId ? member.voice?.channelId === studyVcId : !!member.voice?.channelId;
     const camOrStreamOn = !!member.voice?.selfVideo || !!member.voice?.streaming;
@@ -766,7 +779,10 @@ async function sendMalangAwayPromptTick() {
     try {
       const dmText =
         MALANG_AWAY_PROMPTS[Math.floor(Math.random() * MALANG_AWAY_PROMPTS.length)];
-      await member.send(dmText);
+      await member.send({
+        content: dmText,
+        components: [buildMalangAwayPauseRow(discordGuild.id, dateKey)]
+      });
       user.lastAwayPromptAt = now;
       changed = true;
     } catch (err) {
@@ -1211,6 +1227,35 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       saveData(data);
+      return;
+    }
+
+    if (interaction.customId.startsWith(`${MALANG_AWAY_PAUSE_PREFIX}:`)) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const [_, guildId, userId, dateKey] = interaction.customId.split(":");
+
+      if (interaction.user.id !== userId) {
+        await interaction.editReply("이 버튼은 본인만 눌러야 해");
+        return;
+      }
+
+      const root = normalizeDataRoot(loadData());
+      const { data, guild } = withGuildDataById(root, guildId);
+      guild.users ??= {};
+      guild.users[userId] ??= {
+        id: userId,
+        sessions: [],
+        totalSeconds: 0
+      };
+
+      const user = guild.users[userId];
+      user.awayPromptSkipDate = dateKey;
+      user.awayPromptInactiveSince = null;
+      user.lastAwayPromptAt = null;
+      user.lastAwayPromptWindowKey = null;
+      saveData(data);
+
+      await interaction.editReply("오늘은 재촉 메시지 보내지 않을게");
       return;
     }
 
