@@ -454,10 +454,11 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
     const payload = buildQuietCheerPayload(count);
 
     guildData.settings ??= {};
+    const savedDateKey = String(guildData.settings.quietCheerDateKey || "");
     const savedId = String(guildData.settings.quietCheerMessageId || "");
     let msg = null;
     let matchedMessages = [];
-    if (savedId) {
+    if (savedId && savedDateKey === dateKey) {
       try {
         msg = await textChannel.messages.fetch(savedId);
       } catch (_) {
@@ -473,7 +474,9 @@ async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
           const hasQuietBtn = (m.components || []).some((row) =>
             (row.components || []).some((c) => c.customId === QUIET_CHEER_BUTTON_ID)
           );
-          return hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면");
+          const sameDay =
+            getKstDateParts(Number(m.createdTimestamp || 0)).dateKey === dateKey;
+          return sameDay && (hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면"));
         });
         matchedMessages.sort((a, b) => Number(b.createdTimestamp || 0) - Number(a.createdTimestamp || 0));
         msg = matchedMessages[0] || null;
@@ -527,7 +530,6 @@ async function sendDailyQuietCheerTick() {
 
       const { guild } = withGuildDataById(root, guildId);
       guild.settings ??= {};
-      guild.settings.quietCheerCount = 0;
       await ensureQuietCheerPinnedMessage(discordGuild, guild);
       root.meta.quietCheerSentByGuild[guildId] = dateKey;
       __quietCheerSent.add(onceKey);
