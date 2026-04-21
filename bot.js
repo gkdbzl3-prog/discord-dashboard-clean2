@@ -340,7 +340,7 @@ const PERIOD_END_SCHEDULE = [
 const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중 🔥 조용히 응원을 보내고 싶다면 버튼을 눌러주세요!";
 const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
-const MALANG_AWAY_PAUSE_PREFIX = "malang_away_pause";
+const AWAY_PROMPT_PAUSE_PREFIX = "away_prompt_pause";
 const ENABLE_DM_REVIEW_BUTTON = true;
 const ENABLE_NIGHTLY_REVIEW_DM = true;
 // customId format:
@@ -353,11 +353,11 @@ const CAM_REVIEW_OPTIONS = [
   { key: "sat", label: "그래도 앉음" }
 ];
 
-function buildMalangAwayPauseRow(guildId, dateKey) {
+function buildAwayPromptPauseRow(guildId, userId, dateKey, periodKey) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`${MALANG_AWAY_PAUSE_PREFIX}:${guildId}:${MALANG_USER_ID}:${dateKey}`)
-      .setLabel("오늘은 쉬겠습니다")
+      .setCustomId(`${AWAY_PROMPT_PAUSE_PREFIX}:${guildId}:${userId}:${dateKey}:${periodKey}`)
+      .setLabel("이번 교시는 쉴게요")
       .setStyle(ButtonStyle.Secondary)
   );
 }
@@ -368,8 +368,7 @@ const RANDOM_CHEER_TEXTS = [
   "한 칸씩 전진하는 중, 아주 좋아요",
   "조용히 응원 두고 갈게요 🙌"
 ];
-const MALANG_USER_ID = "476226483703250956";
-const MALANG_AWAY_PROMPT_INTERVAL_MS = 30 * 60 * 1000;
+const AWAY_PROMPT_INTERVAL_MS = 30 * 60 * 1000;
 const CLASS_ACTIVE_WINDOWS = [
   { key: "p1", start: "09:00", end: "09:50" },
   { key: "p2", start: "10:00", end: "11:40" },
@@ -379,18 +378,41 @@ const CLASS_ACTIVE_WINDOWS = [
   { key: "p6", start: "19:00", end: "20:40" },
   { key: "p7", start: "21:00", end: "22:40" }
 ];
-const MALANG_AWAY_PROMPTS = [
-  "말랑님 어디 가셨나요~ 👀",
-  "사라진 말랑님 찾습니다…\n출석체크 하러 왔어요 🙌",
-  "말랑님 자리 비움 감지!\n지금쯤 다시 나타날 시간인데요?",
-  "도망치신 건 아니죠? 👀",
-  "말랑님… 설마 또 딴짓 중?",
-  "잠깐 쉰 거지, 끝난 건 아니지? 😌",
-  "의자와 재회할 시간입니다",
-  "공부하러 돌아올 타이밍~!",
-  "사라진 말랑님 찾습니다~ 👀",
-  "뭐해? 지금 수업중이야! 📚",
-  "오늘도 충분히 잘하고 있어, 조금만 더"
+const AWAY_PROMPT_TARGETS = [
+  {
+    userId: "476226483703250956",
+    displayName: "말랑",
+    prompts: [
+      "말랑님 어디 가셨나요~ 👀",
+      "사라진 말랑님 찾습니다…\n출석체크 하러 왔어요 🙌",
+      "말랑님 자리 비움 감지!\n지금쯤 다시 나타날 시간인데요?",
+      "도망치신 건 아니죠? 👀",
+      "말랑님… 설마 또 딴짓 중?",
+      "잠깐 쉰 거지, 끝난 건 아니지? 😌",
+      "의자와 재회할 시간입니다",
+      "공부하러 돌아올 타이밍~!",
+      "사라진 말랑님 찾습니다~ 👀",
+      "뭐해? 지금 수업중이야! 📚",
+      "오늘도 충분히 잘하고 있어, 조금만 더"
+    ]
+  },
+  {
+    userId: "1495274970564263966",
+    displayName: "할수있다",
+    prompts: [
+      "할수있다님 어디 가셨나요~ 👀",
+      "사라진 할수있다님 찾습니다…\n출석체크 하러 왔어요 🙌",
+      "할수있다님 자리 비움 감지!\n지금쯤 다시 나타날 시간인데요?",
+      "도망치신 건 아니죠? 👀",
+      "할수있다님… 설마 또 딴짓 중?",
+      "잠깐 쉰 거지, 끝난 건 아니지? 😌",
+      "의자와 재회할 시간입니다",
+      "공부하러 돌아올 타이밍~!",
+      "사라진 할수있다님 찾습니다~ 👀",
+      "뭐해? 지금 수업중이야! 📚",
+      "오늘도 충분히 잘하고 있어, 조금만 더"
+    ]
+  }
 ];
 
 function pickRandom(list = []) {
@@ -728,7 +750,7 @@ function getCurrentClassWindow(now = Date.now()) {
   }) || null;
 }
 
-async function sendMalangAwayPromptTick() {
+async function sendAwayPromptTick() {
   if (!client.isReady()) return;
   if (!process.env.FLY_APP_NAME) return;
 
@@ -740,55 +762,63 @@ async function sendMalangAwayPromptTick() {
 
   for (const discordGuild of client.guilds.cache.values()) {
     const { guild } = withGuildDataById(root, discordGuild.id);
-    const member =
-      discordGuild.members.cache.get(MALANG_USER_ID) ||
-      await discordGuild.members.fetch(MALANG_USER_ID).catch(() => null);
+    for (const target of AWAY_PROMPT_TARGETS) {
+      const member =
+        discordGuild.members.cache.get(target.userId) ||
+        await discordGuild.members.fetch(target.userId).catch(() => null);
 
-    if (!member || member.user?.bot) continue;
+      if (!member || member.user?.bot) continue;
 
-    const user = ensureUserExists(guild, member);
-    if (String(user.awayPromptSkipDate || "") === dateKey) continue;
-
-    const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
-    const inStudy = studyVcId ? member.voice?.channelId === studyVcId : !!member.voice?.channelId;
-    const camOrStreamOn = !!member.voice?.selfVideo || !!member.voice?.streaming;
-    const activeNow = inStudy && camOrStreamOn;
-
-    if (!activeWindow || activeNow) {
-      if (user.awayPromptInactiveSince || user.lastAwayPromptAt || user.lastAwayPromptWindowKey) {
-        user.awayPromptInactiveSince = null;
-        user.lastAwayPromptAt = null;
-        user.lastAwayPromptWindowKey = null;
-        changed = true;
+      const user = ensureUserExists(guild, member);
+      if (
+        activeWindow &&
+        String(user.awayPromptSkipDate || "") === dateKey &&
+        String(user.awayPromptSkipPeriodKey || "") === activeWindow.key
+      ) {
+        continue;
       }
-      continue;
-    }
 
-    if (!user.awayPromptInactiveSince || user.lastAwayPromptWindowKey !== activeWindow.key) {
-      user.awayPromptInactiveSince = now;
-      user.lastAwayPromptAt = null;
-      user.lastAwayPromptWindowKey = activeWindow.key;
-      changed = true;
-      continue;
-    }
+      const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+      const inStudy = studyVcId ? member.voice?.channelId === studyVcId : !!member.voice?.channelId;
+      const camOrStreamOn = !!member.voice?.selfVideo || !!member.voice?.streaming;
+      const activeNow = inStudy && camOrStreamOn;
 
-    const inactiveMs = now - Number(user.awayPromptInactiveSince || 0);
-    if (inactiveMs < MALANG_AWAY_PROMPT_INTERVAL_MS) continue;
+      if (!activeWindow || activeNow) {
+        if (user.awayPromptInactiveSince || user.lastAwayPromptAt || user.lastAwayPromptWindowKey) {
+          user.awayPromptInactiveSince = null;
+          user.lastAwayPromptAt = null;
+          user.lastAwayPromptWindowKey = null;
+          changed = true;
+        }
+        continue;
+      }
 
-    const lastPromptAt = Number(user.lastAwayPromptAt || 0);
-    if (lastPromptAt > 0 && now - lastPromptAt < MALANG_AWAY_PROMPT_INTERVAL_MS) continue;
+      if (!user.awayPromptInactiveSince || user.lastAwayPromptWindowKey !== activeWindow.key) {
+        user.awayPromptInactiveSince = now;
+        user.lastAwayPromptAt = null;
+        user.lastAwayPromptWindowKey = activeWindow.key;
+        changed = true;
+        continue;
+      }
 
-    try {
-      const dmText =
-        MALANG_AWAY_PROMPTS[Math.floor(Math.random() * MALANG_AWAY_PROMPTS.length)];
-      await member.send({
-        content: dmText,
-        components: [buildMalangAwayPauseRow(discordGuild.id, dateKey)]
-      });
-      user.lastAwayPromptAt = now;
-      changed = true;
-    } catch (err) {
-      console.error("malang away prompt failed:", err?.message || err);
+      const inactiveMs = now - Number(user.awayPromptInactiveSince || 0);
+      if (inactiveMs < AWAY_PROMPT_INTERVAL_MS) continue;
+
+      const lastPromptAt = Number(user.lastAwayPromptAt || 0);
+      if (lastPromptAt > 0 && now - lastPromptAt < AWAY_PROMPT_INTERVAL_MS) continue;
+
+      try {
+        const dmText =
+          target.prompts[Math.floor(Math.random() * target.prompts.length)];
+        await member.send({
+          content: dmText,
+          components: [buildAwayPromptPauseRow(discordGuild.id, target.userId, dateKey, activeWindow.key)]
+        });
+        user.lastAwayPromptAt = now;
+        changed = true;
+      } catch (err) {
+        console.error("away prompt failed:", err?.message || err);
+      }
     }
   }
 
@@ -1027,7 +1057,7 @@ setInterval(() => {
 }, 20000);
 
 setInterval(() => {
-  sendMalangAwayPromptTick();
+  sendAwayPromptTick();
 }, 60000);
 
 client.on("voiceStateUpdate", (oldState, newState) => {
@@ -1053,11 +1083,12 @@ client.on("voiceStateUpdate", (oldState, newState) => {
     saveData(dataLatest);
   }
 
-  if (userId === MALANG_USER_ID && cameraOnAnyVoice && isInStudy) {
+  if (AWAY_PROMPT_TARGETS.some((target) => target.userId === userId) && cameraOnAnyVoice && isInStudy) {
     if (user.awayPromptInactiveSince || user.lastAwayPromptAt || user.lastAwayPromptWindowKey) {
       user.awayPromptInactiveSince = null;
       user.lastAwayPromptAt = null;
       user.lastAwayPromptWindowKey = null;
+      user.awayPromptSkipPeriodKey = null;
       saveData(dataLatest);
     }
   }
@@ -1232,9 +1263,9 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    if (interaction.customId.startsWith(`${MALANG_AWAY_PAUSE_PREFIX}:`)) {
+    if (interaction.customId.startsWith(`${AWAY_PROMPT_PAUSE_PREFIX}:`)) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      const [_, guildId, userId, dateKey] = interaction.customId.split(":");
+      const [_, guildId, userId, dateKey, periodKey] = interaction.customId.split(":");
 
       if (interaction.user.id !== userId) {
         await interaction.editReply("이 버튼은 본인만 눌러야 해");
@@ -1252,12 +1283,13 @@ client.on("interactionCreate", async (interaction) => {
 
       const user = guild.users[userId];
       user.awayPromptSkipDate = dateKey;
+      user.awayPromptSkipPeriodKey = periodKey || null;
       user.awayPromptInactiveSince = null;
       user.lastAwayPromptAt = null;
       user.lastAwayPromptWindowKey = null;
       saveData(data);
 
-      await interaction.editReply("오늘은 재촉 메시지 보내지 않을게");
+      await interaction.editReply("이번 교시는 재촉 메시지 보내지 않을게");
       return;
     }
 
