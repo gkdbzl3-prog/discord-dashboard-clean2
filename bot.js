@@ -258,6 +258,77 @@ function formatSeconds(sec) {
   return str.trim();
 }
 
+function kstStartOfDayMs(now = Date.now()) {
+  const d = new Date(now + KST_OFFSET_MS);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - KST_OFFSET_MS;
+}
+
+function formatKstMonthDay(ms) {
+  const d = new Date(ms + KST_OFFSET_MS);
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${m}/${day}`;
+}
+
+function formatKstWeekday(ms) {
+  const d = new Date(ms + KST_OFFSET_MS);
+  return ["일", "월", "화", "수", "목", "금", "토"][d.getUTCDay()];
+}
+
+function getCameraAcceptedSessions(user) {
+  const sessions = Array.isArray(user?.sessions) ? user.sessions : [];
+  const hasTagged = sessions.some((s) => typeof s?.source === "string");
+  if (!hasTagged) return sessions;
+  return sessions.filter((s) => s?.source === "camera_event");
+}
+
+function getCameraSecondsBetween(user, rangeStart, rangeEnd, now = Date.now()) {
+  let total = 0;
+  for (const s of getCameraAcceptedSessions(user)) {
+    const start = typeof s?.start === "number" ? s.start : Date.parse(s?.start);
+    const end = typeof s?.end === "number" ? s.end : Date.parse(s?.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+    total += overlapSeconds(start, end, rangeStart, rangeEnd);
+  }
+
+  const liveStart = Number(user?.eventStart || 0);
+  if (Number.isFinite(liveStart) && liveStart > 0 && liveStart < now) {
+    total += overlapSeconds(liveStart, now, rangeStart, rangeEnd);
+  }
+
+  return Math.max(0, Math.floor(total));
+}
+
+function buildWeeklyCameraBrief(user, now = Date.now(), dailyGoalHours = 10) {
+  const todayStart = kstStartOfDayMs(now);
+  const days = [];
+  let totalSeconds = 0;
+  let belowGoalCount = 0;
+  const goalSec = Math.max(0, Math.floor(Number(dailyGoalHours || 0) * 3600));
+
+  for (let offset = 6; offset >= 0; offset--) {
+    const start = todayStart - offset * DAY_MS;
+    const end = start + DAY_MS;
+    const seconds = getCameraSecondsBetween(user, start, end, now);
+    totalSeconds += seconds;
+    const belowGoal = goalSec > 0 ? seconds < goalSec : false;
+    if (belowGoal) belowGoalCount += 1;
+
+    days.push({
+      start,
+      seconds,
+      belowGoal
+    });
+  }
+
+  return {
+    totalSeconds,
+    belowGoalCount,
+    goalSec,
+    days
+  };
+}
+
 function parseGoalToSeconds(input) {
   const raw = String(input || "").trim().toLowerCase();
   if (!raw) return null;
@@ -412,6 +483,13 @@ const AWAY_PROMPT_TARGETS = [
       "뭐해? 지금 수업중이야! 📚",
       "오늘도 충분히 잘하고 있어, 조금만 더"
     ]
+  }
+];
+const WEEKLY_BRIEF_TARGETS = [
+  {
+    userId: "1495274970564263966",
+    displayName: "할수있다",
+    dailyGoalHours: 10
   }
 ];
 
@@ -718,6 +796,78 @@ async function sendNightlyReviewPromptTick() {
     console.error("nightly review tick failed:", err?.message || err);
   } finally {
     __nightlyReviewTickBusy = false;
+  }
+}
+
+let __weeklyBriefTickBusy = false;
+const __weeklyBriefSent = new Set();
+async function sendWeeklyCameraBriefTick() {
+  if (__weeklyBriefTickBusy) return;
+  __weeklyBriefTickBusy = true;
+
+  try {
+    if (!client.isReady()) return;
+    if (!process.env.FLY_APP_NAME) return;
+
+    const now = Date.now();
+    const { dateKey, hhmm } = getKstDateParts(now);
+    const weekday = new Date(now + KST_OFFSET_MS).getUTCDay();
+    if (weekday !== 5) return;
+    if (hhmm !== "22:45") return;
+
+    const root = normalizeDataRoot(loadData());
+    root.meta ??= {};
+    root.meta.weeklyCameraBriefSent ??= {};
+    let changed = false;
+
+    for (const discordGuild of client.guilds.cache.values()) {
+      const guildId = discordGuild.id;
+      const { guild } = withGuildDataById(root, guildId);
+
+      for (const target of WEEKLY_BRIEF_TARGETS) {
+        const onceKey = `${guildId}:${target.userId}:${dateKey}`;
+        if (__weeklyBriefSent.has(onceKey)) continue;
+
+        const persistedKey = `${guildId}:${target.userId}`;
+        if (root.meta.weeklyCameraBriefSent[persistedKey] === dateKey) continue;
+
+        const member =
+          discordGuild.members.cache.get(target.userId) ||
+          await discordGuild.members.fetch(target.userId).catch(() => null);
+        if (!member || member.user?.bot) continue;
+
+        const user = ensureUserExists(guild, member);
+        const brief = buildWeeklyCameraBrief(user, now, target.dailyGoalHours);
+        const dayLines = brief.days.map((day) => {
+          const stamp = `${formatKstMonthDay(day.start)}(${formatKstWeekday(day.start)})`;
+          const suffix = day.belowGoal ? " · 10시간 미달" : "";
+          return `- ${stamp} ${formatSeconds(day.seconds)}${suffix}`;
+        });
+
+        const dmText =
+          `📘 주간 캠 브리핑\n` +
+          `${target.displayName}님 최근 7일 총 캠 활성화 시간은 ${formatSeconds(brief.totalSeconds)}였어요.\n` +
+          `10시간 미달 일수: ${brief.belowGoalCount}회\n\n` +
+          `${dayLines.join("\n")}`;
+
+        try {
+          await member.send(dmText);
+          root.meta.weeklyCameraBriefSent[persistedKey] = dateKey;
+          __weeklyBriefSent.add(onceKey);
+          changed = true;
+        } catch (err) {
+          console.error("weekly camera brief failed:", err?.message || err);
+        }
+      }
+    }
+
+    if (changed) {
+      saveData(root);
+    }
+  } catch (err) {
+    console.error("weekly camera brief tick failed:", err?.message || err);
+  } finally {
+    __weeklyBriefTickBusy = false;
   }
 }
 
@@ -1059,6 +1209,10 @@ setInterval(() => {
 setInterval(() => {
   sendAwayPromptTick();
 }, 60000);
+
+setInterval(() => {
+  sendWeeklyCameraBriefTick();
+}, 20000);
 
 client.on("voiceStateUpdate", (oldState, newState) => {
   const userId = newState.id;
