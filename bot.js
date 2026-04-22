@@ -630,6 +630,7 @@ async function sendDailyQuietCheerTick() {
 
       const { guild } = withGuildDataById(root, guildId);
       guild.settings ??= {};
+      guild.settings.quietCheerCount = 0;
       await ensureQuietCheerPinnedMessage(discordGuild, guild);
       root.meta.quietCheerSentByGuild[guildId] = dateKey;
       __quietCheerSent.add(onceKey);
