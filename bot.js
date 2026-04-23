@@ -412,6 +412,7 @@ const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중
 const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
 const AWAY_PROMPT_PAUSE_PREFIX = "away_prompt_pause";
+const MIDCHECK_BUTTON_PREFIX = "midcheck";
 const ENABLE_DM_REVIEW_BUTTON = true;
 const ENABLE_NIGHTLY_REVIEW_DM = true;
 // customId format:
@@ -490,6 +491,61 @@ const WEEKLY_BRIEF_TARGETS = [
     userId: "1495274970564263966",
     displayName: "할수있다",
     dailyGoalHours: 10
+  }
+];
+const MIDCHECK_TARGETS = [
+  {
+    userId: "476226483703250956",
+    displayName: "말랑"
+  },
+  {
+    userId: "1495274970564263966",
+    displayName: "할수 있다"
+  }
+];
+const MIDCHECK_PROMPT_TEXT = "중간점검하러 왔어! 지금 상태는 어때?";
+const MIDCHECK_OPTIONS = [
+  {
+    key: "rest",
+    label: "쉬고 싶어",
+    responses: [
+      "그래, 잠깐 쉬어가도 괜찮아 ☁️조금만 숨 고르고, 괜찮아지면 다시 와줘.",
+      "맞아, 너무 오래 버티는 것보다 잠깐 쉬는 게 더 도움될 때도 있어."
+    ]
+  },
+  {
+    key: "more",
+    label: "좀더 할 수 있을 것 같은데?",
+    responses: [
+      "오 좋다, 그 감각 이어가 보자.",
+      "좋아! 이대로 쭉 가보는 거야, 할 수 있어."
+    ]
+  },
+  {
+    key: "start_now",
+    label: "이제부터 해야지..",
+    responses: [
+      "괜찮아, 지금부터 시작해도 충분해 🌱 아주 작은 것부터 하나만 해보자.",
+      "좋은 생각이야. 너무 부담 갖지 말고 조금씩 해보자구!"
+    ]
+  },
+  {
+    key: "almost_done",
+    label: "거의 다 했어",
+    responses: [
+      "오, 여기까지 온 거 진짜 좋다 ✨ 조금만 더 하면 마무리다. 끝까지 가보자!",
+      "거의 다 왔네, 마무리만 잘하면 되겠다.",
+      "좋아 조금만 더 힘을 내 보자!"
+    ]
+  },
+  {
+    key: "lost_flow",
+    label: "흐름이 끊겼어",
+    responses: [
+      "그럴 수 있어, 흐름은 다시 잡으면 돼 🌙 너무 조급해하지 말고, 제일 쉬운 것 하나로 다시 시작해보자",
+      "괜찮아, 한번 끊겼다고 끝난 건 아니니까.",
+      "괜찮아. 그럴 때도 있지. 다시 흐름을 잡아 보자. 내가 도와줄게!"
+    ]
   }
 ];
 
@@ -724,6 +780,91 @@ await dm.send({
     // ⚠️ [FIX] 에러를 무시하지 않고 로그 출력 — 디버깅에 필수
     console.error("❌ sendReviewPromptDm 실패:", err?.message || err);
     return false;
+  }
+}
+
+function buildMidCheckRow(guildId, userId, dateKey) {
+  return new ActionRowBuilder().addComponents(
+    MIDCHECK_OPTIONS.map((opt) =>
+      new ButtonBuilder()
+        .setCustomId(`${MIDCHECK_BUTTON_PREFIX}:${guildId}:${userId}:${dateKey}:${opt.key}`)
+        .setLabel(opt.label)
+        .setStyle(ButtonStyle.Secondary)
+    )
+  );
+}
+
+async function sendMidCheckDm(member, guildId, dateKey) {
+  try {
+    const userId = member.id || member.user?.id;
+    if (!userId) return false;
+
+    const dm = await member.createDM();
+    await dm.send({
+      content: MIDCHECK_PROMPT_TEXT,
+      components: [buildMidCheckRow(guildId, userId, dateKey)]
+    });
+    return true;
+  } catch (err) {
+    console.error("midcheck DM failed:", err?.message || err);
+    return false;
+  }
+}
+
+let __midCheckTickBusy = false;
+const __midCheckSent = new Set();
+async function sendDailyMidCheckTick() {
+  if (__midCheckTickBusy) return;
+  __midCheckTickBusy = true;
+
+  try {
+    if (!client.isReady()) return;
+    if (!process.env.FLY_APP_NAME) return;
+
+    const now = Date.now();
+    const { dateKey, hhmm } = getKstDateParts(now);
+    if (hhmm < "17:00") return;
+
+    const root = normalizeDataRoot(loadData());
+    root.meta ??= {};
+    root.meta.midCheckSentByUser ??= {};
+    let changed = false;
+
+    for (const discordGuild of client.guilds.cache.values()) {
+      const guildId = discordGuild.id;
+      const { guild } = withGuildDataById(root, guildId);
+
+      for (const target of MIDCHECK_TARGETS) {
+        const onceKey = `${guildId}:${target.userId}:${dateKey}`;
+        if (__midCheckSent.has(onceKey)) continue;
+
+        const persistedKey = `${guildId}:${target.userId}`;
+        if (root.meta.midCheckSentByUser[persistedKey] === dateKey) continue;
+
+        const member =
+          discordGuild.members.cache.get(target.userId) ||
+          await discordGuild.members.fetch(target.userId).catch(() => null);
+        if (!member || member.user?.bot) continue;
+
+        const sent = await sendMidCheckDm(member, guildId, dateKey);
+        if (!sent) continue;
+
+        const user = ensureUserExists(guild, member);
+        user.lastMidCheckPromptAt = now;
+        user.lastMidCheckPromptDate = dateKey;
+        root.meta.midCheckSentByUser[persistedKey] = dateKey;
+        __midCheckSent.add(onceKey);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveData(root);
+    }
+  } catch (err) {
+    console.error("daily midcheck tick failed:", err?.message || err);
+  } finally {
+    __midCheckTickBusy = false;
   }
 }
 
@@ -1208,6 +1349,10 @@ setInterval(() => {
 }, 20000);
 
 setInterval(() => {
+  sendDailyMidCheckTick();
+}, 20000);
+
+setInterval(() => {
   sendAwayPromptTick();
 }, 60000);
 
@@ -1445,6 +1590,49 @@ client.on("interactionCreate", async (interaction) => {
       saveData(data);
 
       await interaction.editReply("이번 교시는 재촉 메시지 보내지 않을게");
+      return;
+    }
+
+    if (interaction.customId.startsWith(`${MIDCHECK_BUTTON_PREFIX}:`)) {
+      await interaction.deferReply();
+      const [_, guildId, userId, dateKey, choiceKey] = interaction.customId.split(":");
+
+      if (interaction.user.id !== userId) {
+        await interaction.editReply("이 버튼은 본인만 눌러야 해");
+        return;
+      }
+
+      const option = MIDCHECK_OPTIONS.find((item) => item.key === choiceKey);
+      if (!option) {
+        await interaction.editReply("알 수 없는 응답이야");
+        return;
+      }
+
+      const root = normalizeDataRoot(loadData());
+      const { data, guild } = withGuildDataById(root, guildId);
+      guild.users ??= {};
+      guild.users[userId] ??= {
+        id: userId,
+        sessions: [],
+        totalSeconds: 0
+      };
+
+      const user = guild.users[userId];
+      user.midCheckResponses ??= [];
+      const responseText =
+        option.responses[Math.floor(Math.random() * option.responses.length)];
+
+      user.midCheckResponses.unshift({
+        at: Date.now(),
+        dateKey,
+        choiceKey,
+        label: option.label,
+        responseText,
+        guildId
+      });
+      saveData(data);
+
+      await interaction.editReply(responseText);
       return;
     }
 
