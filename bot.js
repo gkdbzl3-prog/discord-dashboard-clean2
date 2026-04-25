@@ -1564,11 +1564,11 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     if (interaction.customId.startsWith(`${AWAY_PROMPT_PAUSE_PREFIX}:`)) {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await interaction.deferUpdate();
       const [_, guildId, userId, dateKey, periodKey] = interaction.customId.split(":");
 
       if (interaction.user.id !== userId) {
-        await interaction.editReply("이 버튼은 본인만 눌러야 해");
+        await interaction.followUp({ content: "이 버튼은 본인만 눌러야 해", flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -1589,22 +1589,22 @@ client.on("interactionCreate", async (interaction) => {
       user.lastAwayPromptWindowKey = null;
       saveData(data);
 
-      await interaction.editReply("이번 교시는 재촉 메시지 보내지 않을게");
+      await interaction.followUp({ content: "이번 교시는 재촉 메시지 보내지 않을게", flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (interaction.customId.startsWith(`${MIDCHECK_BUTTON_PREFIX}:`)) {
-      await interaction.deferReply();
+      await interaction.deferUpdate();
       const [_, guildId, userId, dateKey, choiceKey] = interaction.customId.split(":");
 
       if (interaction.user.id !== userId) {
-        await interaction.editReply("이 버튼은 본인만 눌러야 해");
+        await interaction.followUp({ content: "이 버튼은 본인만 눌러야 해", flags: MessageFlags.Ephemeral });
         return;
       }
 
       const option = MIDCHECK_OPTIONS.find((item) => item.key === choiceKey);
       if (!option) {
-        await interaction.editReply("알 수 없는 응답이야");
+        await interaction.followUp({ content: "알 수 없는 응답이야", flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -1632,13 +1632,12 @@ client.on("interactionCreate", async (interaction) => {
       });
       saveData(data);
 
-      await interaction.editReply(responseText);
+      await interaction.followUp({ content: responseText, flags: MessageFlags.Ephemeral });
       return;
     }
 
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
     if (interaction.customId.startsWith("cam_review:")) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const [_, guildId, userId, moodKey] = interaction.customId.split(":");
 
       if (interaction.user.id !== userId) {
