@@ -1431,10 +1431,7 @@ https://zzozzozzo.fly.dev/`);
   };
 
   const sendOffLog = () => {
-    if (!shouldEmitDiscordLog) return;
     if (getLastLoggedState() === "off") return;
-    if (!logCh || !shouldSendLog("off")) return;
-    logCh.send(`📷 ${usertag} 캠 OFF`);
     setLastLoggedState("off");
   };
 
