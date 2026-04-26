@@ -1514,13 +1514,6 @@ client.on("guildMemberAdd", (member) => {
   user.nickname = member.displayName || member.user.username;
   user.username = member.user.username;
   saveData(latestData);
-
-  const logChannelId = guild.settings.logChannelId || process.env.LOG_CHANNEL_ID;
-  const logCh = client.channels.cache.get(logChannelId);
-  const shouldEmitDiscordLog = !!process.env.FLY_APP_NAME;
-  if (shouldEmitDiscordLog) {
-    logCh?.send(`👋 ${user.nickname} 님이 새로 등록되었습니다`);
-  }
 });
 
 
