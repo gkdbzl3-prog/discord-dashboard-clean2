@@ -1,9 +1,0 @@
-git init
-git add .
-git commit -m "stable before meltdown"
-git remote add origin https://github.com/gkdbzl3-prog/zzozzozzo.git
-git branch -M main
-git push -u origin main
-git init
-git add .
-git commit -m "first stable save"
