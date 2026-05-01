@@ -109,6 +109,38 @@ function isGuildAccessInvalid(req, guild) {
     return out;
   }
 
+  function sanitizeSettlementBoard(rawBoard) {
+    const board = rawBoard && typeof rawBoard === "object" ? rawBoard : {};
+    const members = Array.isArray(board.members)
+      ? Array.from(new Set(board.members.map((id) => String(id || "").trim()).filter(Boolean)))
+      : [];
+    const weeks = {};
+
+    if (board.weeks && typeof board.weeks === "object" && !Array.isArray(board.weeks)) {
+      Object.entries(board.weeks).forEach(([weekKey, weekMap]) => {
+        const safeWeekKey = String(weekKey || "").trim();
+        if (!safeWeekKey) return;
+        if (!weekMap || typeof weekMap !== "object" || Array.isArray(weekMap)) return;
+
+        const safeMap = {};
+        Object.entries(weekMap).forEach(([userId, status]) => {
+          const safeUserId = String(userId || "").trim();
+          const safeStatus = String(status || "").trim();
+          if (!safeUserId) return;
+          if (safeStatus !== "done" && safeStatus !== "miss" && safeStatus !== "") return;
+          safeMap[safeUserId] = safeStatus;
+        });
+
+        weeks[safeWeekKey] = safeMap;
+      });
+    }
+
+    return {
+      members,
+      weeks
+    };
+  }
+
   function dedupeManualSessionsInPlace(user, thresholdMs = 10000) {
     const sessions = Array.isArray(user?.sessions) ? user.sessions : [];
     const manualRows = sessions
@@ -530,6 +562,21 @@ router.get("/today", (req, res) => {
     user.totalSeconds = aggregateTotalSeconds(user);
     saveData(data);
     res.json({ ok: true });
+  });
+
+  router.post("/save-settlement-board", (req, res) => {
+    if (isTokenInvalid(req)) return res.status(403).json({ error: "invalid token" });
+
+    const payload = { ...(req.query || {}), ...(req.body || {}) };
+    const { data, guild, guildId } = readContext(req);
+    guild.settings ??= {};
+    guild.settings.settlementBoard = sanitizeSettlementBoard(payload.settlementBoard);
+    saveData(data);
+    res.json({
+      ok: true,
+      guildId,
+      settlementBoard: guild.settings.settlementBoard
+    });
   });
 
   router.get("/manual-data", (req, res) => {

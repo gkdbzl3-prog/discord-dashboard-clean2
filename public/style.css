@@ -797,7 +797,7 @@ gap: 10px;
   flex-direction: column;
   gap: 12px;
 
-
+  margin-top: 10px;
   justify-content: space-between;
   align-items: center;
   
@@ -2115,6 +2115,292 @@ color: #eee;
   margin: 40px auto;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
   color: var(--text);
+}
+
+#settlementBoardSection {
+  margin: 28px 0 12px;
+}
+
+.settlement-card {
+  background: var(--card);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  color: var(--text);
+}
+
+.settlement-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.settlement-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.settlement-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.settlement-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.settlement-week-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.settlement-week-nav button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settlement-week-label {
+  min-width: 190px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settlement-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settlement-summary-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.settlement-summary-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.settlement-summary-value {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.settlement-carry-box {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settlement-add-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.settlement-member-select {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  color: var(--text);
+  padding: 12px 14px;
+}
+
+.settlement-add-btn,
+.settlement-remove-btn,
+.settlement-toggle {
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settlement-add-btn {
+  padding: 0 16px;
+  font-weight: 700;
+}
+
+.settlement-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settlement-member-row {
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  padding: 16px;
+}
+
+.settlement-member-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.settlement-member-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settlement-member-profile img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.settlement-member-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.settlement-member-sub {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.settlement-remove-btn {
+  padding: 8px 12px;
+}
+
+.settlement-toggle-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.settlement-toggle {
+  flex: 1;
+  padding: 11px 8px;
+  font-weight: 700;
+}
+
+.settlement-toggle.active {
+  background: rgba(57, 227, 160, 0.16);
+  border-color: rgba(57, 227, 160, 0.4);
+}
+
+.settlement-toggle.miss.active {
+  background: rgba(255, 99, 132, 0.14);
+  border-color: rgba(255, 99, 132, 0.4);
+}
+
+.settlement-toggle.muted.active {
+  background: rgba(255,255,255,0.08);
+}
+
+.settlement-result-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settlement-result {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settlement-result.good {
+  background: rgba(57, 227, 160, 0.14);
+  color: #25c989;
+}
+
+.settlement-result.bad {
+  background: rgba(255, 99, 132, 0.14);
+  color: #ff6b8a;
+}
+
+.settlement-result.total {
+  background: rgba(80, 120, 255, 0.14);
+  color: #7da2ff;
+}
+
+.settlement-result.neutral {
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+.settlement-empty {
+  border-radius: 18px;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(255,255,255,0.03);
+}
+
+@media (max-width: 760px) {
+  .settlement-card {
+    padding: 22px 18px;
+    border-radius: 22px;
+  }
+
+  .settlement-header,
+  .settlement-carry-box,
+  .settlement-add-row,
+  .settlement-member-main,
+  .settlement-week-nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settlement-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settlement-week-label {
+    min-width: 0;
+  }
+
+  .settlement-toggle-group {
+    flex-wrap: wrap;
+  }
+
+  .settlement-toggle {
+    min-width: calc(50% - 4px);
+  }
 }
 
 

@@ -280,6 +280,8 @@ window.startDashboardInterval = function () {
   window.dashboardInterval = setInterval(async () => {
     try {
       const rawData = await window.API.fetch("/today");
+      window.todayCache = rawData;
+      window.todaySettings = rawData.settings || {};
       window.applyTodayUsers(rawData.users);
       window.renderDashboard();
       window.updateOnlineStatus(rawData.users);
@@ -302,6 +304,274 @@ window.startDashboardSmoothTicker = function () {
 
     window.updateDashboardLiveCounters();
   }, 1000);
+};
+
+window.getSettlementWeekKey = function (date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const daysBack = (d.getDay() + 2) % 7;
+  d.setDate(d.getDate() - daysBack);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+window.shiftSettlementWeekKey = function (weekKey, delta) {
+  const [y, m, d] = String(weekKey || "").split("-").map(Number);
+  const base = new Date(y, (m || 1) - 1, d || 1);
+  base.setDate(base.getDate() + (delta * 7));
+  return window.getSettlementWeekKey(base);
+};
+
+window.formatSettlementWeekLabel = function (weekKey) {
+  const [y, m, d] = String(weekKey || "").split("-").map(Number);
+  const friday = new Date(y, (m || 1) - 1, d || 1);
+  const thursday = new Date(friday);
+  thursday.setDate(friday.getDate() + 6);
+  const fmt = (date) => `${date.getMonth() + 1}/${date.getDate()}`;
+  return `${friday.getFullYear()}년 ${fmt(friday)} ~ ${fmt(thursday)}`;
+};
+
+window.normalizeSettlementBoard = function (rawBoard) {
+  const board = rawBoard && typeof rawBoard === "object" ? rawBoard : {};
+  const members = Array.isArray(board.members)
+    ? [...new Set(board.members.map((id) => String(id || "").trim()).filter(Boolean))]
+    : [];
+  const weeks = {};
+
+  if (board.weeks && typeof board.weeks === "object" && !Array.isArray(board.weeks)) {
+    Object.entries(board.weeks).forEach(([weekKey, weekMap]) => {
+      const safeWeekKey = String(weekKey || "").trim();
+      if (!safeWeekKey) return;
+      if (!weekMap || typeof weekMap !== "object" || Array.isArray(weekMap)) return;
+
+      const nextMap = {};
+      Object.entries(weekMap).forEach(([userId, status]) => {
+        const safeUserId = String(userId || "").trim();
+        const safeStatus = String(status || "").trim();
+        if (!safeUserId) return;
+        if (!["done", "miss", ""].includes(safeStatus)) return;
+        nextMap[safeUserId] = safeStatus;
+      });
+
+      weeks[safeWeekKey] = nextMap;
+    });
+  }
+
+  return { members, weeks };
+};
+
+window.computeSettlementMap = function (board, currentWeekKey) {
+  const normalized = window.normalizeSettlementBoard(board);
+  const keys = Object.keys(normalized.weeks || {});
+  if (currentWeekKey) keys.push(currentWeekKey);
+  const orderedKeys = [...new Set(keys)].sort();
+  const statsMap = {};
+  let carry = 0;
+
+  orderedKeys.forEach((weekKey) => {
+    const weekMap = normalized.weeks?.[weekKey] || {};
+    const values = Object.values(weekMap);
+    const doneCount = values.filter((v) => v === "done").length;
+    const missCount = values.filter((v) => v === "miss").length;
+    const finePool = missCount * 1000;
+    const rewardPool = carry + finePool;
+    const perWinnerSaving = doneCount > 0 ? Math.floor(rewardPool / doneCount) : 0;
+    const carryOut = doneCount > 0 ? rewardPool % doneCount : rewardPool;
+    const perWinnerTotal = doneCount > 0 ? 2000 + perWinnerSaving : 0;
+
+    statsMap[weekKey] = {
+      weekKey,
+      doneCount,
+      missCount,
+      finePool,
+      carryIn: carry,
+      rewardPool,
+      perWinnerSaving,
+      perWinnerTotal,
+      carryOut
+    };
+
+    carry = carryOut;
+  });
+
+  return statsMap;
+};
+
+window.saveSettlementBoard = async function () {
+  const payload = window.normalizeSettlementBoard(window.settlementBoard || {});
+  const res = await window.API.post("/save-settlement-board", {
+    settlementBoard: payload
+  });
+  window.todaySettings = window.todaySettings || {};
+  window.todaySettings.settlementBoard = window.normalizeSettlementBoard(res?.settlementBoard || payload);
+  window.settlementBoard = window.todaySettings.settlementBoard;
+};
+
+window.addSettlementMember = async function () {
+  const select = document.getElementById("settlementMemberSelect");
+  if (!select || !select.value) return;
+  const board = window.normalizeSettlementBoard(window.settlementBoard || {});
+  if (!board.members.includes(select.value)) {
+    board.members.push(select.value);
+  }
+  window.settlementBoard = board;
+  await window.saveSettlementBoard();
+  window.renderSettlementBoard();
+};
+
+window.removeSettlementMember = async function (userId) {
+  const board = window.normalizeSettlementBoard(window.settlementBoard || {});
+  board.members = board.members.filter((id) => id !== userId);
+  window.settlementBoard = board;
+  await window.saveSettlementBoard();
+  window.renderSettlementBoard();
+};
+
+window.setSettlementStatus = async function (userId, status) {
+  const board = window.normalizeSettlementBoard(window.settlementBoard || {});
+  const weekKey = window.currentSettlementWeekKey || window.getSettlementWeekKey();
+  board.weeks[weekKey] = board.weeks[weekKey] || {};
+  board.weeks[weekKey][userId] = status;
+  window.settlementBoard = board;
+  await window.saveSettlementBoard();
+  window.renderSettlementBoard();
+};
+
+window.renderSettlementBoard = function (boardRaw = window.todaySettings?.settlementBoard) {
+  const section = document.getElementById("settlementBoardSection");
+  if (!section) return;
+
+  const board = window.normalizeSettlementBoard(boardRaw);
+  window.settlementBoard = board;
+  if (!window.currentSettlementWeekKey) {
+    window.currentSettlementWeekKey = window.getSettlementWeekKey();
+  }
+
+  const weekKey = window.currentSettlementWeekKey;
+  const statsMap = window.computeSettlementMap(board, weekKey);
+  const stats = statsMap[weekKey] || {
+    doneCount: 0,
+    missCount: 0,
+    finePool: 0,
+    carryIn: 0,
+    rewardPool: 0,
+    perWinnerSaving: 0,
+    perWinnerTotal: 0,
+    carryOut: 0
+  };
+
+  const weekMap = board.weeks?.[weekKey] || {};
+  const users = Object.values(window.usersCache || {})
+    .filter((u) => !!u && !!u.id && u.id !== "1466022968860737649")
+    .sort((a, b) => String(a.nickname || a.name || "").localeCompare(String(b.nickname || b.name || ""), "ko"));
+
+  const members = board.members
+    .map((id) => users.find((user) => user.id === id) || { id, nickname: id, avatar: null })
+    .filter(Boolean);
+
+  const availableUsers = users.filter((user) => !board.members.includes(user.id));
+  const rowsHtml = members.map((user) => {
+    const status = String(weekMap[user.id] || "");
+    const doneActive = status === "done" ? "active" : "";
+    const missActive = status === "miss" ? "active" : "";
+    const unsetActive = !status ? "active" : "";
+    let resultHtml = `<span class="settlement-result neutral">입력 대기</span>`;
+
+    if (status === "done") {
+      resultHtml = `
+        <span class="settlement-result good">상금 +2,000</span>
+        <span class="settlement-result good">적립금 +${stats.perWinnerSaving.toLocaleString()}</span>
+        <span class="settlement-result total">총 +${stats.perWinnerTotal.toLocaleString()}</span>
+      `;
+    } else if (status === "miss") {
+      resultHtml = `<span class="settlement-result bad">벌금 -1,000</span>`;
+    }
+
+    const avatar = user.avatar || "https://cdn.discordapp.com/embed/avatars/0.png";
+    const name = user.nickname || user.name || user.id;
+    return `
+      <div class="settlement-member-row">
+        <div class="settlement-member-main">
+          <div class="settlement-member-profile">
+            <img src="${avatar}" alt="${name}">
+            <div>
+              <div class="settlement-member-name">${name}</div>
+              <div class="settlement-member-sub">${status === "done" ? "목표 달성" : status === "miss" ? "목표 미달" : "아직 미입력"}</div>
+            </div>
+          </div>
+          <button class="settlement-remove-btn" onclick="window.removeSettlementMember('${user.id}')">삭제</button>
+        </div>
+        <div class="settlement-toggle-group">
+          <button class="settlement-toggle ${doneActive}" onclick="window.setSettlementStatus('${user.id}','done')">달성</button>
+          <button class="settlement-toggle miss ${missActive}" onclick="window.setSettlementStatus('${user.id}','miss')">미달</button>
+          <button class="settlement-toggle muted ${unsetActive}" onclick="window.setSettlementStatus('${user.id}','')">미입력</button>
+        </div>
+        <div class="settlement-result-row">
+          ${resultHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const optionHtml = availableUsers.map((user) => {
+    const name = user.nickname || user.name || user.id;
+    return `<option value="${user.id}">${name}</option>`;
+  }).join("");
+
+  section.innerHTML = `
+    <div class="settlement-card">
+      <div class="settlement-header">
+        <div>
+          <div class="settlement-eyebrow">Weekly Settlement</div>
+          <h2 class="settlement-title">주간 정산 보드</h2>
+          <p class="settlement-note">벌금은 미달 인원당 1,000원, 달성자는 상금 2,000원 + 벌금풀 균등 적립. 나머지는 다음 주로 자동 이월돼.</p>
+        </div>
+        <div class="settlement-week-nav">
+          <button onclick="window.currentSettlementWeekKey = window.shiftSettlementWeekKey(window.currentSettlementWeekKey || window.getSettlementWeekKey(), -1); window.renderSettlementBoard();">◀</button>
+          <div class="settlement-week-label">${window.formatSettlementWeekLabel(weekKey)}</div>
+          <button onclick="window.currentSettlementWeekKey = window.shiftSettlementWeekKey(window.currentSettlementWeekKey || window.getSettlementWeekKey(), 1); window.renderSettlementBoard();">▶</button>
+        </div>
+      </div>
+
+      <div class="settlement-summary-grid">
+        <div class="settlement-summary-card">
+          <span class="settlement-summary-label">달성 인원</span>
+          <strong class="settlement-summary-value">${stats.doneCount}명</strong>
+        </div>
+        <div class="settlement-summary-card">
+          <span class="settlement-summary-label">벌금 총액</span>
+          <strong class="settlement-summary-value">${stats.finePool.toLocaleString()}원</strong>
+        </div>
+        <div class="settlement-summary-card">
+          <span class="settlement-summary-label">이월 포함 풀</span>
+          <strong class="settlement-summary-value">${stats.rewardPool.toLocaleString()}원</strong>
+        </div>
+        <div class="settlement-summary-card">
+          <span class="settlement-summary-label">1인당 총 지급</span>
+          <strong class="settlement-summary-value">${stats.perWinnerTotal.toLocaleString()}원</strong>
+        </div>
+      </div>
+
+      <div class="settlement-carry-box">
+        <span>이전 주 이월 ${stats.carryIn.toLocaleString()}원</span>
+        <span>다음 주 이월 ${stats.carryOut.toLocaleString()}원</span>
+      </div>
+
+      <div class="settlement-add-row">
+        <select id="settlementMemberSelect" class="settlement-member-select">
+          <option value="">정산 멤버 추가</option>
+          ${optionHtml}
+        </select>
+        <button class="settlement-add-btn" onclick="window.addSettlementMember()">추가</button>
+      </div>
+
+      <div class="settlement-member-list">
+        ${rowsHtml || `<div class="settlement-empty">정산 보드에 멤버를 추가해줘.</div>`}
+      </div>
+    </div>
+  `;
 };
 
 window.updateDashboardLiveCounters = function () {
@@ -1141,11 +1411,13 @@ window.showToday = async function() {
   const rawData = await window.API.fetch("/today");
 
   window.todayCache = rawData;
+  window.todaySettings = rawData.settings || {};
 
   window.applyTodayUsers(rawData.users);
 
   window.renderTodayLayout();   // ?뵦 癒쇱? 援ъ“ ?앹꽦
   window.renderDashboard();     // ?뵦 洹??ㅼ쓬 ?곗씠???뚮뜑
+  window.renderSettlementBoard(window.todaySettings.settlementBoard);
   window.renderFeed(rawData.feed);
 
   window.startDashboardInterval();
@@ -1158,6 +1430,8 @@ window.renderTodayLayout = function() {
   view.innerHTML = `
 
       <div id="dashboardSection" class="dashboard-grid"></div>
+
+      <div id="settlementBoardSection"></div>
 
       <div id="feedSection" class="feed-card">
         <h2>Activity Feed</h2>
