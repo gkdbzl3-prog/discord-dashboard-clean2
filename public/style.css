@@ -2158,6 +2158,7 @@ color: #eee;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.55;
+  white-space: nowrap;
 }
 
 .settlement-week-nav {

@@ -526,7 +526,7 @@ window.renderSettlementBoard = function (boardRaw = window.todaySettings?.settle
         <div>
           <div class="settlement-eyebrow">Weekly Settlement</div>
           <h2 class="settlement-title">주간 정산 보드</h2>
-          <p class="settlement-note">일주일(금~목)마다 목표시간에 달성 시 상금(2000원)+적립금(+n)을 드리며, 미달성 시 벌금을 부여하고 있습니다.</p>
+          <p class="settlement-note">일주일(금~목)마다 목표시간에 달성 시 상금(2000원)+적립금(+n)을 드리며,미달성 시 벌금을 부여하고 있습니다.</p>
         </div>
         <div class="settlement-week-nav">
           <button onclick="window.currentSettlementWeekKey = window.shiftSettlementWeekKey(window.currentSettlementWeekKey || window.getSettlementWeekKey(), -1); window.renderSettlementBoard();">◀</button>
