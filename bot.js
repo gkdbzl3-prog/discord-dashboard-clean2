@@ -452,23 +452,6 @@ const CLASS_ACTIVE_WINDOWS = [
 ];
 const AWAY_PROMPT_TARGETS = [
   {
-    userId: "476226483703250956",
-    displayName: "말랑",
-    prompts: [
-      "말랑님 어디 가셨나요~ 👀",
-      "사라진 말랑님 찾습니다…\n출석체크 하러 왔어요 🙌",
-      "말랑님 자리 비움 감지!\n지금쯤 다시 나타날 시간인데요?",
-      "도망치신 건 아니죠? 👀",
-      "말랑님… 설마 또 딴짓 중?",
-      "잠깐 쉰 거지, 끝난 건 아니지? 😌",
-      "의자와 재회할 시간입니다",
-      "공부하러 돌아올 타이밍~!",
-      "사라진 말랑님 찾습니다~ 👀",
-      "뭐해? 지금 수업중이야! 📚",
-      "오늘도 충분히 잘하고 있어, 조금만 더"
-    ]
-  },
-  {
     userId: "1495274970564263966",
     displayName: "할수있다",
     prompts: [
@@ -494,10 +477,6 @@ const WEEKLY_BRIEF_TARGETS = [
   }
 ];
 const MIDCHECK_TARGETS = [
-  {
-    userId: "476226483703250956",
-    displayName: "말랑"
-  },
   {
     userId: "1495274970564263966",
     displayName: "할수 있다"
@@ -548,6 +527,17 @@ const MIDCHECK_OPTIONS = [
     ]
   }
 ];
+
+function resolvePeriodNoticeChannelId(guildData) {
+  const configured = String(
+    guildData?.settings?.periodNoticeChannelId ||
+    process.env.PERIOD_NOTICE_CHANNEL_ID ||
+    guildData?.settings?.studyVcId ||
+    process.env.STUDY_VC_ID ||
+    ""
+  ).trim();
+  return configured || null;
+}
 
 function pickRandom(list = []) {
   if (!Array.isArray(list) || list.length === 0) return null;
@@ -1142,19 +1132,19 @@ async function sendPeriodEndNoticeTick() {
 
     for (const guildId of guildIds) {
       const { guild } = withGuildDataById(root, guildId);
-      const camChannelId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID;
-      if (!camChannelId) continue;
+      const periodNoticeChannelId = resolvePeriodNoticeChannelId(guild);
+      if (!periodNoticeChannelId) continue;
 
       // 같은 채널을 여러 guild 키(default/실제 guild)에서 참조해도 1번만 전송
-      const onceKey = `${camChannelId}:${dateKey}:${hit.key}`;
+      const onceKey = `${periodNoticeChannelId}:${dateKey}:${hit.key}`;
       if (__periodNoticeSent.has(onceKey)) continue;
-      const persistedKey = `${camChannelId}:${hit.key}`;
+      const persistedKey = `${periodNoticeChannelId}:${hit.key}`;
       if (root.meta.periodNoticeSentByChannel[persistedKey] === dateKey) continue;
 
-      let ch = client.channels.cache.get(camChannelId);
+      let ch = client.channels.cache.get(periodNoticeChannelId);
       if (!ch) {
         try {
-          ch = await client.channels.fetch(camChannelId);
+          ch = await client.channels.fetch(periodNoticeChannelId);
         } catch (_) {
           ch = null;
         }

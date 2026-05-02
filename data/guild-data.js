@@ -10,7 +10,8 @@ function createEmptyGuild() {
     feed: [],
     settings: {
       studyVcId: process.env.STUDY_VC_ID || null,
-      logChannelId: process.env.LOG_CHANNEL_ID || null
+      logChannelId: process.env.LOG_CHANNEL_ID || null,
+      periodNoticeChannelId: process.env.PERIOD_NOTICE_CHANNEL_ID || process.env.STUDY_VC_ID || null
     }
   };
 }
@@ -25,6 +26,10 @@ function ensureGuildShape(guild) {
   }
   if (guild.settings.logChannelId === undefined) {
     guild.settings.logChannelId = process.env.LOG_CHANNEL_ID || null;
+  }
+  if (guild.settings.periodNoticeChannelId === undefined) {
+    guild.settings.periodNoticeChannelId =
+      process.env.PERIOD_NOTICE_CHANNEL_ID || guild.settings.studyVcId || process.env.STUDY_VC_ID || null;
   }
   return guild;
 }
@@ -49,7 +54,13 @@ function normalizeDataRoot(rawData) {
         feed: legacyFeed,
         settings: {
           studyVcId: legacySettings.studyVcId || process.env.STUDY_VC_ID || null,
-          logChannelId: legacySettings.logChannelId || process.env.LOG_CHANNEL_ID || null
+          logChannelId: legacySettings.logChannelId || process.env.LOG_CHANNEL_ID || null,
+          periodNoticeChannelId:
+            legacySettings.periodNoticeChannelId ||
+            process.env.PERIOD_NOTICE_CHANNEL_ID ||
+            legacySettings.studyVcId ||
+            process.env.STUDY_VC_ID ||
+            null
         }
       })
     };
