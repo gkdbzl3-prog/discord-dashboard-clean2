@@ -10,6 +10,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 let data = loadData();
+const DISCORD_LOGIN_TOKEN = String(
+  process.env.DISCORD_TOKEN ||
+  process.env.BOT_TOKEN ||
+  ""
+).trim();
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -83,10 +88,96 @@ const client = new Client({
   ]
 });
 
+let __gatewayRecoveryTimer = null;
+let __gatewayRecoveryInFlight = false;
+
+function isTransientGatewayResetError(err) {
+  if (!err || typeof err !== "object") return false;
+
+  const code = String(err.code || "");
+  const syscall = String(err.syscall || "");
+  const stack = String(err.stack || "");
+
+  if (code !== "ECONNRESET" || syscall !== "read") return false;
+
+  return (
+    stack.includes("\\ws\\lib\\websocket.js") ||
+    stack.includes("/ws/lib/websocket.js") ||
+    stack.includes("@discordjs/ws")
+  );
+}
+
+function scheduleGatewayRecovery(source, err) {
+  if (__gatewayRecoveryInFlight || __gatewayRecoveryTimer) return;
+  if (!DISCORD_LOGIN_TOKEN) {
+    console.error(`[gateway-recover:${source}] skipped: missing DISCORD_TOKEN/BOT_TOKEN`);
+    return;
+  }
+
+  __gatewayRecoveryInFlight = true;
+  console.warn(`[gateway-recover:${source}] Discord gateway reconnect scheduled in 5s`);
+  if (err) {
+    console.warn(`[gateway-recover:${source}]`, err?.message || err);
+  }
+
+  __gatewayRecoveryTimer = setTimeout(async () => {
+    __gatewayRecoveryTimer = null;
+
+    try {
+      if (client) {
+        try {
+          await client.destroy();
+        } catch (_) {}
+      }
+
+      await client.login(DISCORD_LOGIN_TOKEN);
+      console.log(`[gateway-recover:${source}] Discord gateway reconnected`);
+    } catch (loginErr) {
+      console.error(`[gateway-recover:${source}] reconnect failed:`, loginErr);
+    } finally {
+      __gatewayRecoveryInFlight = false;
+    }
+  }, 5000);
+}
+
 // ⚠️ [FIX] error 핸들러는 ready 안이 아니라 최상위에 등록해야 함.
 // ready 안에 있으면 ready 이벤트 전에 발생하는 에러를 잡지 못함.
 client.on("error", err => {
   console.error("Discord Client Error:", err);
+});
+client.on("shardError", (err, shardId) => {
+  console.error(`Discord shard error (shard ${shardId}):`, err);
+});
+client.on("shardDisconnect", (event, shardId) => {
+  console.warn(
+    `Discord shard disconnected (shard ${shardId}) code=${event?.code ?? "unknown"} clean=${event?.wasClean ?? false} reason=${event?.reason || "n/a"}`
+  );
+});
+client.on("shardReconnecting", (shardId) => {
+  console.warn(`Discord shard reconnecting (shard ${shardId})`);
+});
+client.on("shardResume", (shardId, replayedEvents) => {
+  console.log(`Discord shard resumed (shard ${shardId}, replayed=${replayedEvents})`);
+});
+client.on("invalidated", () => {
+  console.error("Discord session invalidated");
+  scheduleGatewayRecovery("invalidated");
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+
+  if (isTransientGatewayResetError(err)) {
+    console.warn("Transient Discord gateway ECONNRESET detected; suppressing crash and attempting recovery");
+    scheduleGatewayRecovery("uncaughtException", err);
+    return;
+  }
+
+  console.error("Fatal uncaught exception. Exiting process.");
+  setTimeout(() => process.exit(1), 50);
 });
 
 // Register admin routes after client is created
@@ -1834,12 +1925,6 @@ client.on('messageCreate', async (msg) => {
   }
 
 });
-
-const DISCORD_LOGIN_TOKEN = String(
-  process.env.DISCORD_TOKEN ||
-  process.env.BOT_TOKEN ||
-  ""
-).trim();
 
 if (!DISCORD_LOGIN_TOKEN) {
   console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");

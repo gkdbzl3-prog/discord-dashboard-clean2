@@ -1769,19 +1769,33 @@ window.renderWeeklyGoalCompare = function(user){
 const el = document.getElementById("weeklyGoalCompareText");
 if(!el) return;
 
-const goal = user.monthGoalHours || 40;
-
-const current = user.totalSeconds / 3600;
-
 const now = new Date();
-const days = new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-const today = now.getDate();
+const nowMs = now.getTime();
+const weeklyTarget = 28;
+const weekRange = window.getFridayWeekRange(now);
+const rangeEnd = Math.min(nowMs, weekRange.end);
+const sessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
 
-const expected = (goal/days)*today;
+if (user?.currentStart) {
+  sessions.push({
+    start: user.currentStart,
+    end: nowMs,
+    seconds: Math.max(0, Math.floor((nowMs - user.currentStart) / 1000))
+  });
+}
 
+const current = window.getStudySecondsInRange(sessions, weekRange.start, rangeEnd) / 3600;
+const elapsedDays = Math.min(
+  7,
+  Math.max(1, Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - weekRange.start) / (24 * 60 * 60 * 1000)) + 1)
+);
+const expected = (weeklyTarget / 7) * elapsedDays;
 const diff = current - expected;
 
 const text =
+current >= weeklyTarget
+? "이번 주 목표 이미 달성했어 🎉"
+: 
 diff>=0
 ? `+${diff.toFixed(1)}h 앞서가는 중 🚀`
 : `${Math.abs(diff).toFixed(1)}h 부족 ⚠`;
@@ -2674,47 +2688,131 @@ window.saveMonthlyGoal = async function() {
   }
 };
 
+window.getFridayWeekRange = function(baseDate = new Date()) {
+  const anchor = new Date(baseDate);
+  anchor.setHours(0, 0, 0, 0);
+
+  const daysBack = (anchor.getDay() + 2) % 7;
+  const startDate = new Date(anchor);
+  startDate.setDate(anchor.getDate() - daysBack);
+
+  const endExclusive = new Date(startDate);
+  endExclusive.setDate(startDate.getDate() + 7);
+
+  return {
+    start: startDate.getTime(),
+    end: endExclusive.getTime(),
+    startDate,
+    endDate: new Date(endExclusive.getTime() - 1)
+  };
+};
+
+window.getStudySecondsInRange = function(sessions = [], rangeStart, rangeEnd) {
+  if (!Array.isArray(sessions)) return 0;
+
+  let total = 0;
+  for (const s of sessions) {
+    const start = window.normalizeTime(s?.start);
+    let end = window.normalizeTime(s?.end);
+    const sec = Number(s?.seconds || 0);
+
+    if (!Number.isFinite(start) || start <= 0) continue;
+    if (!Number.isFinite(end) || end <= start) {
+      if (Number.isFinite(sec) && sec > 0) {
+        end = start + (sec * 1000);
+      } else {
+        continue;
+      }
+    }
+
+    total += window.getOverlapSeconds(start, end, rangeStart, rangeEnd);
+  }
+
+  return total;
+};
+
+window.getSessionsInRange = function(sessions = [], rangeStart, rangeEnd) {
+  if (!Array.isArray(sessions)) return [];
+
+  return sessions.filter((s) => {
+    const start = window.normalizeTime(s?.start);
+    let end = window.normalizeTime(s?.end);
+    const sec = Number(s?.seconds || 0);
+
+    if (!Number.isFinite(start) || start <= 0) return false;
+    if (!Number.isFinite(end) || end <= start) {
+      if (Number.isFinite(sec) && sec > 0) {
+        end = start + (sec * 1000);
+      } else {
+        return false;
+      }
+    }
+
+    return window.getOverlapSeconds(start, end, rangeStart, rangeEnd) > 0;
+  });
+};
+
+window.formatShortMonthDay = function(date) {
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+};
+
 // ===== 주간 진행률 렌더링 =====
 window.renderWeeklyStatus = function(user) {
   const weeklyBox = document.getElementById('weeklyStatusText');
   if (!weeklyBox) return;
-  
-  const sessions = user.sessions || [];
+
   const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  
-  // 이번 주 세션만 필터
-  const weekSessions = sessions.filter(s => {
-    const sessionDate = new Date(s.start);
-    return sessionDate >= weekAgo && sessionDate <= now;
-  });
-  
-  const weekTotal = weekSessions.reduce((sum, s) => sum + (s.seconds || 0), 0);
-  const weekHours = (weekTotal / 3600).toFixed(1);
-  const dailyAvg = (weekTotal / 7 / 3600).toFixed(1);
-  
-  // 일별 분포 계산
-  const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const nowMs = now.getTime();
+  const weeklyTarget = 28;
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekRange = window.getFridayWeekRange(now);
+  const rangeEnd = Math.min(nowMs, weekRange.end);
+  const sessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
+
+  if (user?.currentStart) {
+    sessions.push({
+      start: user.currentStart,
+      end: nowMs,
+      seconds: Math.max(0, Math.floor((nowMs - user.currentStart) / 1000))
+    });
+  }
+
+  const weekSessions = window.getSessionsInRange(sessions, weekRange.start, rangeEnd);
+  const weekTotal = window.getStudySecondsInRange(sessions, weekRange.start, rangeEnd);
+  const weekHoursNum = weekTotal / 3600;
+  const weekHours = weekHoursNum.toFixed(1);
+  const elapsedDays = Math.min(
+    7,
+    Math.max(1, Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - weekRange.start) / (24 * 60 * 60 * 1000)) + 1)
+  );
+  const dailyAvg = (weekTotal / elapsedDays / 3600).toFixed(1);
+
   const dailyData = [];
-  for (let i = 6; i >= 0; i--) {
-    const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    const dayStr = day.toDateString();
-    const daySeconds = weekSessions
-      .filter(s => new Date(s.start).toDateString() === dayStr)
-      .reduce((sum, s) => sum + (s.seconds || 0), 0);
-    
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekRange.startDate);
+    day.setDate(weekRange.startDate.getDate() + i);
+
+    const { start, end } = window.getDayRange(day.getFullYear(), day.getMonth(), day.getDate());
+    const cappedEnd = Math.min(end, rangeEnd, weekRange.end);
+    const daySeconds = cappedEnd > start
+      ? window.getStudySecondsInRange(sessions, start, cappedEnd)
+      : 0;
+
     dailyData.push({
       label: dayNames[day.getDay()],
       hoursText: (daySeconds / 3600).toFixed(1),
       hours: (daySeconds / 3600).toFixed(1),
-      percentage: Math.min((daySeconds / 14400) * 100, 100) // 4시간 기준
+      percentage: Math.min((daySeconds / 14400) * 100, 100)
     });
   }
-  const weeklyTarget = 28; // 주 28시간 기준
-const progress = Math.min((weekHours / weeklyTarget) * 100,100).toFixed(0);
-const statusText = progress >= 100
-  ? "🔥 목표 달성!"
-  : `🚀 ${progress}% 진행 중`;
+
+  const progressNum = Math.min((weekHoursNum / weeklyTarget) * 100, 100);
+  const progress = progressNum.toFixed(0);
+  const statusText = progressNum >= 100
+    ? "🔥 목표 달성!"
+    : `🚀 ${progress}% 진행 중`;
+  const weekLabel =
+    `금~목 기준 · ${window.formatShortMonthDay(weekRange.startDate)}~${window.formatShortMonthDay(weekRange.endDate)}`;
 
  weeklyBox.innerHTML = `
 
@@ -2722,7 +2820,7 @@ const statusText = progress >= 100
 
   <div class="weekly-kpi">
     <div class="weekly-main">${weekHours}h</div>
-    <div class="weekly-sub">이번 주 공부 시간</div>
+    <div class="weekly-sub">이번 주 공부 시간<br>${weekLabel}</div>
   </div>
 
   <div class="weekly-status">
