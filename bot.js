@@ -532,11 +532,84 @@ function resolvePeriodNoticeChannelId(guildData) {
   const configured = String(
     guildData?.settings?.periodNoticeChannelId ||
     process.env.PERIOD_NOTICE_CHANNEL_ID ||
-    guildData?.settings?.studyVcId ||
-    process.env.STUDY_VC_ID ||
     ""
   ).trim();
   return configured || null;
+}
+
+async function resolvePeriodNoticeChannel(channelId) {
+  let ch = client.channels.cache.get(channelId) || null;
+  if (!ch) {
+    try {
+      ch = await client.channels.fetch(channelId);
+    } catch (_) {
+      ch = null;
+    }
+  }
+  if (!ch) return null;
+
+  if (typeof ch.isThread === "function" && ch.isThread()) {
+    if (ch.archived && typeof ch.setArchived === "function") {
+      try {
+        await ch.setArchived(false);
+      } catch (_) {}
+    }
+    if (ch.joinable && typeof ch.join === "function") {
+      try {
+        await ch.join();
+      } catch (_) {}
+    }
+  }
+
+  return typeof ch.send === "function" ? ch : null;
+}
+
+function claimPeriodNoticeSlot(persistedKey, dateKey) {
+  const claimToken = `${dateKey}:${process.pid}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+  const latestRoot = normalizeDataRoot(loadData());
+  latestRoot.meta ??= {};
+  latestRoot.meta.periodNoticeSentByChannel ??= {};
+  latestRoot.meta.periodNoticeClaimByChannel ??= {};
+
+  if (latestRoot.meta.periodNoticeSentByChannel[persistedKey] === dateKey) {
+    return null;
+  }
+
+  latestRoot.meta.periodNoticeClaimByChannel[persistedKey] = claimToken;
+  saveData(latestRoot);
+
+  const confirmedRoot = normalizeDataRoot(loadData());
+  const confirmedClaim = confirmedRoot?.meta?.periodNoticeClaimByChannel?.[persistedKey];
+  const alreadySent = confirmedRoot?.meta?.periodNoticeSentByChannel?.[persistedKey] === dateKey;
+  if (alreadySent || confirmedClaim !== claimToken) {
+    return null;
+  }
+
+  return claimToken;
+}
+
+function releasePeriodNoticeSlot(persistedKey, claimToken) {
+  const latestRoot = normalizeDataRoot(loadData());
+  latestRoot.meta ??= {};
+  latestRoot.meta.periodNoticeClaimByChannel ??= {};
+
+  if (latestRoot.meta.periodNoticeClaimByChannel[persistedKey] === claimToken) {
+    delete latestRoot.meta.periodNoticeClaimByChannel[persistedKey];
+    saveData(latestRoot);
+  }
+}
+
+function markPeriodNoticeSent(persistedKey, claimToken, dateKey) {
+  const latestRoot = normalizeDataRoot(loadData());
+  latestRoot.meta ??= {};
+  latestRoot.meta.periodNoticeSentByChannel ??= {};
+  latestRoot.meta.periodNoticeClaimByChannel ??= {};
+
+  if (latestRoot.meta.periodNoticeClaimByChannel[persistedKey] === claimToken) {
+    latestRoot.meta.periodNoticeSentByChannel[persistedKey] = dateKey;
+    delete latestRoot.meta.periodNoticeClaimByChannel[persistedKey];
+    saveData(latestRoot);
+  }
 }
 
 function pickRandom(list = []) {
@@ -1127,8 +1200,8 @@ async function sendPeriodEndNoticeTick() {
     const root = normalizeDataRoot(loadData());
     root.meta ??= {};
     root.meta.periodNoticeSentByChannel ??= {};
+    root.meta.periodNoticeClaimByChannel ??= {};
     const guildIds = Object.keys(root?.guilds || {});
-    let changed = false;
 
     for (const guildId of guildIds) {
       const { guild } = withGuildDataById(root, guildId);
@@ -1141,29 +1214,30 @@ async function sendPeriodEndNoticeTick() {
       const persistedKey = `${periodNoticeChannelId}:${hit.key}`;
       if (root.meta.periodNoticeSentByChannel[persistedKey] === dateKey) continue;
 
-      let ch = client.channels.cache.get(periodNoticeChannelId);
-      if (!ch) {
-        try {
-          ch = await client.channels.fetch(periodNoticeChannelId);
-        } catch (_) {
-          ch = null;
-        }
-      }
-      if (!ch || typeof ch.send !== "function") continue;
+      const claimToken = claimPeriodNoticeSlot(persistedKey, dateKey);
+      if (!claimToken) continue;
 
-      await ch.send(hit.message);
-      __periodNoticeSent.add(onceKey);
-      root.meta.periodNoticeSentByChannel[persistedKey] = dateKey;
-      changed = true;
+      try {
+        const ch = await resolvePeriodNoticeChannel(periodNoticeChannelId);
+        if (!ch) {
+          releasePeriodNoticeSlot(persistedKey, claimToken);
+          continue;
+        }
+
+        await ch.send(hit.message);
+        __periodNoticeSent.add(onceKey);
+        root.meta.periodNoticeSentByChannel[persistedKey] = dateKey;
+        markPeriodNoticeSent(persistedKey, claimToken, dateKey);
+      } catch (err) {
+        releasePeriodNoticeSlot(persistedKey, claimToken);
+        console.error("period notice send failed:", err?.message || err);
+      }
     }
 
     // 메모리 누적 방지 (오늘 날짜 키만 유지)
     const keepPrefix = `:${dateKey}:`;
     for (const key of Array.from(__periodNoticeSent)) {
       if (!key.includes(keepPrefix)) __periodNoticeSent.delete(key);
-    }
-    if (changed) {
-      saveData(root);
     }
   } catch (err) {
     console.error("period notice tick failed:", err?.message || err);

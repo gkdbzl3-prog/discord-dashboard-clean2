@@ -276,53 +276,8 @@ function isGuildAccessInvalid(req, guild) {
 
   router.get("/guilds", sendGuildList);
   router.get("/admin/guilds", sendGuildList);
-  router.get("/today", sendToday);
-  router.get("/admin/today", sendToday);
-
-
-router.get("/today", (req, res) => {
-  if (isTokenInvalid(req)) {
-    return res.status(403).json({ error: "invalid token" });
-  }
-
-  const { data, guild, guildId, error } = getGuildContext(req);
-  if (error) {
-    return res.status(400).json({ error });
-  }
-
-  if (!ALLOWED_GUILDS.includes(guildId)) {
-    return res.status(403).json({ error: "guild not allowed" });
-  }
-
-  if (isGuildAccessInvalid(req, guild)) {
-    return res.status(403).json({ error: "invalid guild access" });
-  }
-
-  if (isTokenInvalid(req)) {
-    return res.status(403).json({ error: "invalid token" });
-  }
-
-
-  const result = {};
-
-  Object.entries(guild.users || {}).forEach(([userId, user]) => {
-    result[userId] = {
-      id: userId,
-      name: user.nickname || user.name || "알 수 없음",
-      avatar: user.avatar,
-      seconds: 0,
-      online: !!user.currentStart,
-      sessions: user.sessions || [],
-      totalSeconds: user.totalSeconds || 0,
-      freeGoals: user.freeGoals || [],
-      studyRecords: user.studyRecords || [],
-      memo: user.memo || ""
-    };
-  });
- 
-});
-
-
+router.get("/today", sendToday);
+router.get("/admin/today", sendToday);
 
   router.get("/weekly", (req, res) => {
     if (isTokenInvalid(req)) return res.status(403).json({ error: "invalid token" });
