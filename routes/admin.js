@@ -72,17 +72,43 @@ function isGuildAccessInvalid(req, guild) {
     return aggregateSessions(user?.sessions).reduce((sum, s) => sum + secondsOf(s), 0);
   }
 
+  function normalizeFeedImage(rawImage) {
+    const image = rawImage ? String(rawImage).trim() : "";
+    if (!image) {
+      return { image: null, changed: rawImage != null && String(rawImage).trim() !== "" };
+    }
+
+    if (/^\/uploads\//.test(image)) {
+      const fileName = path.basename(image);
+      const absPath = path.join(__dirname, "..", "public", "uploads", fileName);
+      if (!fs.existsSync(absPath)) {
+        return { image: null, changed: true };
+      }
+    }
+
+    return { image, changed: image !== rawImage };
+  }
+
   function normalizeFeed(feed = []) {
     const list = Array.isArray(feed) ? feed : [];
     const milestoneSeen = new Set();
     const out = [];
+    let changed = !Array.isArray(feed);
 
     for (const raw of list) {
-      if (!raw || typeof raw !== "object") continue;
+      if (!raw || typeof raw !== "object") {
+        changed = true;
+        continue;
+      }
       const text = String(raw.text ?? "").trim();
-      const image = raw.image ? String(raw.image).trim() : "";
+      const imageInfo = normalizeFeedImage(raw.image);
+      const image = imageInfo.image;
       const safeText = /^undefined$/i.test(text) ? "" : text;
-      if (!safeText && !image) continue;
+      if (imageInfo.changed) changed = true;
+      if (!safeText && !image) {
+        changed = true;
+        continue;
+      }
 
       const createdAt = Number(raw.createdAt || Date.now());
       const userId = String(raw.userId || "");
@@ -92,9 +118,15 @@ function isGuildAccessInvalid(req, guild) {
         const d = new Date(createdAt);
         const dayKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
         const key = `${userId}|${dayKey}|${safeText}`;
-        if (milestoneSeen.has(key)) continue;
+        if (milestoneSeen.has(key)) {
+          changed = true;
+          continue;
+        }
         milestoneSeen.add(key);
       }
+
+      if (safeText !== String(raw.text ?? "").trim()) changed = true;
+      if (createdAt !== Number(raw.createdAt || Date.now())) changed = true;
 
       out.push({
         ...raw,
@@ -103,10 +135,13 @@ function isGuildAccessInvalid(req, guild) {
         createdAt
       });
 
-      if (out.length >= 400) break;
+      if (out.length >= 400) {
+        if (list.length > out.length) changed = true;
+        break;
+      }
     }
 
-    return out;
+    return { feed: out, changed };
   }
 
   function sanitizeSettlementBoard(rawBoard) {
@@ -250,8 +285,8 @@ function isGuildAccessInvalid(req, guild) {
         };
       });
 
-      const normalizedFeed = normalizeFeed(guild.feed);
-      if (normalizedFeed.length !== (Array.isArray(guild.feed) ? guild.feed.length : 0)) {
+      const { feed: normalizedFeed, changed: feedChanged } = normalizeFeed(guild.feed);
+      if (feedChanged) {
         guild.feed = normalizedFeed;
         saveData(data);
       }
