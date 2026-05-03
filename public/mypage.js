@@ -1921,17 +1921,28 @@ window.getStreakFromSessions = function(sessions = []) {
 window.getMonthSeconds = function(user) {
 
   const now = new Date();
+  const nowMs = now.getTime();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
 
   let total = 0;
 
-  (user.sessions || []).forEach(s => {
+  const baseSessions = window.getAggregateSessionList(user?.sessions || []);
+
+  baseSessions.forEach(s => {
 
     const start = window.normalizeTime(s.start);
-    const end   = window.normalizeTime(s.end);
+    let end   = window.normalizeTime(s.end);
+    const sec = Number(s?.seconds || 0);
 
-    if (!start || !end) return;
+    if (!start) return;
+    if (!end || end <= start) {
+      if (Number.isFinite(sec) && sec > 0) {
+        end = start + sec * 1000;
+      } else {
+        return;
+      }
+    }
 
     total += window.getOverlapSeconds(
       start,
@@ -1941,6 +1952,16 @@ window.getMonthSeconds = function(user) {
     );
 
   });
+
+  const currentStart = window.normalizeTime(user?.currentStart);
+  if (currentStart && nowMs > currentStart) {
+    total += window.getOverlapSeconds(
+      currentStart,
+      nowMs,
+      monthStart,
+      monthEnd
+    );
+  }
 
   return total;
 };
@@ -2708,10 +2729,11 @@ window.getFridayWeekRange = function(baseDate = new Date()) {
 };
 
 window.getStudySecondsInRange = function(sessions = [], rangeStart, rangeEnd) {
-  if (!Array.isArray(sessions)) return 0;
+  const baseSessions = window.getAggregateSessionList(sessions);
+  if (!Array.isArray(baseSessions) || baseSessions.length === 0) return 0;
 
   let total = 0;
-  for (const s of sessions) {
+  for (const s of baseSessions) {
     const start = window.normalizeTime(s?.start);
     let end = window.normalizeTime(s?.end);
     const sec = Number(s?.seconds || 0);
@@ -2732,9 +2754,10 @@ window.getStudySecondsInRange = function(sessions = [], rangeStart, rangeEnd) {
 };
 
 window.getSessionsInRange = function(sessions = [], rangeStart, rangeEnd) {
-  if (!Array.isArray(sessions)) return [];
+  const baseSessions = window.getAggregateSessionList(sessions);
+  if (!Array.isArray(baseSessions) || baseSessions.length === 0) return [];
 
-  return sessions.filter((s) => {
+  return baseSessions.filter((s) => {
     const start = window.normalizeTime(s?.start);
     let end = window.normalizeTime(s?.end);
     const sec = Number(s?.seconds || 0);

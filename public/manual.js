@@ -23,6 +23,19 @@ window.formatTimeHM = function(totalSeconds) {
     return `${m}m`;
 };
 
+window.refreshCurrentMyPageAfterManualChange = async function(userId) {
+  const currentId = String(window.currentUserId || "");
+  const targetId = String(userId || "");
+  if (!currentId || !targetId || currentId !== targetId) return;
+  if (typeof window.showMyPage !== "function") return;
+
+  try {
+    await window.showMyPage(targetId);
+  } catch (err) {
+    console.error("mypage refresh after manual change failed:", err);
+  }
+};
+
 window.showManualModal = async function() {
   window.token =
     window.token ||
@@ -263,6 +276,7 @@ historyBox.innerHTML = itemsHtml || "No manual records";
                 
                 // 유저 캐시 새로고침
                 await window.loadUsers();
+                await window.refreshCurrentMyPageAfterManualChange(userId);
                 window.manualDataCache = null;
 
                 // 히스토리가 이미 열려 있을 때만 갱신
@@ -352,6 +366,7 @@ window.deleteManualSession = async function (userId, index) {
       window.showToast("🗑 삭제 완료");
 
       await window.loadUsers();
+      await window.refreshCurrentMyPageAfterManualChange(userId);
       window.manualDataCache = null;
 
       const historyBox = document.getElementById("manualHistory");
@@ -401,6 +416,7 @@ window.editManualSession = function (userId, index) {
       window.showToast("✏️ 수정 완료!");
 
       await window.loadUsers();
+      await window.refreshCurrentMyPageAfterManualChange(userId);
       window.manualDataCache = null;
 
       const btn = document.getElementById("loadHistoryBtn");
