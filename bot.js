@@ -505,7 +505,11 @@ const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
 const AWAY_PROMPT_PAUSE_PREFIX = "away_prompt_pause";
 const MIDCHECK_BUTTON_PREFIX = "midcheck";
 const ENABLE_DM_REVIEW_BUTTON = true;
-const ENABLE_NIGHTLY_REVIEW_DM = true;
+const ENABLE_AWAY_PROMPT_DM = false;
+const ENABLE_MIDCHECK_DM = false;
+const ENABLE_NIGHTLY_REVIEW_DM = false;
+const ENABLE_WEEKLY_CAMERA_BRIEF_DM = false;
+const ENABLE_PERIOD_END_NOTICE = false;
 // customId format:
 // quiet cheer: "quiet_cheer_send"
 // cam review:  "cam_review:<guildId>:<userId>:<moodKey>"
@@ -641,6 +645,7 @@ const MIDCHECK_OPTIONS = [
 ];
 
 function resolvePeriodNoticeChannelId(guildData) {
+  if (!ENABLE_PERIOD_END_NOTICE) return null;
   const configured = String(
     guildData?.settings?.periodNoticeChannelId ||
     process.env.PERIOD_NOTICE_CHANNEL_ID ||
@@ -649,14 +654,63 @@ function resolvePeriodNoticeChannelId(guildData) {
   return configured || null;
 }
 
+function isMissingOrInaccessibleDiscordChannelError(err) {
+  const code = Number(err?.code || 0);
+  const status = Number(err?.status || err?.httpStatus || 0);
+  const message = String(err?.message || err?.rawError?.message || "");
+  return (
+    code === 10003 ||
+    code === 50001 ||
+    status === 404 ||
+    /Unknown Channel|Missing Access/i.test(message)
+  );
+}
+
+function disablePeriodNoticeChannel(channelId, reason = "missing_or_inaccessible") {
+  const safeChannelId = String(channelId || "").trim();
+  if (!safeChannelId) return false;
+
+  const root = normalizeDataRoot(loadData());
+  root.meta ??= {};
+  root.meta.periodNoticeSentByChannel ??= {};
+  root.meta.periodNoticeClaimByChannel ??= {};
+
+  let changed = false;
+
+  for (const guildId of Object.keys(root.guilds || {})) {
+    const { guild } = withGuildDataById(root, guildId);
+    if (String(guild?.settings?.periodNoticeChannelId || "").trim() === safeChannelId) {
+      guild.settings.periodNoticeChannelId = null;
+      changed = true;
+    }
+  }
+
+  for (const key of Object.keys(root.meta.periodNoticeSentByChannel)) {
+    if (key.startsWith(`${safeChannelId}:`)) {
+      delete root.meta.periodNoticeSentByChannel[key];
+      changed = true;
+    }
+  }
+
+  for (const key of Object.keys(root.meta.periodNoticeClaimByChannel)) {
+    if (key.startsWith(`${safeChannelId}:`)) {
+      delete root.meta.periodNoticeClaimByChannel[key];
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    saveData(root);
+    console.warn(`[period-notice] disabled channel ${safeChannelId} (${reason})`);
+  }
+
+  return changed;
+}
+
 async function resolvePeriodNoticeChannel(channelId) {
   let ch = client.channels.cache.get(channelId) || null;
   if (!ch) {
-    try {
-      ch = await client.channels.fetch(channelId);
-    } catch (_) {
-      ch = null;
-    }
+    ch = await client.channels.fetch(channelId);
   }
   if (!ch) return null;
 
@@ -993,6 +1047,7 @@ async function sendDailyMidCheckTick() {
   __midCheckTickBusy = true;
 
   try {
+    if (!ENABLE_MIDCHECK_DM) return;
     if (!client.isReady()) return;
     if (!process.env.FLY_APP_NAME) return;
 
@@ -1123,6 +1178,7 @@ async function sendWeeklyCameraBriefTick() {
   __weeklyBriefTickBusy = true;
 
   try {
+    if (!ENABLE_WEEKLY_CAMERA_BRIEF_DM) return;
     if (!client.isReady()) return;
     if (!process.env.FLY_APP_NAME) return;
 
@@ -1218,6 +1274,7 @@ function getCurrentClassWindow(now = Date.now()) {
 }
 
 async function sendAwayPromptTick() {
+  if (!ENABLE_AWAY_PROMPT_DM) return;
   if (!client.isReady()) return;
   if (!process.env.FLY_APP_NAME) return;
 
@@ -1302,6 +1359,7 @@ async function sendPeriodEndNoticeTick() {
   __periodNoticeTickBusy = true;
 
   try {
+    if (!ENABLE_PERIOD_END_NOTICE) return;
     if (!client.isReady()) return;
     if (!process.env.FLY_APP_NAME) return; // 로컬 중복 전송 방지
 
@@ -1342,6 +1400,10 @@ async function sendPeriodEndNoticeTick() {
         markPeriodNoticeSent(persistedKey, claimToken, dateKey);
       } catch (err) {
         releasePeriodNoticeSlot(persistedKey, claimToken);
+        if (isMissingOrInaccessibleDiscordChannelError(err)) {
+          disablePeriodNoticeChannel(periodNoticeChannelId, err?.message || err?.code || "unknown");
+          continue;
+        }
         console.error("period notice send failed:", err?.message || err);
       }
     }
