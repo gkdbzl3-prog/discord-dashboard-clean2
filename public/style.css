@@ -203,6 +203,7 @@ z-index: 1;
   padding: var(--spacing-xl);
   margin-bottom: var(--spacing-lg);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  width: fit-content;
 }
 
 .back-btn { 
