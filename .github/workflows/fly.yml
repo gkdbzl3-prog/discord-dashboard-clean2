@@ -10,12 +10,11 @@ jobs:
     name: Deploy app
     runs-on: ubuntu-latest
     concurrency: deploy-group
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
-        with:
-          version: 0.4.33
 
       - run: flyctl deploy --remote-only
         env:
