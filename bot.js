@@ -88,6 +88,142 @@ const client = new Client({
   ]
 });
 
+const ERROR_REPORT_TARGET_ID = String(
+  process.env.ERROR_REPORT_TARGET_ID || "1456111932062044264"
+).trim();
+const ERROR_REPORT_DEDUPE_MS = 60 * 1000;
+const ERROR_REPORT_MAX_LEN = 1500;
+const __nativeConsoleError = console.error.bind(console);
+let __errorReportQueue = [];
+let __errorReportFlushBusy = false;
+let __errorReportDestinationPromise = null;
+let __errorReportHookInstalled = false;
+const __errorReportRecent = new Map();
+
+function stringifyErrorReportPart(value) {
+  if (value instanceof Error) {
+    return String(value.stack || `${value.name}: ${value.message}`);
+  }
+  if (typeof value === "string") return value;
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (_) {
+    return String(value);
+  }
+}
+
+function truncateErrorReportText(text, maxLen = ERROR_REPORT_MAX_LEN) {
+  const normalized = String(text || "").replace(/```/g, "'''");
+  if (normalized.length <= maxLen) return normalized;
+  return `${normalized.slice(0, maxLen)}\n...[truncated]`;
+}
+
+function rememberRecentErrorReport(signature) {
+  const now = Date.now();
+  const prev = Number(__errorReportRecent.get(signature) || 0);
+
+  for (const [key, ts] of __errorReportRecent.entries()) {
+    if (now - Number(ts || 0) > ERROR_REPORT_DEDUPE_MS) {
+      __errorReportRecent.delete(key);
+    }
+  }
+
+  __errorReportRecent.set(signature, now);
+  return prev > 0 && now - prev < ERROR_REPORT_DEDUPE_MS;
+}
+
+function buildErrorReportMessage(item) {
+  const ts = new Date(item.createdAt).toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour12: false
+  });
+  const scope = process.env.FLY_APP_NAME || "local";
+  return [
+    "🚨 봇 에러 알림",
+    `시간: ${ts} KST`,
+    `앱: ${scope} / pid ${process.pid}`,
+    "```txt",
+    truncateErrorReportText(item.text),
+    "```"
+  ].join("\n");
+}
+
+async function resolveErrorReportTarget() {
+  if (!ERROR_REPORT_TARGET_ID) return null;
+  if (__errorReportDestinationPromise) return __errorReportDestinationPromise;
+
+  __errorReportDestinationPromise = (async () => {
+    try {
+      const channel = await client.channels.fetch(ERROR_REPORT_TARGET_ID).catch(() => null);
+      if (channel && typeof channel.send === "function") return channel;
+
+      const user = await client.users.fetch(ERROR_REPORT_TARGET_ID).catch(() => null);
+      if (user && typeof user.send === "function") return user;
+    } catch (err) {
+      __nativeConsoleError("[error-report] target resolve failed:", err?.message || err);
+    }
+
+    return null;
+  })();
+
+  return __errorReportDestinationPromise;
+}
+
+async function flushErrorReportQueue() {
+  if (__errorReportFlushBusy) return;
+  if (!client?.isReady?.()) return;
+  if (!__errorReportQueue.length) return;
+
+  __errorReportFlushBusy = true;
+
+  try {
+    const target = await resolveErrorReportTarget();
+    if (!target) return;
+
+    while (__errorReportQueue.length > 0) {
+      const item = __errorReportQueue.shift();
+      if (!item) continue;
+      try {
+        await target.send(buildErrorReportMessage(item));
+      } catch (err) {
+        __nativeConsoleError("[error-report] send failed:", err?.message || err);
+        break;
+      }
+    }
+  } finally {
+    __errorReportFlushBusy = false;
+  }
+}
+
+function queueErrorReport(level, args) {
+  if (!ERROR_REPORT_TARGET_ID) return;
+  const text = args.map((part) => stringifyErrorReportPart(part)).join(" ");
+  const signature = `${level}:${text}`;
+  if (rememberRecentErrorReport(signature)) return;
+
+  __errorReportQueue.push({
+    level,
+    text,
+    createdAt: Date.now()
+  });
+
+  void flushErrorReportQueue();
+}
+
+function installErrorReportHook() {
+  if (__errorReportHookInstalled) return;
+  __errorReportHookInstalled = true;
+
+  console.error = (...args) => {
+    __nativeConsoleError(...args);
+    queueErrorReport("error", args);
+  };
+}
+
+installErrorReportHook();
+
 let __gatewayRecoveryTimer = null;
 let __gatewayRecoveryInFlight = false;
 
@@ -263,6 +399,7 @@ function markDirty() {
 
 // discord.js v14에서 'clientReady'는 정상 동작 (v15부터 공식 이벤트명)
 client.on('clientReady', async () => {
+  void flushErrorReportQueue();
   const STUDY_VC_ID = process.env.STUDY_VC_ID;
   const now = Date.now();
   data = normalizeDataRoot(loadData());
@@ -504,6 +641,7 @@ const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
 const AWAY_PROMPT_PAUSE_PREFIX = "away_prompt_pause";
 const MIDCHECK_BUTTON_PREFIX = "midcheck";
+const ENABLE_DAILY_QUIET_CHEER = false;
 const ENABLE_DM_REVIEW_BUTTON = true;
 const ENABLE_AWAY_PROMPT_DM = false;
 const ENABLE_MIDCHECK_DM = false;
@@ -896,6 +1034,7 @@ async function sendDailyQuietCheerTick() {
   if (__quietCheerTickBusy) return;
   __quietCheerTickBusy = true;
   try {
+    if (!ENABLE_DAILY_QUIET_CHEER) return;
     if (!client.isReady()) return;
     if (!process.env.FLY_APP_NAME) return;
 
@@ -1938,16 +2077,6 @@ client.on('messageCreate', async (msg) => {
   const root = normalizeDataRoot(loadData());
   const { data: latestData, guild } = withGuildDataById(root, guildId);
 
-  if (content === '!응원고정') {
-    guild.settings ??= {};
-    guild.settings.quietCheerMessageId = null;
-    await ensureQuietCheerPinnedMessage(msg.guild, guild);
-    saveData(latestData);
-    return;
-  }
-
-
-
   const user = guild.users[userId];
   if (!user) return;
 
@@ -1957,8 +2086,7 @@ client.on('messageCreate', async (msg) => {
       '⏰ `!time`\n' +
       '📅 `!today`\n' +
       '📆 `!week`\n' +
-      '🎯 `!goal 3h`\n' +
-      '🌿 `!응원고정`\n'
+      '🎯 `!goal 3h`\n'
 
     );
     return;
@@ -2016,5 +2144,3 @@ if (!DISCORD_LOGIN_TOKEN) {
     .then(() => console.log("Discord bot logged in"))
     .catch((err) => console.error("Bot login failed:", err));
 }
-
-
