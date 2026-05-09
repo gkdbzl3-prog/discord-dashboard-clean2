@@ -405,11 +405,11 @@ const now = new Date();
     <!-- 목표 섹션 -->
 <div class="mypage-widgets">
 
-  <!-- 이번달 목표 -->
+  <!-- 이번주 목표 -->
    <div class="widget-card">
     <div class="goal-header">
-      <span class="goal-icon">👟</span>
-      <h3 class="goal-title">이번 달 목표</h3>
+      <span class="goal-icon">🎯</span>
+      <h3 class="goal-title">이번 주 목표</h3>
     </div>
     <img
       class="month-goal-cat"
@@ -1704,34 +1704,8 @@ if (percent >= 100) {
 
 }
 
-window.renderTimeGoal = function() {
-  const box = document.getElementById("timeGoalBox");
-  if (!box) return;
-
-const user = window.currentUser;
-  if (!user) return;
-
-  const goalHours = user.monthGoalHours || 40;
-
-  const monthSeconds = window.getMonthSeconds(user);
-  const currentHours = monthSeconds / 3600;
-
-  const percent = Math.min(
-    100,
-    Math.floor((currentHours / goalHours) * 100)
-  );
-
- box.innerHTML = `
-  <div class="time-goal-text">
-    ${goalHours}시간 중 ${currentHours.toFixed(1)}시간
-  </div>
-
-  <div class="goal-bar">
-    <div class="goal-bar-fill" style="width:${percent}%"></div>
-  </div>
-
-  <div class="goal-percent">${percent}%</div>
-`;
+window._renderTimeGoalSimple = function() {
+  // 이 함수는 아래 renderTimeGoal로 대체됨
 };
 
 window.saveUserData = async function () {
@@ -2549,34 +2523,35 @@ window.removeTag = function(closeBtn) {
 };
 
 
-// ===== 시간 목표 렌더링 =====
+// ===== 주간 목표 렌더링 =====
 window.renderTimeGoal = function(user) {
   const goalBox = document.getElementById('timeGoalBox');
   if (!goalBox) return;
-  
+
   const goalSec = Number(user.goalSec || 0);
-  const monthSec = typeof window.getMonthSeconds === "function"
-    ? Number(window.getMonthSeconds(user) || 0)
-    : Number(user.totalSeconds || 0);
-  const totalSec = Number.isFinite(monthSec) ? Math.max(0, monthSec) : 0;
-  const goalHoursValue = goalSec > 0 ? Math.max(1, Math.round(goalSec / 3600)) : 40;
-  
+  const goalHoursValue = goalSec > 0 ? Math.max(1, Math.round(goalSec / 3600)) : 28;
+
+  const now = new Date();
+  const weekRange = window.getFridayWeekRange(now);
+  const sessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
+  if (user?.currentStart) {
+    sessions.push({
+      start: user.currentStart,
+      end: now.getTime(),
+      seconds: Math.max(0, Math.floor((now.getTime() - user.currentStart) / 1000))
+    });
+  }
+  const weekSec = window.getStudySecondsInRange(sessions, weekRange.start, Math.min(now.getTime(), weekRange.end));
+  const totalSec = Number.isFinite(weekSec) ? Math.max(0, weekSec) : 0;
+  const weekLabel = `${window.formatShortMonthDay(weekRange.startDate)}~${window.formatShortMonthDay(weekRange.endDate)}`;
+
   if (goalSec === 0) {
     goalBox.innerHTML = `
      <div class="goal-empty">
-
 <div class="goal-empty-icon">🎯</div>
-
-<div class="goal-empty-text">
-이번 달 목표를 설정해보세요
+<div class="goal-empty-text">이번 주 목표를 설정해보세요</div>
+<div class="goal-empty-sub">목표 시간을 입력하고 저장해보세요!</div>
 </div>
-
-<div class="goal-empty-sub">
-디스코드에서 <code>!goal 40h</code>을 통해 목표시간을 설정해보세요!
-</div>
-
-</div>
-
 <div class="month-goal-edit-row">
   <input
     id="monthGoalHoursInput"
@@ -2587,17 +2562,12 @@ window.renderTimeGoal = function(user) {
     value="${goalHoursValue}"
     placeholder="목표 시간(h)"
   >
-  <button
-    class="month-goal-save-btn"
-    onclick="window.saveMonthlyGoal()"
-  >
-    저장
-  </button>
+  <button class="month-goal-save-btn" onclick="window.saveMonthlyGoal()">저장</button>
 </div>
     `;
     return;
   }
-  
+
   const goalHours = Math.max(1, Math.floor(goalSec / 3600));
   const currentHours = (totalSec / 3600).toFixed(1);
   const percentNum = goalSec > 0
@@ -2606,8 +2576,9 @@ window.renderTimeGoal = function(user) {
   const percentage = String(percentNum);
   const remaining = Math.max(goalSec - totalSec, 0);
   const remainingHours = (remaining / 3600).toFixed(1);
-  
+
   goalBox.innerHTML = `
+    <div class="goal-week-label">${weekLabel}</div>
     <div class="goal-progress-container">
       <div class="goal-stats">
         <div class="goal-stat">
@@ -2623,7 +2594,6 @@ window.renderTimeGoal = function(user) {
           <span class="goal-stat-value">${remainingHours}h</span>
         </div>
       </div>
-      
       <div class="progress-bar-wrapper">
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" style="width: ${percentage}%">
@@ -2631,13 +2601,7 @@ window.renderTimeGoal = function(user) {
           </div>
         </div>
       </div>
-      
-      ${percentNum >= 100 ? `
-        <div class="goal-achievement">
-          🎉 목표 달성! 축하합니다!
-        </div>
-      ` : ''}
-
+      ${percentNum >= 100 ? `<div class="goal-achievement">🎉 목표 달성! 축하합니다!</div>` : ''}
       <div class="month-goal-edit-row">
         <input
           id="monthGoalHoursInput"
@@ -2648,12 +2612,7 @@ window.renderTimeGoal = function(user) {
           value="${goalHoursValue}"
           placeholder="목표 시간(h)"
         >
-        <button
-          class="month-goal-save-btn"
-          onclick="window.saveMonthlyGoal()"
-        >
-          저장
-        </button>
+        <button class="month-goal-save-btn" onclick="window.saveMonthlyGoal()">저장</button>
       </div>
     </div>
   `;
@@ -2810,6 +2769,12 @@ window.renderWeeklyStatus = function(user) {
   );
   const dailyAvg = (weekTotal / elapsedDays / 3600).toFixed(1);
 
+  // 지난 주 총 참여시간 계산
+  const lastWeekRange = window.getFridayWeekRange(new Date(weekRange.start - 1));
+  const lastWeekTotal = window.getStudySecondsInRange(sessions, lastWeekRange.start, lastWeekRange.end);
+  const lastWeekHours = (lastWeekTotal / 3600).toFixed(1);
+  const lastWeekLabel = `${window.formatShortMonthDay(lastWeekRange.startDate)}~${window.formatShortMonthDay(lastWeekRange.endDate)}`;
+
   const dailyData = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekRange.startDate);
@@ -2883,6 +2848,12 @@ window.renderWeeklyStatus = function(user) {
       </div>
     `).join("")}
 
+  </div>
+
+  <div class="last-week-summary">
+    <span class="last-week-label">지난 주 총 참여시간</span>
+    <span class="last-week-range">${lastWeekLabel}</span>
+    <span class="last-week-hours">${lastWeekHours}h</span>
   </div>
 
 </div>
