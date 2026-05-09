@@ -5532,6 +5532,15 @@ text-align: center;
   background: var(--accent-soft);
 }
 
+.goal-week-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 8px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
 .goal-progress-container {
   margin-top: 16px;
 }
@@ -5702,6 +5711,41 @@ font-size:11px;
 line-height:1;
 margin-top:6px;
 color:var(--text-muted);
+}
+
+.last-week-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.last-week-label {
+  color: var(--text-muted);
+  font-weight: 500;
+  flex: 1 1 auto;
+}
+
+.last-week-range {
+  color: var(--text-muted);
+  font-size: 12px;
+  background: var(--card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.last-week-hours {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 14px;
+  margin-left: auto;
 }
 
 .month-goal-cat{
@@ -5985,6 +6029,45 @@ letter-spacing:.08em;
     padding: 14px;
     border-radius: 16px;
     margin-top: 8px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  body.mypage .mypage-widgets {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  body.mypage .widget-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  body.mypage .weekly-main {
+    font-size: 28px;
+  }
+
+  body.mypage .goal-stats {
+    gap: 8px;
+  }
+
+  body.mypage .goal-stat {
+    padding: 8px 6px;
+  }
+
+  body.mypage .goal-stat-value {
+    font-size: 16px;
+  }
+
+  body.mypage .chart-bar {
+    min-width: 0;
+  }
+
+  body.mypage .weekly-chart {
+    gap: 4px;
   }
 
   body.mypage .profile-card,
