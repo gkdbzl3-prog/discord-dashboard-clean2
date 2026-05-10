@@ -1745,7 +1745,17 @@ if(!el) return;
 
 const now = new Date();
 const nowMs = now.getTime();
-const weeklyTarget = 28;
+const goalSec = Number(user?.goalSec || 0);
+
+if (!Number.isFinite(goalSec) || goalSec <= 0) {
+  el.innerHTML = `
+<div class="weekly-status bad">
+목표 시간을 먼저 저장해줘
+</div>
+`;
+  return;
+}
+
 const weekRange = window.getFridayWeekRange(now);
 const rangeEnd = Math.min(nowMs, weekRange.end);
 const sessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
@@ -1759,23 +1769,26 @@ if (user?.currentStart) {
 }
 
 const current = window.getStudySecondsInRange(sessions, weekRange.start, rangeEnd) / 3600;
-const elapsedDays = Math.min(
-  7,
-  Math.max(1, Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - weekRange.start) / (24 * 60 * 60 * 1000)) + 1)
+const target = goalSec / 3600;
+const elapsedRatio = Math.max(
+  0,
+  Math.min(1, (rangeEnd - weekRange.start) / (weekRange.end - weekRange.start))
 );
-const expected = (weeklyTarget / 7) * elapsedDays;
+const expected = target * elapsedRatio;
 const diff = current - expected;
+const isComplete = current >= target;
+const isAhead = diff >= 0;
 
 const text =
-current >= weeklyTarget
+isComplete
 ? "이번 주 목표 이미 달성했어 🎉"
 : 
-diff>=0
+isAhead
 ? `+${diff.toFixed(1)}h 앞서가는 중 🚀`
 : `${Math.abs(diff).toFixed(1)}h 부족 ⚠`;
 
 el.innerHTML = `
-<div class="weekly-status ${diff>=0?'good':'bad'}">
+<div class="weekly-status ${isAhead?'good':'bad'}">
 ${text}
 </div>
 `;
@@ -2657,6 +2670,8 @@ window.saveMonthlyGoal = async function() {
     }
 
     window.renderTimeGoal(window.currentUser);
+    window.renderWeeklyStatus(window.currentUser);
+    window.renderWeeklyGoalCompare(window.currentUser);
     if (typeof window.showToast === "function") {
       window.showToast("저장 완료");
     }
@@ -2769,7 +2784,8 @@ window.renderWeeklyStatus = function(user) {
 
   const now = new Date();
   const nowMs = now.getTime();
-  const weeklyTarget = 28;
+  const goalSec = Number(user?.goalSec || 0);
+  const weeklyTarget = goalSec > 0 ? goalSec / 3600 : 0;
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const weekRange = window.getFridayWeekRange(now);
   const rangeEnd = Math.min(nowMs, weekRange.end);
@@ -2819,9 +2835,13 @@ window.renderWeeklyStatus = function(user) {
     });
   }
 
-  const progressNum = Math.min((weekHoursNum / weeklyTarget) * 100, 100);
+  const progressNum = weeklyTarget > 0
+    ? Math.min((weekHoursNum / weeklyTarget) * 100, 100)
+    : 0;
   const progress = progressNum.toFixed(0);
-  const statusText = progressNum >= 100
+  const statusText = weeklyTarget <= 0
+    ? "목표 미설정"
+    : progressNum >= 100
     ? "🔥 목표 달성!"
     : `🚀 ${progress}% 진행 중`;
   const weekLabel =
