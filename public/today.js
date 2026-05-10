@@ -309,7 +309,7 @@ window.startDashboardSmoothTicker = function () {
 window.getSettlementWeekKey = function (date = new Date()) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const daysBack = (d.getDay() + 2) % 7;
+  const daysBack = d.getDay() === 5 ? 7 : (d.getDay() + 2) % 7;
   d.setDate(d.getDate() - daysBack);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -321,7 +321,10 @@ window.shiftSettlementWeekKey = function (weekKey, delta) {
   const [y, m, d] = String(weekKey || "").split("-").map(Number);
   const base = new Date(y, (m || 1) - 1, d || 1);
   base.setDate(base.getDate() + (delta * 7));
-  return window.getSettlementWeekKey(base);
+  const yy = base.getFullYear();
+  const mm = String(base.getMonth() + 1).padStart(2, "0");
+  const dd = String(base.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 };
 
 window.formatSettlementWeekLabel = function (weekKey) {
@@ -1677,4 +1680,3 @@ if (!window.heartListenerAdded) {
     }
   });
 }
-
