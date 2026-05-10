@@ -4,3 +4,6 @@ data/data.json
 *.log
 public/uploads/
 secret.txt
+
+data/data.json.lock
+data/data.json.tmp.*
