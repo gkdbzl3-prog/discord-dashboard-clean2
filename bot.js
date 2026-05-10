@@ -89,7 +89,9 @@ const client = new Client({
 });
 
 const ERROR_REPORT_TARGET_ID = String(
-  process.env.ERROR_REPORT_TARGET_ID || "1456111932062044264"
+  process.env.ERROR_REPORT_USER_ID ||
+  process.env.ERROR_REPORT_TARGET_ID ||
+  ""
 ).trim();
 const ERROR_REPORT_DEDUPE_MS = 60 * 1000;
 const ERROR_REPORT_MAX_LEN = 1500;
@@ -156,9 +158,6 @@ async function resolveErrorReportTarget() {
 
   __errorReportDestinationPromise = (async () => {
     try {
-      const channel = await client.channels.fetch(ERROR_REPORT_TARGET_ID).catch(() => null);
-      if (channel && typeof channel.send === "function") return channel;
-
       const user = await client.users.fetch(ERROR_REPORT_TARGET_ID).catch(() => null);
       if (user && typeof user.send === "function") return user;
     } catch (err) {
