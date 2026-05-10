@@ -2749,7 +2749,8 @@ window.renderWeeklyStatus = function(user) {
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const weekRange = window.getFridayWeekRange(now);
   const rangeEnd = Math.min(nowMs, weekRange.end);
-  const sessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
+  const storedSessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
+  const sessions = [...storedSessions];
 
   if (user?.currentStart) {
     sessions.push({
@@ -2771,7 +2772,7 @@ window.renderWeeklyStatus = function(user) {
 
   // 지난 주 총 참여시간 계산
   const lastWeekRange = window.getFridayWeekRange(new Date(weekRange.start - 1));
-  const lastWeekTotal = window.getStudySecondsInRange(sessions, lastWeekRange.start, lastWeekRange.end);
+  const lastWeekTotal = window.getStudySecondsInRange(storedSessions, lastWeekRange.start, lastWeekRange.end);
   const lastWeekHours = (lastWeekTotal / 3600).toFixed(1);
   const lastWeekLabel = `${window.formatShortMonthDay(lastWeekRange.startDate)}~${window.formatShortMonthDay(lastWeekRange.endDate)}`;
 
@@ -3063,4 +3064,3 @@ window.getDayStudySeconds = function(sessions = [], year, month, day) {
 
   return total;
 };
-
