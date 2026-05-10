@@ -2691,7 +2691,7 @@ window.getStudySecondsInRange = function(sessions = [], rangeStart, rangeEnd) {
   const baseSessions = window.getAggregateSessionList(sessions);
   if (!Array.isArray(baseSessions) || baseSessions.length === 0) return 0;
 
-  let total = 0;
+  const intervals = [];
   for (const s of baseSessions) {
     const start = window.normalizeTime(s?.start);
     let end = window.normalizeTime(s?.end);
@@ -2706,9 +2706,33 @@ window.getStudySecondsInRange = function(sessions = [], rangeStart, rangeEnd) {
       }
     }
 
-    total += window.getOverlapSeconds(start, end, rangeStart, rangeEnd);
+    const overlapStart = Math.max(start, rangeStart);
+    const overlapEnd = Math.min(end, rangeEnd);
+    if (overlapEnd > overlapStart) {
+      intervals.push([overlapStart, overlapEnd]);
+    }
   }
 
+  if (intervals.length === 0) return 0;
+
+  intervals.sort((a, b) => a[0] - b[0]);
+
+  let total = 0;
+  let [mergedStart, mergedEnd] = intervals[0];
+
+  for (let i = 1; i < intervals.length; i++) {
+    const [start, end] = intervals[i];
+    if (start <= mergedEnd) {
+      mergedEnd = Math.max(mergedEnd, end);
+      continue;
+    }
+
+    total += (mergedEnd - mergedStart) / 1000;
+    mergedStart = start;
+    mergedEnd = end;
+  }
+
+  total += (mergedEnd - mergedStart) / 1000;
   return total;
 };
 
