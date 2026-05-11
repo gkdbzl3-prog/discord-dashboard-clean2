@@ -225,6 +225,8 @@ installErrorReportHook();
 
 let __gatewayRecoveryTimer = null;
 let __gatewayRecoveryInFlight = false;
+let __discordLoginTimer = null;
+let __discordLoginInFlight = false;
 
 function isTransientGatewayResetError(err) {
   if (!err || typeof err !== "object") return false;
@@ -240,6 +242,71 @@ function isTransientGatewayResetError(err) {
     stack.includes("/ws/lib/websocket.js") ||
     stack.includes("@discordjs/ws")
   );
+}
+
+function getDiscordSessionLimitResetAt(err) {
+  const text = String(err?.stack || err?.message || err || "");
+  if (!/Not enough sessions remaining/i.test(text)) return null;
+
+  const match = text.match(/resets at ([0-9T:.\-]+Z)/i);
+  if (!match) return null;
+
+  const resetAt = Date.parse(match[1]);
+  return Number.isFinite(resetAt) ? resetAt : null;
+}
+
+function formatKstDateTime(ms) {
+  return new Date(ms).toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour12: false
+  });
+}
+
+function scheduleDiscordLogin(source, delayMs = 0) {
+  if (__discordLoginTimer || client?.isReady?.()) return;
+  if (!DISCORD_LOGIN_TOKEN) return;
+
+  const delay = Math.max(0, Number(delayMs || 0));
+  if (delay > 0) {
+    console.warn(`[discord-login:${source}] retry scheduled at ${formatKstDateTime(Date.now() + delay)} KST`);
+  }
+
+  __discordLoginTimer = setTimeout(async () => {
+    __discordLoginTimer = null;
+    await loginDiscordClient(source);
+  }, delay);
+}
+
+async function loginDiscordClient(source = "startup") {
+  if (__discordLoginInFlight || client?.isReady?.()) return false;
+  if (!DISCORD_LOGIN_TOKEN) {
+    console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
+    return false;
+  }
+
+  __discordLoginInFlight = true;
+
+  try {
+    await client.login(DISCORD_LOGIN_TOKEN);
+    console.log("Discord bot logged in");
+    return true;
+  } catch (err) {
+    const resetAt = getDiscordSessionLimitResetAt(err);
+    if (resetAt) {
+      const retryDelay = Math.max(60 * 1000, resetAt - Date.now() + 5000);
+      console.error(
+        `[discord-login:${source}] Discord 세션 시작 한도를 모두 사용했습니다. ` +
+        `${formatKstDateTime(resetAt)} KST 이후 재시도합니다.`
+      );
+      scheduleDiscordLogin(`${source}:session-limit`, retryDelay);
+      return false;
+    }
+
+    console.error("Bot login failed:", err);
+    return false;
+  } finally {
+    __discordLoginInFlight = false;
+  }
 }
 
 function scheduleGatewayRecovery(source, err) {
@@ -265,8 +332,10 @@ function scheduleGatewayRecovery(source, err) {
         } catch (_) {}
       }
 
-      await client.login(DISCORD_LOGIN_TOKEN);
-      console.log(`[gateway-recover:${source}] Discord gateway reconnected`);
+      const loggedIn = await loginDiscordClient(`gateway-recover:${source}`);
+      if (loggedIn) {
+        console.log(`[gateway-recover:${source}] Discord gateway reconnected`);
+      }
     } catch (loginErr) {
       console.error(`[gateway-recover:${source}] reconnect failed:`, loginErr);
     } finally {
@@ -2192,7 +2261,5 @@ client.on('messageCreate', async (msg) => {
 if (!DISCORD_LOGIN_TOKEN) {
   console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
 } else {
-  client.login(DISCORD_LOGIN_TOKEN)
-    .then(() => console.log("Discord bot logged in"))
-    .catch((err) => console.error("Bot login failed:", err));
+  void loginDiscordClient("startup");
 }
