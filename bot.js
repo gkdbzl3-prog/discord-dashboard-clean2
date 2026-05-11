@@ -303,6 +303,7 @@ async function loginDiscordClient(source = "startup") {
     }
 
     console.error("Bot login failed:", err);
+    scheduleDiscordLogin(`${source}:retry`, 30_000);
     return false;
   } finally {
     __discordLoginInFlight = false;
