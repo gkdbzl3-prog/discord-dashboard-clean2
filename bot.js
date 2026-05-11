@@ -576,13 +576,28 @@ function parseGoalToSeconds(input) {
   return seconds;
 }
 
+function addCommandMemoRecord(user, memoText, now = Date.now()) {
+  if (!user || !memoText) return;
+  if (!Array.isArray(user.studyRecords)) user.studyRecords = [];
+
+  user.studyRecords.unshift({
+    id: now,
+    type: "commandMemo",
+    source: "discord_memo",
+    subject: "메모",
+    subjects: ["메모"],
+    content: memoText,
+    timestamp: now
+  });
+}
+
 function computeTodayWeekAll(user) {
 
   const now = Date.now();
   const todayStart = kstStartOfTodayMs(now);
 
-  const day = new Date(now).getDay(); // 0=Sunday
-  const diff = day === 0 ? 6 : day - 1;
+  const day = new Date(now + KST_OFFSET_MS).getUTCDay(); // 0=Sunday in KST
+  const diff = (day + 2) % 7;
   const weekStart = todayStart - diff * DAY_MS;
 
   let todaysec = 0;
@@ -2085,20 +2100,20 @@ client.on('messageCreate', async (msg) => {
       '⏰ `!time`\n' +
       '📅 `!today`\n' +
       '📆 `!week`\n' +
-      '🎯 `!goal 3h`\n'
+      '🎯 `!goal 3h`\n' +
+      '📝 `!memo 메모내용` / `!memo` / `!memo clear`\n'
 
     );
     return;
   }
 
   if (content === '!time') {
-    const { todaysec, weekSec, allSec } = computeTodayWeekAll(user);
+    const { todaysec, weekSec } = computeTodayWeekAll(user);
 
     await msg.reply(
      `🕒 ${user.nickname || msg.author.username}\n` +
       `- 오늘: ${formatSeconds(todaysec)}\n` +
-      `- 이번주: ${formatSeconds(weekSec)}\n` +
-      `- 누적: ${formatSeconds(allSec)}`
+      `- 이번주: ${formatSeconds(weekSec)}`
     );
     return;
   }
@@ -2112,6 +2127,44 @@ client.on('messageCreate', async (msg) => {
   if (content === '!week') {
     const { weekSec } = computeTodayWeekAll(user);
     await msg.reply(`📆 이번 주: ${formatSeconds(weekSec)}`);
+    return;
+  }
+
+  if (content === '!memo' || content.startsWith('!memo ')) {
+    const todayKey = getKstDateParts(Date.now()).dateKey;
+    const rawMemo = content.slice('!memo'.length).trim();
+    const savedMemo = user.commandMemo && typeof user.commandMemo === "object"
+      ? user.commandMemo
+      : null;
+
+    if (savedMemo && savedMemo.dateKey !== todayKey) {
+      user.commandMemo = null;
+      saveData(latestData);
+    }
+
+    if (!rawMemo) {
+      const currentMemo = user.commandMemo?.dateKey === todayKey
+        ? String(user.commandMemo?.text || "").trim()
+        : "";
+      await msg.reply(currentMemo ? `📝 오늘 메모\n${currentMemo}` : "📝 오늘 저장된 메모가 없습니다.");
+      return;
+    }
+
+    if (rawMemo.toLowerCase() === "clear") {
+      user.commandMemo = null;
+      saveData(latestData);
+      await msg.reply("📝 오늘 메모를 지웠습니다.");
+      return;
+    }
+
+    user.commandMemo = {
+      dateKey: todayKey,
+      text: rawMemo,
+      updatedAt: Date.now()
+    };
+    addCommandMemoRecord(user, rawMemo, user.commandMemo.updatedAt);
+    saveData(latestData);
+    await msg.reply("📝 메모를 저장했습니다.");
     return;
   }
 

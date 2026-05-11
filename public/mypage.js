@@ -1750,7 +1750,7 @@ const goalSec = Number(user?.goalSec || 0);
 if (!Number.isFinite(goalSec) || goalSec <= 0) {
   el.innerHTML = `
 <div class="weekly-status bad">
-목표 시간을 먼저 저장해줘
+목표 시간을 먼저 저장해주세요.
 </div>
 `;
   return;
@@ -1781,7 +1781,7 @@ const isAhead = diff >= 0;
 
 const text =
 isComplete
-? "이번 주 목표 이미 달성했어 🎉"
+? "이번 주 목표를 이미 달성했습니다 🎉"
 : 
 isAhead
 ? `+${diff.toFixed(1)}h 앞서가는 중 🚀`
@@ -2327,7 +2327,7 @@ window.setupMemoEditor = function(userId) {
 window.startTimer = function(minutes) {
 
   if (!window.selectedSubject) {
-    alert("과목을 먼저 선택해줘");
+    alert("과목을 먼저 선택해주세요.");
     return;
   }
 
@@ -2638,7 +2638,7 @@ window.saveMonthlyGoal = async function() {
   const nextHours = Math.floor(Number(input.value || 0));
   if (!Number.isFinite(nextHours) || nextHours <= 0) {
     if (typeof window.showToast === "function") {
-      window.showToast("목표 시간을 1 이상으로 입력해줘");
+      window.showToast("목표 시간을 1 이상으로 입력해주세요.");
     }
     return;
   }
@@ -2930,7 +2930,7 @@ ${goals.length===0?`
 <div class="goal-placeholder-icon">📝</div>
 
 <div class="goal-placeholder-text">
-아직 목표가 없어요🥲
+아직 목표가 없습니다🥲
 </div>
 
 <div class="goal-placeholder-sub">

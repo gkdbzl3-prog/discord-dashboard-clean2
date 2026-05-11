@@ -571,7 +571,7 @@ window.renderSettlementBoard = function (boardRaw = window.todaySettings?.settle
       </div>
 
       <div class="settlement-member-list">
-        ${rowsHtml || `<div class="settlement-empty">정산 보드에 멤버를 추가해줘.</div>`}
+        ${rowsHtml || `<div class="settlement-empty">정산 보드에 멤버를 추가해주세요.</div>`}
       </div>
     </div>
   `;
@@ -1039,7 +1039,7 @@ window.renderFeed = function(feed) {
 
   if (!feed || feed.length === 0) {
     container.innerHTML =
-      "<p style='opacity:0.6'>아직 활동 기록이 없어요</p>";
+      "<p style='opacity:0.6'>아직 활동 기록이 없습니다.</p>";
     return;
   }
 
