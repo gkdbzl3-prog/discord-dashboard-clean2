@@ -309,7 +309,7 @@ window.startDashboardSmoothTicker = function () {
 window.getSettlementWeekKey = function (date = new Date()) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const daysBack = d.getDay() === 5 ? 7 : (d.getDay() + 2) % 7;
+  const daysBack = (d.getDay() + 2) % 7;
   d.setDate(d.getDate() - daysBack);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -448,9 +448,11 @@ window.renderSettlementBoard = function (boardRaw = window.todaySettings?.settle
 
   const board = window.normalizeSettlementBoard(boardRaw);
   window.settlementBoard = board;
-  if (!window.currentSettlementWeekKey) {
-    window.currentSettlementWeekKey = window.getSettlementWeekKey();
+  const autoWeekKey = window.getSettlementWeekKey();
+  if (!window.currentSettlementWeekKey || window.currentSettlementWeekKey === window.lastAutoSettlementWeekKey) {
+    window.currentSettlementWeekKey = autoWeekKey;
   }
+  window.lastAutoSettlementWeekKey = autoWeekKey;
 
   const weekKey = window.currentSettlementWeekKey;
   const statsMap = window.computeSettlementMap(board, weekKey);

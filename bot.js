@@ -4,7 +4,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const createAdminRouter = require('./routes/admin');
-const { loadData, saveData } = require('./data/store');
+const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const multer = require("multer");
 const path = require("path");
@@ -15,6 +15,8 @@ const DISCORD_LOGIN_TOKEN = String(
   process.env.BOT_TOKEN ||
   ""
 ).trim();
+const DISCORD_LOGIN_LOCK_FILE = `${DATA_FILE}.discord-login-lock.json`;
+const ERROR_REPORT_QUEUE_FILE = `${DATA_FILE}.error-report-queue.json`;
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -102,6 +104,40 @@ let __errorReportDestinationPromise = null;
 let __errorReportHookInstalled = false;
 const __errorReportRecent = new Map();
 
+function loadPersistedErrorReports() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(ERROR_REPORT_QUEUE_FILE, "utf8"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item.text === "string")
+      .slice(-50);
+  } catch (_) {
+    return [];
+  }
+}
+
+function savePersistedErrorReports(queue = __errorReportQueue) {
+  const items = Array.isArray(queue) ? queue.slice(-50) : [];
+
+  try {
+    if (!items.length) {
+      fs.unlinkSync(ERROR_REPORT_QUEUE_FILE);
+      return;
+    }
+
+    fs.writeFileSync(ERROR_REPORT_QUEUE_FILE, JSON.stringify(items, null, 2), "utf8");
+  } catch (err) {
+    if (err?.code === "ENOENT" && !items.length) return;
+    __nativeConsoleError("[error-report] persist failed:", err?.message || err);
+  }
+}
+
+function hydrateErrorReportQueue() {
+  const persisted = loadPersistedErrorReports();
+  if (!persisted.length) return;
+  __errorReportQueue.push(...persisted);
+}
+
 function stringifyErrorReportPart(value) {
   if (value instanceof Error) {
     return String(value.stack || `${value.name}: ${value.message}`);
@@ -182,10 +218,16 @@ async function flushErrorReportQueue() {
     if (!target) return;
 
     while (__errorReportQueue.length > 0) {
-      const item = __errorReportQueue.shift();
-      if (!item) continue;
+      const item = __errorReportQueue[0];
+      if (!item) {
+        __errorReportQueue.shift();
+        savePersistedErrorReports();
+        continue;
+      }
       try {
         await target.send(buildErrorReportMessage(item));
+        __errorReportQueue.shift();
+        savePersistedErrorReports();
       } catch (err) {
         __nativeConsoleError("[error-report] send failed:", err?.message || err);
         break;
@@ -207,6 +249,7 @@ function queueErrorReport(level, args) {
     text,
     createdAt: Date.now()
   });
+  savePersistedErrorReports();
 
   void flushErrorReportQueue();
 }
@@ -221,6 +264,7 @@ function installErrorReportHook() {
   };
 }
 
+hydrateErrorReportQueue();
 installErrorReportHook();
 
 let __gatewayRecoveryTimer = null;
@@ -262,6 +306,36 @@ function formatKstDateTime(ms) {
   });
 }
 
+function getPersistedDiscordLoginResetAt() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(DISCORD_LOGIN_LOCK_FILE, "utf8"));
+    const resetAt = Number(parsed?.resetAt || 0);
+    if (Number.isFinite(resetAt) && resetAt > Date.now()) return resetAt;
+  } catch (_) {}
+
+  return null;
+}
+
+function persistDiscordLoginResetAt(resetAt) {
+  if (!Number.isFinite(resetAt) || resetAt <= Date.now()) return;
+
+  try {
+    fs.writeFileSync(
+      DISCORD_LOGIN_LOCK_FILE,
+      JSON.stringify({ resetAt, savedAt: Date.now() }, null, 2),
+      "utf8"
+    );
+  } catch (err) {
+    console.warn("[discord-login] failed to persist session limit lock:", err?.message || err);
+  }
+}
+
+function clearPersistedDiscordLoginResetAt() {
+  try {
+    fs.unlinkSync(DISCORD_LOGIN_LOCK_FILE);
+  } catch (_) {}
+}
+
 function scheduleDiscordLogin(source, delayMs = 0) {
   if (__discordLoginTimer || client?.isReady?.()) return;
   if (!DISCORD_LOGIN_TOKEN) return;
@@ -284,15 +358,28 @@ async function loginDiscordClient(source = "startup") {
     return false;
   }
 
+  const lockedUntil = getPersistedDiscordLoginResetAt();
+  if (lockedUntil) {
+    const retryDelay = Math.max(60 * 1000, lockedUntil - Date.now() + 5000);
+    console.error(
+      `[discord-login:${source}] persisted session limit lock active. ` +
+      `${formatKstDateTime(lockedUntil)} KST 이후 재시도합니다.`
+    );
+    scheduleDiscordLogin(`${source}:persisted-session-limit`, retryDelay);
+    return false;
+  }
+
   __discordLoginInFlight = true;
 
   try {
     await client.login(DISCORD_LOGIN_TOKEN);
+    clearPersistedDiscordLoginResetAt();
     console.log("Discord bot logged in");
     return true;
   } catch (err) {
     const resetAt = getDiscordSessionLimitResetAt(err);
     if (resetAt) {
+      persistDiscordLoginResetAt(resetAt);
       const retryDelay = Math.max(60 * 1000, resetAt - Date.now() + 5000);
       console.error(
         `[discord-login:${source}] Discord 세션 시작 한도를 모두 사용했습니다. ` +

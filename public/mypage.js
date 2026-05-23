@@ -442,13 +442,6 @@ const now = new Date();
     <div id="freeGoalList"></div>
   </div>
 
-
-  <!-- 주간 그래프 -->
-   <div class="widget-card">
-    <h3 class="block-title">📊 WEEKLY STUDY</h3>
-    <canvas id="weeklyChart"></canvas>
-  </div>
-
 </div>
 
 
@@ -842,6 +835,10 @@ window.renderWeeklyChart = function(){
 const ctx = document.getElementById("weeklyChart");
 if(!ctx) return;
 
+if (window.weeklyChartInstance) {
+  window.weeklyChartInstance.destroy();
+}
+
 const sessions = window.currentMainSessions || [];
 
 const days=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -863,7 +860,7 @@ data[day]+=sec;
 
 const hours=data.map(v=>v/3600);
 
-new Chart(ctx,{
+window.weeklyChartInstance = new Chart(ctx,{
 
 type:"bar",
 
@@ -2786,7 +2783,6 @@ window.renderWeeklyStatus = function(user) {
   const nowMs = now.getTime();
   const goalSec = Number(user?.goalSec || 0);
   const weeklyTarget = goalSec > 0 ? goalSec / 3600 : 0;
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const weekRange = window.getFridayWeekRange(now);
   const rangeEnd = Math.min(nowMs, weekRange.end);
   const storedSessions = Array.isArray(user?.sessions) ? [...user.sessions] : [];
@@ -2815,25 +2811,6 @@ window.renderWeeklyStatus = function(user) {
   const lastWeekTotal = window.getStudySecondsInRange(storedSessions, lastWeekRange.start, lastWeekRange.end);
   const lastWeekHours = (lastWeekTotal / 3600).toFixed(1);
   const lastWeekLabel = `${window.formatShortMonthDay(lastWeekRange.startDate)}~${window.formatShortMonthDay(lastWeekRange.endDate)}`;
-
-  const dailyData = [];
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(weekRange.startDate);
-    day.setDate(weekRange.startDate.getDate() + i);
-
-    const { start, end } = window.getDayRange(day.getFullYear(), day.getMonth(), day.getDate());
-    const cappedEnd = Math.min(end, rangeEnd, weekRange.end);
-    const daySeconds = cappedEnd > start
-      ? window.getStudySecondsInRange(sessions, start, cappedEnd)
-      : 0;
-
-    dailyData.push({
-      label: dayNames[day.getDay()],
-      hoursText: (daySeconds / 3600).toFixed(1),
-      hours: (daySeconds / 3600).toFixed(1),
-      percentage: Math.min((daySeconds / 14400) * 100, 100)
-    });
-  }
 
   const progressNum = weeklyTarget > 0
     ? Math.min((weekHoursNum / weeklyTarget) * 100, 100)
@@ -2883,16 +2860,9 @@ window.renderWeeklyStatus = function(user) {
 
   </div>
 
-  <div class="weekly-chart">
-
-    ${dailyData.map(d => `
-      <div class="chart-bar">
-        <span class="chart-bar-hour">${d.hoursText}h</span>
-        <div class="chart-bar-fill" style="height:${d.percentage}%"></div>
-        <span class="chart-bar-label">${d.label}</span>
-      </div>
-    `).join("")}
-
+  <div class="weekly-chart-canvas-wrap">
+    <div class="weekly-chart-title">WEEKLY STUDY</div>
+    <canvas id="weeklyChart"></canvas>
   </div>
 
   <div class="last-week-summary">
