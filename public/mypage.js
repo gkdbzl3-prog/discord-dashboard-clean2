@@ -116,8 +116,9 @@ window.renderSubjectList = function() {
 
 window.loadMyPageUsers = async function () {
 
-  const res = await fetch("/mypage");
-const data = await res.json();
+const data = window.API?.fetch
+  ? await window.API.fetch("/mypage")
+  : await fetch("/mypage").then((res) => res.json());
 
 let list = [];
 if (Array.isArray(data)) {

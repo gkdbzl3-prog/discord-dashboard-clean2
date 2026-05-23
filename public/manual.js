@@ -257,21 +257,13 @@ historyBox.innerHTML = itemsHtml || "No manual records";
         console.log("📝 Manual 추가 요청:", { userId, minutes });
 
         try {
-            const res = await fetch('/manual-data', {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    token: window.token,
-                    guildId: window.currentGuildId || localStorage.getItem("guildId") || "",
-                    userId, 
-                    minutes: Number(minutes) 
-                })
+            const result = await window.API.post('/manual-data', {
+                userId,
+                minutes: Number(minutes)
             });
-
-            const result = await res.json();
             console.log("📬 Manual 추가 결과:", result);
 
-            if (res.ok && result.ok) {
+            if (result.ok) {
                 window.showToast(result.deduped ? "저장 취소" : "✅ 저장 완료!");
                 
                 // 유저 캐시 새로고침
@@ -348,20 +340,12 @@ window.deleteManualSession = async function (userId, index) {
 
   window.showConfirmModal("정말 삭제할까요?", async () => {
 
-    const res = await fetch("/delete-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: window.token,
-        guildId: window.currentGuildId || localStorage.getItem("guildId") || "",
-        userId,
-        index
-      })
+    const result = await window.API.post("/delete-session", {
+      userId,
+      index
     });
 
-    const result = await res.json();
-
-    if (res.ok && result.ok) {
+    if (result.ok) {
 
       window.showToast("🗑 삭제 완료");
 
@@ -396,22 +380,14 @@ window.editManualSession = function (userId, index) {
 
   window.showInputModal("수정할 시간 (분):", async (newMin) => {
 
-    const res = await fetch("/edit-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: window.token,
-        guildId: window.currentGuildId || localStorage.getItem("guildId") || "",
-        userId,
-        index,
-        newSeconds: Number(newMin) * 60,
-        editTime: new Date().toISOString()
-      })
+    const result = await window.API.post("/edit-session", {
+      userId,
+      index,
+      newSeconds: Number(newMin) * 60,
+      editTime: new Date().toISOString()
     });
 
-    const result = await res.json();
-
-    if (res.ok && result.ok) {
+    if (result.ok) {
 
       window.showToast("✏️ 수정 완료!");
 
