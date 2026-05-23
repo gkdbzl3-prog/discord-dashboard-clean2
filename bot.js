@@ -2259,6 +2259,17 @@ client.on('messageCreate', async (msg) => {
 
 });
 
+// Watchdog: 5분마다 Discord 연결 상태 확인 — 이벤트 없이 조용히 끊어진 경우에도 자동 재로그인
+setInterval(() => {
+  if (!DISCORD_LOGIN_TOKEN) return;
+  if (client?.isReady?.()) return;
+  if (__discordLoginInFlight || __discordLoginTimer) return;
+  if (__gatewayRecoveryInFlight || __gatewayRecoveryTimer) return;
+
+  console.warn("[watchdog] Discord client not ready, scheduling reconnect");
+  scheduleDiscordLogin("watchdog");
+}, 5 * 60 * 1000);
+
 if (!DISCORD_LOGIN_TOKEN) {
   console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
 } else {
