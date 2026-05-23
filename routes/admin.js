@@ -72,6 +72,34 @@ function isGuildAccessInvalid(req, guild) {
     return aggregateSessions(user?.sessions).reduce((sum, s) => sum + secondsOf(s), 0);
   }
 
+  function getKstStartOfTodayMs(now = Date.now()) {
+    const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+    const d = new Date(now + KST_OFFSET_MS);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - KST_OFFSET_MS;
+  }
+
+  function getSessionTimeMs(session) {
+    const start = typeof session?.start === "number" ? session.start : new Date(session?.start).getTime();
+    let end = typeof session?.end === "number" ? session.end : new Date(session?.end).getTime();
+    const sec = Number(session?.seconds || 0);
+
+    if (!Number.isFinite(start) || start <= 0) return null;
+    if (!Number.isFinite(end) || end <= start) {
+      end = Number.isFinite(sec) && sec > 0 ? start + sec * 1000 : start;
+    }
+
+    return { start, end };
+  }
+
+  function getTodayDashboardSessions(sessions) {
+    const dayStart = getKstStartOfTodayMs();
+    const list = aggregateSessions(sessions);
+    return list.filter((session) => {
+      const time = getSessionTimeMs(session);
+      return time && time.end >= dayStart;
+    });
+  }
+
   function normalizeFeedImage(rawImage) {
     const image = rawImage ? String(rawImage).trim() : "";
     if (!image) {
@@ -277,7 +305,7 @@ function isGuildAccessInvalid(req, guild) {
           seconds: Number(user?.seconds || 0),
           online: !!user?.currentStart,
           currentStart: user?.currentStart || null,
-          sessions: Array.isArray(user?.sessions) ? user.sessions : [],
+          sessions: getTodayDashboardSessions(user?.sessions),
           totalSeconds: aggregateTotalSeconds(user),
           freeGoals: Array.isArray(user?.freeGoals) ? user.freeGoals : [],
           studyRecords: Array.isArray(user?.studyRecords) ? user.studyRecords : [],

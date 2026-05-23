@@ -17,6 +17,10 @@ const DISCORD_LOGIN_TOKEN = String(
 ).trim();
 const DISCORD_LOGIN_LOCK_FILE = `${DATA_FILE}.discord-login-lock.json`;
 const ERROR_REPORT_QUEUE_FILE = `${DATA_FILE}.error-report-queue.json`;
+const AUTO_SPLIT_INTERVAL_MS = Math.max(
+  60_000,
+  Number(process.env.AUTO_SPLIT_INTERVAL_MS || 5 * 60_000)
+);
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -1878,7 +1882,7 @@ setInterval(() => {
     saveData(data);
   }
 
-}, 30000);
+}, AUTO_SPLIT_INTERVAL_MS);
 
 setInterval(() => {
   reconcileLiveStates();

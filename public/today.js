@@ -253,13 +253,13 @@ window.getLiveTotalSeconds = function (user) {
     return 0;
   };
 
-  let total = rawSessions.reduce((sum, s) => {
-    const src = s?.source || (s?.manual === true ? "manual" : "legacy");
-    if (src === "camera_event" && hasAutoSplit) return sum;
-    return sum + secondsOf(s);
-  }, 0);
+  let total = Number(user.totalSeconds || 0);
   if (!Number.isFinite(total) || total <= 0) {
-    total = Number(user.totalSeconds || 0);
+    total = rawSessions.reduce((sum, s) => {
+      const src = s?.source || (s?.manual === true ? "manual" : "legacy");
+      if (src === "camera_event" && hasAutoSplit) return sum;
+      return sum + secondsOf(s);
+    }, 0);
   }
   if (!Number.isFinite(total) || total < 0) total = 0;
 
