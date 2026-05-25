@@ -37,6 +37,16 @@ window.getAggregateSessions = function (sessions = []) {
   return list.filter((s) => !s?.source || s?.source === "camera_event" || s?.source === "manual" || s?.manual === true);
 };
 
+window.getLiveSessionStart = function (user) {
+  const eventStart = Number(user?.eventStart);
+  if (Number.isFinite(eventStart) && eventStart > 0) return eventStart;
+
+  const currentStart = Number(user?.currentStart);
+  if (Number.isFinite(currentStart) && currentStart > 0) return currentStart;
+
+  return null;
+};
+
 window.applyTodayUsers = function (rawUsers) {
   const usersArray = Array.isArray(rawUsers)
     ? rawUsers
@@ -228,11 +238,11 @@ window.getTodaySeconds = function (user) {
   }, 0);
 
  
-  if (user.currentStart && window.isUserOnline(user)) {
-    const startTime = Number(user.currentStart);
+  if (window.isUserOnline(user)) {
+    const startTime = window.getLiveSessionStart(user);
 
-    if (startTime >= today.getTime()) {
-      todaySeconds += Math.floor((now - startTime) / 1000);
+    if (Number.isFinite(startTime) && startTime < now) {
+      todaySeconds += Math.floor((now - Math.max(startTime, today.getTime())) / 1000);
     }
   }
   return todaySeconds;
@@ -264,7 +274,7 @@ window.getLiveTotalSeconds = function (user) {
   if (!Number.isFinite(total) || total < 0) total = 0;
 
   if (window.isUserOnline(user)) {
-    const start = Number(user.currentStart);
+    const start = window.getLiveSessionStart(user);
     if (Number.isFinite(start) && start > 0) {
       total += Math.max(0, Math.floor((Date.now() - start) / 1000));
     }

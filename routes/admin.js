@@ -305,6 +305,7 @@ function isGuildAccessInvalid(req, guild) {
           seconds: Number(user?.seconds || 0),
           online: !!user?.currentStart,
           currentStart: user?.currentStart || null,
+          eventStart: user?.eventStart || null,
           sessions: getTodayDashboardSessions(user?.sessions),
           totalSeconds: aggregateTotalSeconds(user),
           freeGoals: Array.isArray(user?.freeGoals) ? user.freeGoals : [],
