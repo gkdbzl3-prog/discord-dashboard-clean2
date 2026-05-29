@@ -9,6 +9,7 @@ const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { shouldLoginDiscordClient } = require("./utils/discord-login-policy");
 let data = loadData();
 const DISCORD_LOGIN_TOKEN = String(
   process.env.DISCORD_TOKEN ||
@@ -811,12 +812,9 @@ const PERIOD_END_SCHEDULE = [
   { key: "p7", end: "22:40", message: "🔔7교시 종료 \n수고 많으셨습니다🙌 " }
 ];
 
-const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중 🔥 조용히 응원을 보내고 싶다면 버튼을 눌러주세요!";
-const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
 const AWAY_PROMPT_PAUSE_PREFIX = "away_prompt_pause";
 const MIDCHECK_BUTTON_PREFIX = "midcheck";
-const ENABLE_DAILY_QUIET_CHEER = false;
 const ENABLE_DM_REVIEW_BUTTON = true;
 const ENABLE_AWAY_PROMPT_DM = false;
 const ENABLE_MIDCHECK_DM = false;
@@ -824,7 +822,6 @@ const ENABLE_NIGHTLY_REVIEW_DM = false;
 const ENABLE_WEEKLY_CAMERA_BRIEF_DM = false;
 const ENABLE_PERIOD_END_NOTICE = false;
 // customId format:
-// quiet cheer: "quiet_cheer_send"
 // cam review:  "cam_review:<guildId>:<userId>:<moodKey>"
 const CAM_REVIEW_OPTIONS = [
   { key: "great", label: "오늘 만족" },
@@ -1096,23 +1093,6 @@ function pickRandom(list = []) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function buildQuietCheerPayload(count) {
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(QUIET_CHEER_BUTTON_ID)
-      .setLabel("🌿 조용한 응원 보내기")
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  return {
-    content:
-      "오늘도 각자 자리에서 열심히 하는 중🔥\n" +
-      "조용히 응원을 보내고 싶다면 버튼을 눌러주세요\n\n" +
-      `🌿조용한 응원 ${count}회`,
-    components: [row]
-  };
-}
-
 async function resolveStudyTextChannel(discordGuild, guildData) {
   const configuredId =
     guildData?.settings?.studyTextChannelId ||
@@ -1141,109 +1121,6 @@ async function resolveStudyTextChannel(discordGuild, guildData) {
   return ch;
 }
 
-async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
-  try {
-    if (!process.env.FLY_APP_NAME) return; // 로컬 실행 중 중복 생성 방지
-    const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
-    if (!textChannel) return;
-
-    const { dateKey } = getKstDateParts(Date.now());
-    const count = Number(guildData.settings.quietCheerCount || 0);
-    const payload = buildQuietCheerPayload(count);
-
-    guildData.settings ??= {};
-    const savedDateKey = String(guildData.settings.quietCheerDateKey || "");
-    const savedId = String(guildData.settings.quietCheerMessageId || "");
-    let msg = null;
-    let matchedMessages = [];
-    if (savedId && savedDateKey === dateKey) {
-      try {
-        msg = await textChannel.messages.fetch(savedId);
-      } catch (_) {
-        msg = null;
-      }
-    }
-
-    if (!msg) {
-      try {
-        const recent = await textChannel.messages.fetch({ limit: 30 });
-        matchedMessages = recent.filter((m) => {
-          if (!m || m.author?.id !== client.user?.id) return false;
-          const hasQuietBtn = (m.components || []).some((row) =>
-            (row.components || []).some((c) => c.customId === QUIET_CHEER_BUTTON_ID)
-          );
-          const sameDay =
-            getKstDateParts(Number(m.createdTimestamp || 0)).dateKey === dateKey;
-          return sameDay && (hasQuietBtn || String(m.content || "").includes("조용히 응원을 보내고 싶다면"));
-        });
-        matchedMessages.sort((a, b) => Number(b.createdTimestamp || 0) - Number(a.createdTimestamp || 0));
-        msg = matchedMessages[0] || null;
-      } catch (_) {
-        msg = null;
-        matchedMessages = [];
-      }
-    }
-
-    if (msg && msg.author?.id === client.user?.id) {
-      await msg.edit(payload);
-      guildData.settings.quietCheerMessageId = msg.id;
-      guildData.settings.quietCheerDateKey = dateKey;
-      for (const oldMsg of matchedMessages) {
-        if (!oldMsg || oldMsg.id === msg.id) continue;
-        try { await oldMsg.delete(); } catch (_) {}
-      }
-      return;
-    }
-
-    const sent = await textChannel.send(payload);
-    guildData.settings.quietCheerMessageId = sent.id;
-    guildData.settings.quietCheerDateKey = dateKey;
-  } catch (err) {
-    console.error("ensure quiet cheer message failed:", err?.message || err);
-  }
-}
-
-let __quietCheerTickBusy = false;
-const __quietCheerSent = new Set();
-async function sendDailyQuietCheerTick() {
-  if (__quietCheerTickBusy) return;
-  __quietCheerTickBusy = true;
-  try {
-    if (!ENABLE_DAILY_QUIET_CHEER) return;
-    if (!client.isReady()) return;
-    if (!process.env.FLY_APP_NAME) return;
-
-    const { dateKey, hhmm } = getKstDateParts(Date.now());
-    if (hhmm !== "12:00") return;
-
-    const root = normalizeDataRoot(loadData());
-    root.meta ??= {};
-    root.meta.quietCheerSentByGuild ??= {};
-    let changed = false;
-
-    for (const discordGuild of client.guilds.cache.values()) {
-      const guildId = discordGuild.id;
-      const onceKey = `${guildId}:${dateKey}`;
-      if (__quietCheerSent.has(onceKey)) continue;
-      if (root.meta.quietCheerSentByGuild[guildId] === dateKey) continue;
-
-      const { guild } = withGuildDataById(root, guildId);
-      guild.settings ??= {};
-      guild.settings.quietCheerCount = 0;
-      await ensureQuietCheerPinnedMessage(discordGuild, guild);
-      root.meta.quietCheerSentByGuild[guildId] = dateKey;
-      __quietCheerSent.add(onceKey);
-      changed = true;
-    }
-
-    if (changed) saveData(root);
-  } catch (err) {
-    console.error("daily quiet cheer tick failed:", err?.message || err);
-  } finally {
-    __quietCheerTickBusy = false;
-  }
-}
-
 async function ensureCheerSlashCommand(discordGuild) {
   try {
     const desired = {
@@ -1268,9 +1145,6 @@ async function ensureCheerSlashCommand(discordGuild) {
 // ──────────────────────────────────────────────
 // customId 설계 (봇 재시작 후에도 작동하는 영구적 라우팅)
 // ──────────────────────────────────────────────
-// ● 조용한 응원 버튼:  "quiet_cheer_send"
-//   → 고정, 단일 ID. guildId는 interaction.guildId에서 가져옴.
-//
 // ● 캠 회고 버튼:  "cam_review:<guildId>:<userId>:<moodKey>"
 //   예) "cam_review:123456789:987654321:great"
 //   → guildId: 어느 서버 데이터에 저장할지
@@ -1893,10 +1767,6 @@ setInterval(() => {
 }, 20000);
 
 setInterval(() => {
-  sendDailyQuietCheerTick();
-}, 20000);
-
-setInterval(() => {
   sendNightlyReviewPromptTick();
 }, 20000);
 
@@ -2076,34 +1946,6 @@ client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
     const { MessageFlags } = require("discord.js");
-
-    if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
-      if (!interaction.guildId) {
-        await interaction.reply({ content: "서버에서만 사용할 수 있어", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      await interaction.deferUpdate();
-
-      const root = normalizeDataRoot(loadData());
-      const { data, guild } = withGuildDataById(root, interaction.guildId);
-      guild.settings ??= {};
-      guild.settings.quietCheerCount = Number(guild.settings.quietCheerCount || 0) + 1;
-      guild.settings.quietCheerDateKey = getKstDateParts(Date.now()).dateKey;
-
-      const nextPayload = buildQuietCheerPayload(guild.settings.quietCheerCount);
-      try {
-        if (interaction.message && typeof interaction.message.edit === "function") {
-          await interaction.message.edit(nextPayload);
-          guild.settings.quietCheerMessageId = interaction.message.id;
-        }
-      } catch (err) {
-        console.error("❌ quiet cheer update failed:", err?.message || err);
-      }
-
-      saveData(data);
-      return;
-    }
 
     if (interaction.customId.startsWith(`${AWAY_PROMPT_PAUSE_PREFIX}:`)) {
       await interaction.deferUpdate();
@@ -2350,8 +2192,14 @@ client.on('messageCreate', async (msg) => {
 
 });
 
-if (!DISCORD_LOGIN_TOKEN) {
+const discordLoginPolicy = shouldLoginDiscordClient(process.env);
+if (!discordLoginPolicy.ok && discordLoginPolicy.reason === "missing-token") {
   console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
+} else if (!discordLoginPolicy.ok) {
+  console.warn(
+    "Discord bot login skipped for local run. " +
+    "Set ENABLE_LOCAL_DISCORD_LOGIN=true only when Fly/production is not running."
+  );
 } else {
   void loginDiscordClient("startup");
 }
