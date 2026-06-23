@@ -20,6 +20,7 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require("discord.js");
+const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require("@discordjs/voice");
 
 app.use(express.static("public", {
   setHeaders: (res, filePath) => {
@@ -388,6 +389,59 @@ process.on("uncaughtException", (err) => {
 // Register admin routes after client is created
 app.use('/', createAdminRouter(client));
 
+let __studyVcConnection = null;
+
+function getStudyChannelHumanCount(channel) {
+  if (!channel?.members) return 0;
+  return channel.members.filter(m => !m.user?.bot).size;
+}
+
+async function updateStudyChannelPresence() {
+  const studyVcId = process.env.STUDY_VC_ID;
+  if (!studyVcId) return;
+
+  try {
+    const channel = await client.channels.fetch(studyVcId);
+    if (!channel?.guild) return;
+
+    const humanCount = getStudyChannelHumanCount(channel);
+
+    if (humanCount >= 2 && __studyVcConnection) {
+      __studyVcConnection.destroy();
+      __studyVcConnection = null;
+      console.log("[voice] 2명 이상 접속 → 스터디 채널 퇴장");
+      return;
+    }
+
+    if (humanCount < 2 && !__studyVcConnection) {
+      __studyVcConnection = joinVoiceChannel({
+        channelId: studyVcId,
+        guildId: channel.guild.id,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+        selfDeaf: true,
+        selfMute: true,
+      });
+
+      __studyVcConnection.on(VoiceConnectionStatus.Disconnected, async () => {
+        try {
+          await Promise.race([
+            entersState(__studyVcConnection, VoiceConnectionStatus.Signalling, 5_000),
+            entersState(__studyVcConnection, VoiceConnectionStatus.Connecting, 5_000),
+          ]);
+        } catch {
+          __studyVcConnection.destroy();
+          __studyVcConnection = null;
+          setTimeout(() => updateStudyChannelPresence(), 5_000);
+        }
+      });
+
+      console.log("[voice] 스터디 채널 상주 시작:", studyVcId);
+    }
+  } catch (err) {
+    console.error("[voice] 스터디 채널 상태 업데이트 실패:", err?.message || err);
+  }
+}
+
 
 
 
@@ -518,6 +572,7 @@ if (STUDY_VC_ID) {
 
   saveData(data);
 
+  await updateStudyChannelPresence();
 
 });
 
@@ -1822,6 +1877,11 @@ setInterval(() => {
 }, 20000);
 
 client.on("voiceStateUpdate", (oldState, newState) => {
+  const STUDY_VC_CHECK = process.env.STUDY_VC_ID;
+  if (STUDY_VC_CHECK && (oldState.channelId === STUDY_VC_CHECK || newState.channelId === STUDY_VC_CHECK)) {
+    updateStudyChannelPresence().catch(() => {});
+  }
+
   const userId = newState.id;
   const member = newState.member || oldState.member;
   if (!member) return;
