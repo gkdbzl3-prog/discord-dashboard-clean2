@@ -28,6 +28,87 @@ function buildAwayStatus(time, message) {
   return prefix ? `${prefix} | ${suffix}` : suffix;
 }
 
+function parseAwayShortcut(content) {
+  const value = String(content || "").trim();
+  const untilMatch = /^~(\d{2}):(\d{2})까지 함$/.exec(value);
+  if (untilMatch) {
+    const hour = Number(untilMatch[1]);
+    const minute = Number(untilMatch[2]);
+    if (hour > 23 || minute > 59) return null;
+
+    const time = `${untilMatch[1]}:${untilMatch[2]}`;
+    return { time, status: `⏳ ${time}까지 함` };
+  }
+
+  const rangeMatch =
+    /^~(\d{2}):(\d{2})부터 (\d{2}):(\d{2})까지 자리 비움$/.exec(value);
+  if (!rangeMatch) return null;
+
+  const startHour = Number(rangeMatch[1]);
+  const startMinute = Number(rangeMatch[2]);
+  const endHour = Number(rangeMatch[3]);
+  const endMinute = Number(rangeMatch[4]);
+  if (startHour > 23 || startMinute > 59 || endHour > 23 || endMinute > 59) {
+    return null;
+  }
+
+  const startTime = `${rangeMatch[1]}:${rangeMatch[2]}`;
+  const endTime = `${rangeMatch[3]}:${rangeMatch[4]}`;
+  return {
+    startTime,
+    endTime,
+    status: `🚪 ${startTime}부터 ${endTime}까지 자리 비움`,
+  };
+}
+
+async function executeAwayShortcut({
+  content,
+  isAdmin,
+  now = Date.now(),
+  deleteTrigger,
+  onDeleteError = () => {},
+  activate,
+}) {
+  const shortcut = parseAwayShortcut(content);
+  if (!shortcut || !isAdmin) return false;
+
+  try {
+    await deleteTrigger();
+  } catch (error) {
+    onDeleteError(error);
+  }
+
+  if (shortcut.time) {
+    await activate({
+      time: shortcut.time,
+      endAt: parseKstAwayEndAt(shortcut.time, now),
+      status: shortcut.status,
+    });
+    return true;
+  }
+
+  const startAt = parseKstAwayEndAt(shortcut.startTime, now);
+  await activate({
+    startTime: shortcut.startTime,
+    endTime: shortcut.endTime,
+    startAt,
+    endAt: parseKstAwayEndAt(shortcut.endTime, startAt),
+    status: shortcut.status,
+  });
+  return true;
+}
+
+function getAwayReservationPhase(reservation, now = Date.now()) {
+  const endAt = Number(reservation?.endAt);
+  if (!Number.isFinite(endAt)) return "invalid";
+  if (endAt <= now) return "expired";
+
+  const startAt = reservation?.startAt == null ? null : Number(reservation.startAt);
+  if (startAt !== null && !Number.isFinite(startAt)) return "invalid";
+  if (startAt !== null && startAt > now) return "pending";
+  return "active";
+}
+
 function ensureReservations(root) {
   root.meta ??= {};
   root.meta.awayReservations ??= {};
@@ -55,6 +136,9 @@ async function setVoiceChannelStatus(rest, channelId, status) {
 module.exports = {
   buildAwayStatus,
   clearAwayReservation,
+  executeAwayShortcut,
+  getAwayReservationPhase,
+  parseAwayShortcut,
   parseKstAwayEndAt,
   saveAwayReservation,
   setVoiceChannelStatus,
