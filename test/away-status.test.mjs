@@ -34,7 +34,34 @@ describe("parseKstAwayEndAt", () => {
   );
 });
 
-test("builds an immediate reservation from the /away content option", () => {
+test("builds an immediate reservation from a free-form label and time", () => {
+  expect(
+    createAwayReservationFromInput(
+      "🍚 밥 먹으러 감 00:30까지",
+      Date.parse("2026-08-20T00:00:00.000Z"),
+    ),
+  ).toEqual({
+    time: "00:30",
+    endAt: Date.parse("2026-08-20T15:30:00.000Z"),
+    status: "🍚 밥 먹으러 감 · 00:30까지",
+  });
+});
+
+test("prepends a matching emoji when the label has none", () => {
+  const now = Date.parse("2026-08-20T00:00:00.000Z");
+
+  expect(createAwayReservationFromInput("밥 먹으러 감 00:30까지", now).status).toBe(
+    "🍚 밥 먹으러 감 · 00:30까지",
+  );
+  expect(createAwayReservationFromInput("병원 09:00까지", now).status).toBe(
+    "🏥 병원 · 09:00까지",
+  );
+  expect(createAwayReservationFromInput("잠깐 나갔다 옴 11:00까지", now).status).toBe(
+    "🚪 잠깐 나갔다 옴 · 11:00까지",
+  );
+});
+
+test("still accepts the legacy time-first content", () => {
   expect(
     createAwayReservationFromInput(
       "08:30까지 함",
@@ -43,7 +70,7 @@ test("builds an immediate reservation from the /away content option", () => {
   ).toEqual({
     time: "08:30",
     endAt: Date.parse("2026-08-20T23:30:00.000Z"),
-    status: "⏳ 08:30까지 함",
+    status: "⏳ 함 · 08:30까지",
   });
 });
 
@@ -58,20 +85,28 @@ test("builds a scheduled range reservation that can cross midnight", () => {
     endTime: "01:00",
     startAt: Date.parse("2026-08-20T14:00:00.000Z"),
     endAt: Date.parse("2026-08-20T16:00:00.000Z"),
-    status: "🚪 23:00부터 01:00까지 자리 비움",
+    status: "🚪 자리 비움 · 01:00까지",
   });
+});
+
+test("defaults the range label when only the times are given", () => {
+  expect(
+    createAwayReservationFromInput(
+      "13:00부터 15:00까지",
+      Date.parse("2026-08-20T00:00:00.000Z"),
+    ).status,
+  ).toBe("🚪 자리 비움 · 15:00까지");
 });
 
 test.each([
   "~08:30까지 함",
   "8:30까지 함",
   "24:00까지 함",
-  "08:30까지 함 오늘은 병원",
+  "밥 먹으러 감 12:60까지",
+  "밥 먹으러 감",
   "13:00부터 25:00까지 자리 비움",
 ])("rejects unsupported /away content: %s", (content) => {
-  expect(() => createAwayReservationFromInput(content, 0)).toThrow(
-    "08:30까지 함",
-  );
+  expect(() => createAwayReservationFromInput(content, 0)).toThrow("내용은");
 });
 
 test("classifies persisted reservations for restart recovery", () => {

@@ -1112,7 +1112,7 @@ const AWAY_COMMANDS = [
       {
         type: ApplicationCommandOptionType.String,
         name: "내용",
-        description: "예: 08:30까지 함 / 13:00부터 15:00까지 자리 비움",
+        description: "예: 🍚 밥 먹으러 감 00:30까지 / 13:00부터 15:00까지 자리 비움",
         required: false,
         maxLength: 100
       },
@@ -1895,7 +1895,7 @@ client.on("interactionCreate", async (interaction) => {
 
     await interaction.editReply(
       phase === "pending"
-        ? `상태를 예약했습니다: ${reservation.status}`
+        ? `${reservation.startTime}부터 표시됩니다: ${reservation.status}`
         : `상태를 설정했습니다: ${reservation.status}`
     );
   } catch (err) {

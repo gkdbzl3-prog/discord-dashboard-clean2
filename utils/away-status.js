@@ -28,46 +28,85 @@ function buildAwayStatus(time, message) {
   return prefix ? `${prefix} | ${suffix}` : suffix;
 }
 
+const AWAY_EMOJI_RULES = [
+  [/밥|식사|점심|저녁|아침|먹/, "🍚"],
+  [/커피|카페|음료|차 마/, "☕"],
+  [/병원|약국|치과|진료|검진/, "🏥"],
+  [/운동|헬스|산책|달리|러닝|등산/, "🏃"],
+  [/샤워|씻|목욕|머리 감/, "🚿"],
+  [/낮잠|취침|수면|자러|잘게|눕/, "😴"],
+  [/청소|빨래|설거지|정리/, "🧹"],
+  [/공부|작업|집중|함$/, "⏳"],
+];
+const DEFAULT_AWAY_EMOJI = "🚪";
+const DEFAULT_RANGE_LABEL = "자리 비움";
+const AWAY_CONTENT_ERROR =
+  "내용은 ‘🍚 밥 먹으러 감 00:30까지’ 또는 ‘13:00부터 15:00까지 자리 비움’ 형식으로 입력해 주세요.";
+
+const TIME_SOURCE = String.raw`(\d{2}):(\d{2})`;
+const AWAY_RANGE_RE = new RegExp(`^${TIME_SOURCE}부터 ${TIME_SOURCE}까지(?:\\s+(.*))?$`);
+const AWAY_LABEL_FIRST_RE = new RegExp(`^(.+?)\\s+${TIME_SOURCE}까지$`);
+const AWAY_TIME_FIRST_RE = new RegExp(`^${TIME_SOURCE}까지\\s+(.+)$`);
+
+function isValidClockTime(hour, minute) {
+  return hour <= 23 && minute <= 59;
+}
+
+function decorateAwayLabel(label) {
+  const text = String(label || "").trim();
+  if (!text) return `${DEFAULT_AWAY_EMOJI} ${DEFAULT_RANGE_LABEL}`;
+  if (/^\p{Extended_Pictographic}/u.test(text)) return text;
+
+  const rule = AWAY_EMOJI_RULES.find(([pattern]) => pattern.test(text));
+  return `${rule ? rule[1] : DEFAULT_AWAY_EMOJI} ${text}`;
+}
+
+function buildAwayChannelStatus(label, endTime) {
+  return `${decorateAwayLabel(label)} · ${endTime}까지`;
+}
+
 function createAwayReservationFromInput(content, now = Date.now()) {
   const value = String(content || "").trim();
-  const untilMatch = /^(\d{2}):(\d{2})까지 함$/.exec(value);
-  if (untilMatch) {
-    const hour = Number(untilMatch[1]);
-    const minute = Number(untilMatch[2]);
-    if (hour <= 23 && minute <= 59) {
-      const time = `${untilMatch[1]}:${untilMatch[2]}`;
-      return {
-        time,
-        endAt: parseKstAwayEndAt(time, now),
-        status: `⏳ ${time}까지 함`,
-      };
-    }
-  }
 
-  const rangeMatch =
-    /^(\d{2}):(\d{2})부터 (\d{2}):(\d{2})까지 자리 비움$/.exec(value);
+  const rangeMatch = AWAY_RANGE_RE.exec(value);
   if (rangeMatch) {
-    const startHour = Number(rangeMatch[1]);
-    const startMinute = Number(rangeMatch[2]);
-    const endHour = Number(rangeMatch[3]);
-    const endMinute = Number(rangeMatch[4]);
-    if (startHour <= 23 && startMinute <= 59 && endHour <= 23 && endMinute <= 59) {
-      const startTime = `${rangeMatch[1]}:${rangeMatch[2]}`;
-      const endTime = `${rangeMatch[3]}:${rangeMatch[4]}`;
+    const [, startHour, startMinute, endHour, endMinute, label = ""] = rangeMatch;
+    if (
+      isValidClockTime(Number(startHour), Number(startMinute)) &&
+      isValidClockTime(Number(endHour), Number(endMinute))
+    ) {
+      const startTime = `${startHour}:${startMinute}`;
+      const endTime = `${endHour}:${endMinute}`;
       const startAt = parseKstAwayEndAt(startTime, now);
       return {
         startTime,
         endTime,
         startAt,
         endAt: parseKstAwayEndAt(endTime, startAt),
-        status: `🚪 ${startTime}부터 ${endTime}까지 자리 비움`,
+        status: buildAwayChannelStatus(label, endTime),
       };
     }
+    throw new Error(AWAY_CONTENT_ERROR);
   }
 
-  throw new Error(
-    "내용은 ‘08:30까지 함’ 또는 ‘13:00부터 15:00까지 자리 비움’ 형식으로 입력해 주세요.",
-  );
+  const labelFirst = AWAY_LABEL_FIRST_RE.exec(value);
+  const timeFirst = labelFirst ? null : AWAY_TIME_FIRST_RE.exec(value);
+  const single = labelFirst
+    ? { label: labelFirst[1], hour: labelFirst[2], minute: labelFirst[3] }
+    : timeFirst
+      ? { label: timeFirst[3], hour: timeFirst[1], minute: timeFirst[2] }
+      : null;
+
+  if (single && isValidClockTime(Number(single.hour), Number(single.minute))) {
+    const time = `${single.hour}:${single.minute}`;
+    return {
+      time,
+      endAt: parseKstAwayEndAt(time, now),
+      status: buildAwayChannelStatus(single.label, time),
+    };
+  }
+
+  throw new Error(AWAY_CONTENT_ERROR);
 }
 function getAwayReservationPhase(reservation, now = Date.now()) {
   const endAt = Number(reservation?.endAt);
