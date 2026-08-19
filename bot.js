@@ -21,7 +21,8 @@ const {
   createAwayReservationFromInput,
   getAwayReservationPhase,
   saveAwayReservation,
-  setVoiceChannelStatus
+  setVoiceChannelStatus,
+  withAwaySpeaker
 } = require("./utils/away-status");
 let data = loadData();
 const DISCORD_LOGIN_TOKEN = String(
@@ -1839,7 +1840,15 @@ client.on("interactionCreate", async (interaction) => {
       interaction.options.getString("내용")
     );
     const channel = await resolveStudyVoiceChannel(guildId);
-    const reservation = { ...reservationInput, channelId: channel.id };
+    const speaker =
+      interaction.member?.displayName ||
+      interaction.user?.displayName ||
+      interaction.user?.username;
+    const reservation = {
+      ...reservationInput,
+      status: withAwaySpeaker(speaker, reservationInput.status),
+      channelId: channel.id
+    };
 
     await setVoiceChannelStatus(client.rest, channel.id, reservation.status);
 

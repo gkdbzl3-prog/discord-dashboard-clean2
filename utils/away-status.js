@@ -41,6 +41,14 @@ function createAwayReservationFromInput(content, now = Date.now()) {
   return { time, endAt: parseKstAwayEndAt(time, now), status };
 }
 
+// 채널 상태만 보면 누가 남긴 말인지 알 수 없어 이름을 앞에 붙인다.
+function withAwaySpeaker(name, status) {
+  const speaker = String(name || "").trim();
+  const text = String(status || "").trim();
+  if (!speaker || text.startsWith(`${speaker}:`)) return text;
+  return `${speaker}: ${text}`;
+}
+
 function getAwayReservationPhase(reservation, now = Date.now()) {
   const endAt = Number(reservation?.endAt);
   if (!Number.isFinite(endAt)) return "invalid";
@@ -79,4 +87,5 @@ module.exports = {
   parseKstAwayEndAt,
   saveAwayReservation,
   setVoiceChannelStatus,
+  withAwaySpeaker,
 };

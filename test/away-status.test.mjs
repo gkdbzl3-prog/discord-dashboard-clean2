@@ -6,6 +6,7 @@ import {
   parseKstAwayEndAt,
   saveAwayReservation,
   setVoiceChannelStatus,
+  withAwaySpeaker,
 } from "../utils/away-status.js";
 
 describe("parseKstAwayEndAt", () => {
@@ -74,6 +75,18 @@ test.each(["밥 먹으러 감", "8:30까지 함", "24:00까지 함", "   "])(
     expect(() => createAwayReservationFromInput(content, 0)).toThrow("내용은");
   },
 );
+
+test("prefixes the speaker so the channel status shows who left it", () => {
+  expect(withAwaySpeaker("날", "밥 먹으러 감 00:30까지")).toBe(
+    "날: 밥 먹으러 감 00:30까지",
+  );
+  expect(withAwaySpeaker("날", "날: 밥 먹으러 감 00:30까지")).toBe(
+    "날: 밥 먹으러 감 00:30까지",
+  );
+  expect(withAwaySpeaker("  ", "밥 먹으러 감 00:30까지")).toBe(
+    "밥 먹으러 감 00:30까지",
+  );
+});
 
 test("classifies persisted reservations for restart recovery", () => {
   const now = 1_000;
