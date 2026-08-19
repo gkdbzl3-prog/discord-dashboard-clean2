@@ -19,7 +19,7 @@ const { shouldLoginDiscordClient } = require("./utils/discord-login-policy");
 const {
   buildAwayStatus,
   clearAwayReservation,
-  executeAwayShortcut,
+  createAwayReservationFromInput,
   getAwayReservationPhase,
   parseKstAwayEndAt,
   saveAwayReservation,
@@ -1111,16 +1111,23 @@ const AWAY_COMMANDS = [
     options: [
       {
         type: ApplicationCommandOptionType.String,
+        name: "내용",
+        description: "예: 08:30까지 함 / 13:00부터 15:00까지 자리 비움",
+        required: false,
+        maxLength: 100
+      },
+      {
+        type: ApplicationCommandOptionType.String,
         name: "시간",
-        description: "복귀 예정 시각 (한국 시간, HH:MM)",
-        required: true,
+        description: "기존 형식: 복귀 예정 시각 (HH:MM)",
+        required: false,
         minLength: 5,
         maxLength: 5
       },
       {
         type: ApplicationCommandOptionType.String,
         name: "메시지",
-        description: "예: 🏥 병원",
+        description: "시간과 함께 사용, 예: 🏥 병원",
         required: false,
         maxLength: 450
       }
@@ -1858,28 +1865,51 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    const time = interaction.options.getString("시간", true).trim();
-    const message = interaction.options.getString("메시지") || "";
-    const endAt = parseKstAwayEndAt(time);
-    const status = buildAwayStatus(time, message);
+    const content = interaction.options.getString("내용");
+    const legacyTime = interaction.options.getString("시간");
+    const legacyMessage = interaction.options.getString("메시지") || "";
+    const reservationInput = content
+      ? createAwayReservationFromInput(content)
+      : {
+          endAt: parseKstAwayEndAt(legacyTime),
+          status: buildAwayStatus(legacyTime, legacyMessage)
+        };
     const channel = await resolveStudyVoiceChannel(guildId);
-    await setVoiceChannelStatus(client.rest, channel.id, status);
+    const reservation = { ...reservationInput, channelId: channel.id };
+    const phase = getAwayReservationPhase(reservation);
+
+    await setVoiceChannelStatus(
+      client.rest,
+      channel.id,
+      phase === "pending" ? null : reservation.status
+    );
 
     const root = normalizeDataRoot(loadData());
-    const reservation = { channelId: channel.id, endAt, status };
     saveAwayReservation(root, guildId, reservation);
     saveData(root);
-    scheduleAwayExpiration(guildId, reservation);
+    if (phase === "pending") {
+      scheduleAwayActivation(guildId, reservation);
+    } else {
+      scheduleAwayExpiration(guildId, reservation);
+    }
 
-    await interaction.editReply(`상태를 설정했습니다: ${status}`);
+    await interaction.editReply(
+      phase === "pending"
+        ? `상태를 예약했습니다: ${reservation.status}`
+        : `상태를 설정했습니다: ${reservation.status}`
+    );
   } catch (err) {
     console.error("❌ interactionCreate error:", err);
     const { MessageFlags } = require("discord.js")
+    const errorMessage = String(err?.message || "");
+    const replyMessage = /^(내용은 |시간은 )/.test(errorMessage)
+      ? errorMessage
+      : "처리 중 오류가 발생했어";
     try {
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: "처리 중 오류가 발생했어", flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: replyMessage, flags: MessageFlags.Ephemeral });
       } else {
-        await interaction.editReply("처리 중 오류가 발생했어");
+        await interaction.editReply(replyMessage);
       }
     } catch (_) {}
   }
@@ -1892,41 +1922,6 @@ client.on('messageCreate', async (msg) => {
   const userId = msg.author.id;
 
   const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
-  const handledAwayShortcut = await executeAwayShortcut({
-    content,
-    isAdmin: Boolean(
-      msg.guildId && msg.member?.permissions?.has(PermissionFlagsBits.Administrator)
-    ),
-    deleteTrigger: () => msg.delete(),
-    onDeleteError: (err) => {
-      console.error("away shortcut message delete failed:", err?.message || err);
-    },
-    activate: async (reservationInput) => {
-      const channel = await resolveStudyVoiceChannel(guildId);
-      const reservation = { ...reservationInput, channelId: channel.id };
-
-      if (Number.isFinite(Number(reservation.startAt)) && reservation.startAt > Date.now()) {
-        await setVoiceChannelStatus(client.rest, channel.id, null);
-      } else {
-        await setVoiceChannelStatus(client.rest, channel.id, reservation.status);
-      }
-
-      const latestRoot = normalizeDataRoot(loadData());
-      saveAwayReservation(latestRoot, guildId, reservation);
-      saveData(latestRoot);
-
-      if (Number.isFinite(Number(reservation.startAt)) && reservation.startAt > Date.now()) {
-        scheduleAwayActivation(guildId, reservation);
-      } else {
-        scheduleAwayExpiration(guildId, reservation);
-      }
-    }
-  }).catch((err) => {
-    console.error("away shortcut failed:", err?.message || err);
-    return true;
-  });
-  if (handledAwayShortcut) return;
-
   const root = normalizeDataRoot(loadData());
   const { data: latestData, guild } = withGuildDataById(root, guildId);
 
