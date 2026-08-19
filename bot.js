@@ -2,7 +2,13 @@
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 8080;
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const {
+  ApplicationCommandOptionType,
+  Client,
+  GatewayIntentBits,
+  Partials,
+  PermissionFlagsBits
+} = require('discord.js');
 const createAdminRouter = require('./routes/admin');
 const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
@@ -10,6 +16,13 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { shouldLoginDiscordClient } = require("./utils/discord-login-policy");
+const {
+  buildAwayStatus,
+  clearAwayReservation,
+  parseKstAwayEndAt,
+  saveAwayReservation,
+  setVoiceChannelStatus
+} = require("./utils/away-status");
 let data = loadData();
 const DISCORD_LOGIN_TOKEN = String(
   process.env.DISCORD_TOKEN ||
@@ -22,11 +35,6 @@ const AUTO_SPLIT_INTERVAL_MS = Math.max(
   60_000,
   Number(process.env.AUTO_SPLIT_INTERVAL_MS || 5 * 60_000)
 );
-const {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
-} = require("discord.js");
 const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require("@discordjs/voice");
 
 app.use(express.static("public", {
@@ -659,12 +667,13 @@ if (STUDY_VC_ID) {
       user.nickname = member.displayName;
       user.username = member.user.username;
     });
-    await ensureCheerSlashCommand(guild);
+    await ensureAwaySlashCommands(guild);
   }
 
   saveData(data);
 
   await updateStudyChannelPresence();
+  await restoreAwayReservations();
 
 });
 
@@ -867,39 +876,9 @@ const PERIOD_END_SCHEDULE = [
   { key: "p7", end: "22:40", message: "🔔7교시 종료 \n수고 많으셨습니다🙌 " }
 ];
 
-const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
-const AWAY_PROMPT_PAUSE_PREFIX = "away_prompt_pause";
-const MIDCHECK_BUTTON_PREFIX = "midcheck";
-const ENABLE_DM_REVIEW_BUTTON = true;
 const ENABLE_AWAY_PROMPT_DM = false;
-const ENABLE_MIDCHECK_DM = false;
-const ENABLE_NIGHTLY_REVIEW_DM = false;
 const ENABLE_WEEKLY_CAMERA_BRIEF_DM = false;
 const ENABLE_PERIOD_END_NOTICE = false;
-// customId format:
-// cam review:  "cam_review:<guildId>:<userId>:<moodKey>"
-const CAM_REVIEW_OPTIONS = [
-  { key: "great", label: "오늘 만족" },
-  { key: "okay", label: "그럭저럭" },
-  { key: "broken", label: "흐름 끊김" },
-  { key: "sat", label: "그래도 앉음" }
-];
-
-function buildAwayPromptPauseRow(guildId, userId, dateKey, periodKey) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`${AWAY_PROMPT_PAUSE_PREFIX}:${guildId}:${userId}:${dateKey}:${periodKey}`)
-      .setLabel("이번 교시는 쉴게요")
-      .setStyle(ButtonStyle.Secondary)
-  );
-}
-const RANDOM_CHEER_TEXTS = [
-  "오늘도 묵묵히 쌓는 중 🌿",
-  "지금처럼만 가도 충분히 잘하고 있어요",
-  "집중의 흐름 이어가보자구요🔥",
-  "한 칸씩 전진하는 중, 아주 좋아요",
-  "조용히 응원 두고 갈게요 🙌"
-];
 const AWAY_PROMPT_INTERVAL_MS = 30 * 60 * 1000;
 const CLASS_ACTIVE_WINDOWS = [
   { key: "p1", start: "09:00", end: "09:50" },
@@ -951,61 +930,6 @@ const WEEKLY_BRIEF_TARGETS = [
     userId: "1495274970564263966",
     displayName: "할수있다",
     dailyGoalHours: 10
-  }
-];
-const MIDCHECK_TARGETS = [
-  {
-    userId: "476226483703250956",
-    displayName: "쫑"
-  },
-  {
-    userId: "1495274970564263966",
-    displayName: "할수 있다"
-  }
-];
-const MIDCHECK_PROMPT_TEXT = "중간점검하러 왔어! 지금 상태는 어때?";
-const MIDCHECK_OPTIONS = [
-  {
-    key: "rest",
-    label: "쉬고 싶어",
-    responses: [
-      "그래, 잠깐 쉬어가도 괜찮아 ☁️조금만 숨 고르고, 괜찮아지면 다시 와줘.",
-      "맞아, 너무 오래 버티는 것보다 잠깐 쉬는 게 더 도움될 때도 있어."
-    ]
-  },
-  {
-    key: "more",
-    label: "좀더 할 수 있을 것 같은데?",
-    responses: [
-      "오 좋다, 그 감각 이어가 보자.",
-      "좋아! 이대로 쭉 가보는 거야, 할 수 있어."
-    ]
-  },
-  {
-    key: "start_now",
-    label: "이제부터 해야지..",
-    responses: [
-      "괜찮아, 지금부터 시작해도 충분해 🌱 아주 작은 것부터 하나만 해보자.",
-      "좋은 생각이야. 너무 부담 갖지 말고 조금씩 해보자구!"
-    ]
-  },
-  {
-    key: "almost_done",
-    label: "거의 다 했어",
-    responses: [
-      "오, 여기까지 온 거 진짜 좋다 ✨ 조금만 더 하면 마무리다. 끝까지 가보자!",
-      "거의 다 왔네, 마무리만 잘하면 되겠다.",
-      "좋아 조금만 더 힘을 내 보자!"
-    ]
-  },
-  {
-    key: "lost_flow",
-    label: "흐름이 끊겼어",
-    responses: [
-      "그럴 수 있어, 흐름은 다시 잡으면 돼 🌙 너무 조급해하지 말고, 제일 쉬운 것 하나로 다시 시작해보자",
-      "괜찮아, 한번 끊겼다고 끝난 건 아니니까.",
-      "괜찮아. 그럴 때도 있지. 다시 흐름을 잡아 보자. 내가 도와줄게!"
-    ]
   }
 ];
 
@@ -1176,241 +1100,126 @@ async function resolveStudyTextChannel(discordGuild, guildData) {
   return ch;
 }
 
-async function ensureCheerSlashCommand(discordGuild) {
-  try {
-    const desired = {
-      name: "응원",
-      description: "캠 활성화 중인 사람에게 랜덤 응원을 보냅니다."
-    };
+const awayStatusTimers = new Map();
 
+const AWAY_COMMANDS = [
+  {
+    name: "away",
+    description: "STUDY 음성채널에 자리 비움 상태를 설정합니다.",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator.toString(),
+    options: [
+      {
+        type: ApplicationCommandOptionType.String,
+        name: "시간",
+        description: "복귀 예정 시각 (한국 시간, HH:MM)",
+        required: true,
+        minLength: 5,
+        maxLength: 5
+      },
+      {
+        type: ApplicationCommandOptionType.String,
+        name: "메시지",
+        description: "예: 🏥 병원",
+        required: false,
+        maxLength: 450
+      }
+    ]
+  },
+  {
+    name: "back",
+    description: "STUDY 음성채널의 자리 비움 상태를 즉시 삭제합니다.",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator.toString()
+  }
+];
+
+async function ensureAwaySlashCommands(discordGuild) {
+  try {
     const commands = await discordGuild.commands.fetch();
-    const existing = commands.find((c) => c.name === desired.name);
-    if (!existing) {
-      await discordGuild.commands.create(desired);
-      return;
-    }
-    if (existing.description !== desired.description) {
-      await existing.edit(desired);
-    }
-  } catch (err) {
-    console.error("ensure /응원 failed:", err?.message || err);
-  }
-}
+    const cheer = commands.find((command) => command.name === "응원");
+    if (cheer) await cheer.delete();
 
-// ──────────────────────────────────────────────
-// customId 설계 (봇 재시작 후에도 작동하는 영구적 라우팅)
-// ──────────────────────────────────────────────
-// ● 캠 회고 버튼:  "cam_review:<guildId>:<userId>:<moodKey>"
-//   예) "cam_review:123456789:987654321:great"
-//   → guildId: 어느 서버 데이터에 저장할지
-//   → userId:  본인 확인용 (interaction.user.id와 비교)
-//   → moodKey: "great" | "okay" | "broken" | "sat"
-//
-// ※ collector 방식이 실패하는 이유:
-//   - createMessageComponentCollector는 메시지 객체에 바인딩됨
-//   - 봇이 재시작되면 메모리의 collector가 사라져서
-//     이미 보낸 DM의 버튼을 눌러도 아무 핸들러가 없어 "상호작용 실패" 발생
-//   - 전역 interactionCreate + customId 파싱 방식은
-//     봇이 재시작되어도 customId만 파싱하면 되므로 영구 작동
-// ──────────────────────────────────────────────
-
-async function sendReviewPromptDm(
-  member,
-  guildId,
-  promptText = "오늘 참여한 기록이 있어 🙌 짧게 회고 남겨줘"
-) {
-  try {
-    if (!ENABLE_DM_REVIEW_BUTTON) {
-      console.log("⚠️ sendReviewPromptDm: ENABLE_DM_REVIEW_BUTTON is false, skipping");
-      return false;
-    }
-
-    // member가 User 객체일 수도 있고 GuildMember일 수도 있음 — 둘 다 createDM() 지원
-    const userId = member.id || member.user?.id;
-    if (!userId) {
-      console.error("⚠️ sendReviewPromptDm: member.id가 없음");
-      return false;
-    }
-
-    const dm = await member.createDM();
-    const row = new ActionRowBuilder().addComponents(
-  CAM_REVIEW_OPTIONS.map((opt) =>
-    new ButtonBuilder()
-      .setCustomId(`${CAM_REVIEW_BUTTON_PREFIX}:${guildId}:${userId}:${opt.key}`)
-      .setLabel(opt.label)
-      .setStyle(ButtonStyle.Secondary)
-  )
-);
-
-await dm.send({
-  content: promptText,
-  components: [row]
-});
-    console.log(`✅ 회고 DM 전송 완료 → userId=${userId}, guildId=${guildId}`);
-    return true;
-  } catch (err) {
-    // ⚠️ [FIX] 에러를 무시하지 않고 로그 출력 — 디버깅에 필수
-    console.error("❌ sendReviewPromptDm 실패:", err?.message || err);
-    return false;
-  }
-}
-
-function buildMidCheckRow(guildId, userId, dateKey) {
-  return new ActionRowBuilder().addComponents(
-    MIDCHECK_OPTIONS.map((opt) =>
-      new ButtonBuilder()
-        .setCustomId(`${MIDCHECK_BUTTON_PREFIX}:${guildId}:${userId}:${dateKey}:${opt.key}`)
-        .setLabel(opt.label)
-        .setStyle(ButtonStyle.Secondary)
-    )
-  );
-}
-
-async function sendMidCheckDm(member, guildId, dateKey) {
-  try {
-    const userId = member.id || member.user?.id;
-    if (!userId) return false;
-
-    const dm = await member.createDM();
-    await dm.send({
-      content: MIDCHECK_PROMPT_TEXT,
-      components: [buildMidCheckRow(guildId, userId, dateKey)]
-    });
-    return true;
-  } catch (err) {
-    console.error("midcheck DM failed:", err?.message || err);
-    return false;
-  }
-}
-
-let __midCheckTickBusy = false;
-const __midCheckSent = new Set();
-async function sendDailyMidCheckTick() {
-  if (__midCheckTickBusy) return;
-  __midCheckTickBusy = true;
-
-  try {
-    if (!ENABLE_MIDCHECK_DM) return;
-    if (!client.isReady()) return;
-    if (!process.env.FLY_APP_NAME) return;
-
-    const now = Date.now();
-    const { dateKey, hhmm } = getKstDateParts(now);
-    if (hhmm < "17:00") return;
-
-    const root = normalizeDataRoot(loadData());
-    root.meta ??= {};
-    root.meta.midCheckSentByUser ??= {};
-    let changed = false;
-
-    for (const discordGuild of client.guilds.cache.values()) {
-      const guildId = discordGuild.id;
-      const { guild } = withGuildDataById(root, guildId);
-
-      for (const target of MIDCHECK_TARGETS) {
-        const onceKey = `${guildId}:${target.userId}:${dateKey}`;
-        if (__midCheckSent.has(onceKey)) continue;
-
-        const persistedKey = `${guildId}:${target.userId}`;
-        if (root.meta.midCheckSentByUser[persistedKey] === dateKey) continue;
-
-        const member =
-          discordGuild.members.cache.get(target.userId) ||
-          await discordGuild.members.fetch(target.userId).catch(() => null);
-        if (!member || member.user?.bot) continue;
-
-        const sent = await sendMidCheckDm(member, guildId, dateKey);
-        if (!sent) continue;
-
-        const user = ensureUserExists(guild, member);
-        user.lastMidCheckPromptAt = now;
-        user.lastMidCheckPromptDate = dateKey;
-        root.meta.midCheckSentByUser[persistedKey] = dateKey;
-        __midCheckSent.add(onceKey);
-        changed = true;
+    for (const desired of AWAY_COMMANDS) {
+      const existing = commands.find((command) => command.name === desired.name);
+      if (existing) {
+        await existing.edit(desired);
+      } else {
+        await discordGuild.commands.create(desired);
       }
     }
+  } catch (err) {
+    console.error("ensure /away and /back failed:", err?.message || err);
+  }
+}
 
-    if (changed) {
+async function resolveStudyVoiceChannel(guildId, preferredChannelId = null) {
+  const root = normalizeDataRoot(loadData());
+  const { guild } = withGuildDataById(root, guildId);
+  const channelId =
+    preferredChannelId || guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
+  if (!channelId) throw new Error("STUDY 음성채널이 설정되지 않았습니다.");
+
+  const channel = await client.channels.fetch(channelId);
+  if (!channel || typeof channel.isVoiceBased !== "function" || !channel.isVoiceBased()) {
+    throw new Error("STUDY 음성채널을 찾을 수 없습니다.");
+  }
+  return channel;
+}
+
+function clearAwayTimer(guildId) {
+  const key = String(guildId);
+  const timer = awayStatusTimers.get(key);
+  if (timer) clearTimeout(timer);
+  awayStatusTimers.delete(key);
+}
+
+async function expireAwayReservation(guildId, expectedEndAt) {
+  const root = normalizeDataRoot(loadData());
+  const reservation = root?.meta?.awayReservations?.[guildId];
+  if (!reservation || Number(reservation.endAt) !== Number(expectedEndAt)) return;
+
+  try {
+    const channel = await resolveStudyVoiceChannel(guildId, reservation.channelId);
+    await setVoiceChannelStatus(client.rest, channel.id, null);
+    clearAwayReservation(root, guildId);
+    saveData(root);
+    clearAwayTimer(guildId);
+  } catch (err) {
+    console.error("away status auto-clear failed:", err?.message || err);
+    scheduleAwayReservation(guildId, reservation, 60_000);
+  }
+}
+
+function scheduleAwayReservation(guildId, reservation, retryDelay = null) {
+  clearAwayTimer(guildId);
+  const delay = retryDelay ?? Math.max(0, Number(reservation.endAt) - Date.now());
+  const timer = setTimeout(() => {
+    void expireAwayReservation(String(guildId), reservation.endAt);
+  }, delay);
+  awayStatusTimers.set(String(guildId), timer);
+}
+
+async function restoreAwayReservations() {
+  const root = normalizeDataRoot(loadData());
+  for (const [guildId, reservation] of Object.entries(root?.meta?.awayReservations || {})) {
+    if (!reservation?.channelId || !Number.isFinite(Number(reservation.endAt))) {
+      clearAwayReservation(root, guildId);
       saveData(root);
-    }
-  } catch (err) {
-    console.error("daily midcheck tick failed:", err?.message || err);
-  } finally {
-    __midCheckTickBusy = false;
-  }
-}
-
-let __nightlyReviewTickBusy = false;
-const __nightlyReviewSent = new Set();
-async function sendNightlyReviewPromptTick() {
-  if (__nightlyReviewTickBusy) return;
-  __nightlyReviewTickBusy = true;
-  try {
-    if (!ENABLE_NIGHTLY_REVIEW_DM) return;
-    if (!client.isReady()) return;
-    if (!process.env.FLY_APP_NAME) return; // 운영에서만 전송
-
-    const now = Date.now();
-    const { dateKey, hhmm } = getKstDateParts(now);
-    if (hhmm !== "21:00") return;
-
-    const root = normalizeDataRoot(loadData());
-    root.meta ??= {};
-    root.meta.nightlyReviewSentByGuild ??= {};
-    let changed = false;
-
-    for (const discordGuild of client.guilds.cache.values()) {
-      const guildId = discordGuild.id;
-      const onceKey = `${guildId}:${dateKey}`;
-      if (__nightlyReviewSent.has(onceKey)) continue;
-      if (root.meta.nightlyReviewSentByGuild[guildId] === dateKey) continue;
-
-      const { guild } = withGuildDataById(root, guildId);
-      const targets = Object.entries(guild.users || {})
-        .filter(([_, user]) => {
-          if (!user || typeof user !== "object") return false;
-          const todaysec = Number(computeTodayWeekAll(user)?.todaysec || 0);
-          return todaysec > 0 || Number(user.currentStart || 0) > 0;
-        })
-        .map(([userId]) => userId);
-
-      if (targets.length > 0) {
-        try {
-          await discordGuild.members.fetch();
-        } catch (_) {}
-      }
-
-      for (const userId of targets) {
-        const member = discordGuild.members.cache.get(userId);
-        if (!member || member.user?.bot) continue;
-
-        const user = ensureUserExists(guild, member);
-        if (String(user.lastReviewPromptDate || "") === dateKey) continue;
-
-        await sendReviewPromptDm(
-          member,
-          guildId,
-          "오늘 참여한 기록이 있어요 🙌 짧게 회고 남겨주세요"
-        );
-
-        user.lastReviewPromptAt = now;
-        user.lastReviewPromptDate = dateKey;
-        changed = true;
-      }
-
-      root.meta.nightlyReviewSentByGuild[guildId] = dateKey;
-      __nightlyReviewSent.add(onceKey);
-      changed = true;
+      continue;
     }
 
-    if (changed) {
-      saveData(root);
+    if (Number(reservation.endAt) <= Date.now()) {
+      await expireAwayReservation(guildId, reservation.endAt);
+      continue;
     }
-  } catch (err) {
-    console.error("nightly review tick failed:", err?.message || err);
-  } finally {
-    __nightlyReviewTickBusy = false;
+
+    try {
+      const channel = await resolveStudyVoiceChannel(guildId, reservation.channelId);
+      await setVoiceChannelStatus(client.rest, channel.id, reservation.status);
+      scheduleAwayReservation(guildId, reservation);
+    } catch (err) {
+      console.error("away status restore failed:", err?.message || err);
+      scheduleAwayReservation(guildId, reservation, 60_000);
+    }
   }
 }
 
@@ -1522,7 +1331,6 @@ async function sendAwayPromptTick() {
   if (!process.env.FLY_APP_NAME) return;
 
   const now = Date.now();
-  const { dateKey } = getKstDateParts(now);
   const activeWindow = getCurrentClassWindow(now);
   const root = normalizeDataRoot(loadData());
   let changed = false;
@@ -1537,14 +1345,6 @@ async function sendAwayPromptTick() {
       if (!member || member.user?.bot) continue;
 
       const user = ensureUserExists(guild, member);
-      if (
-        activeWindow &&
-        String(user.awayPromptSkipDate || "") === dateKey &&
-        String(user.awayPromptSkipPeriodKey || "") === activeWindow.key
-      ) {
-        continue;
-      }
-
       const studyVcId = guild?.settings?.studyVcId || process.env.STUDY_VC_ID || null;
       const inStudy = studyVcId ? member.voice?.channelId === studyVcId : !!member.voice?.channelId;
       const camOrStreamOn = !!member.voice?.selfVideo || !!member.voice?.streaming;
@@ -1577,10 +1377,7 @@ async function sendAwayPromptTick() {
       try {
         const dmText =
           target.prompts[Math.floor(Math.random() * target.prompts.length)];
-        await member.send({
-          content: dmText,
-          components: [buildAwayPromptPauseRow(discordGuild.id, target.userId, dateKey, activeWindow.key)]
-        });
+        await member.send(dmText);
         user.lastAwayPromptAt = now;
         changed = true;
       } catch (err) {
@@ -1822,14 +1619,6 @@ setInterval(() => {
 }, 20000);
 
 setInterval(() => {
-  sendNightlyReviewPromptTick();
-}, 20000);
-
-setInterval(() => {
-  sendDailyMidCheckTick();
-}, 20000);
-
-setInterval(() => {
   sendAwayPromptTick();
 }, 60000);
 
@@ -2003,133 +1792,55 @@ client.on("interactionCreate", async (interaction) => {
 
 
   try {
-    if (!interaction.isButton()) return;
-
     const { MessageFlags } = require("discord.js");
 
-    if (interaction.customId.startsWith(`${AWAY_PROMPT_PAUSE_PREFIX}:`)) {
-      await interaction.deferUpdate();
-      const [_, guildId, userId, dateKey, periodKey] = interaction.customId.split(":");
+    if (!interaction.isChatInputCommand()) return;
+    if (interaction.commandName !== "away" && interaction.commandName !== "back") return;
 
-      if (interaction.user.id !== userId) {
-        await interaction.followUp({ content: "이 버튼은 본인만 눌러야 해", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      const root = normalizeDataRoot(loadData());
-      const { data, guild } = withGuildDataById(root, guildId);
-      guild.users ??= {};
-      guild.users[userId] ??= {
-        id: userId,
-        sessions: [],
-        totalSeconds: 0
-      };
-
-      const user = guild.users[userId];
-      user.awayPromptSkipDate = dateKey;
-      user.awayPromptSkipPeriodKey = periodKey || null;
-      user.awayPromptInactiveSince = null;
-      user.lastAwayPromptAt = null;
-      user.lastAwayPromptWindowKey = null;
-      saveData(data);
-
-      await interaction.followUp({ content: "이번 교시는 재촉 메시지 보내지 않을게", flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    if (interaction.customId.startsWith(`${MIDCHECK_BUTTON_PREFIX}:`)) {
-      await interaction.deferUpdate();
-      const [_, guildId, userId, dateKey, choiceKey] = interaction.customId.split(":");
-
-      if (interaction.user.id !== userId) {
-        await interaction.followUp({ content: "이 버튼은 본인만 눌러야 해", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      const option = MIDCHECK_OPTIONS.find((item) => item.key === choiceKey);
-      if (!option) {
-        await interaction.followUp({ content: "알 수 없는 응답이야", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      const root = normalizeDataRoot(loadData());
-      const { data, guild } = withGuildDataById(root, guildId);
-      guild.users ??= {};
-      guild.users[userId] ??= {
-        id: userId,
-        sessions: [],
-        totalSeconds: 0
-      };
-
-      const user = guild.users[userId];
-      user.midCheckResponses ??= [];
-      const responseText =
-        option.responses[Math.floor(Math.random() * option.responses.length)];
-
-      user.midCheckResponses.unshift({
-        at: Date.now(),
-        dateKey,
-        choiceKey,
-        label: option.label,
-        responseText,
-        guildId
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      await interaction.reply({
+        content: "Discord 관리자만 사용할 수 있는 명령입니다.",
+        flags: MessageFlags.Ephemeral
       });
-      saveData(data);
-
-      await interaction.followUp({ content: responseText, flags: MessageFlags.Ephemeral });
       return;
     }
 
-    if (interaction.customId.startsWith("cam_review:")) {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      const [_, guildId, userId, moodKey] = interaction.customId.split(":");
-
-      if (interaction.user.id !== userId) {
-        await interaction.editReply("이 버튼은 본인만 눌러야 해");
-        return;
-      }
-
-      const root = normalizeDataRoot(loadData());
-      const { data, guild } = withGuildDataById(root, guildId);
-
-      guild.users ??= {};
-      guild.users[userId] ??= {
-        id: userId,
-        sessions: [],
-        totalSeconds: 0
-      };
-
-      const user = guild.users[userId];
-      const labelMap = {
-        great: "오늘 만족",
-        okay: "그럭저럭",
-        broken: "흐름 끊김",
-        sat: "그래도 앉음"
-      }
-      user.reviews ??= [];
-      user.reviews.unshift({
-        at: Date.now(),
-        dateKey: getKstDateParts(Date.now()).dateKey,
-        mood: moodKey,
-        label: labelMap[moodKey] || moodKey,
-        source: "cam_off_prompt",
-        guildId
+    const guildId = interaction.guildId;
+    if (!guildId) {
+      await interaction.reply({
+        content: "서버 안에서만 사용할 수 있는 명령입니다.",
+        flags: MessageFlags.Ephemeral
       });
-
-      saveData(data);
-
-      const latest = user.reviews?.[0];
-      if (
-        latest &&
-        latest.source === "cam_off_prompt" &&
-        latest.dateKey === getKstDateParts(Date.now()).dateKey
-      )
-      await interaction.editReply("회고 저장 완료 👍");
       return;
     }
 
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    if (interaction.commandName === "back") {
+      const root = normalizeDataRoot(loadData());
+      const previous = clearAwayReservation(root, guildId);
+      const channel = await resolveStudyVoiceChannel(guildId, previous?.channelId);
+      await setVoiceChannelStatus(client.rest, channel.id, null);
+      clearAwayTimer(guildId);
+      saveData(root);
+      await interaction.editReply("STUDY 음성채널의 자리 비움 상태를 삭제했습니다.");
+      return;
+    }
 
+    const time = interaction.options.getString("시간", true).trim();
+    const message = interaction.options.getString("메시지") || "";
+    const endAt = parseKstAwayEndAt(time);
+    const status = buildAwayStatus(time, message);
+    const channel = await resolveStudyVoiceChannel(guildId);
+    await setVoiceChannelStatus(client.rest, channel.id, status);
+
+    const root = normalizeDataRoot(loadData());
+    const reservation = { channelId: channel.id, endAt, status };
+    saveAwayReservation(root, guildId, reservation);
+    saveData(root);
+    scheduleAwayReservation(guildId, reservation);
+
+    await interaction.editReply(`상태를 설정했습니다: ${status}`);
   } catch (err) {
     console.error("❌ interactionCreate error:", err);
     const { MessageFlags } = require("discord.js")
