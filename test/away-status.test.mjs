@@ -33,87 +33,47 @@ describe("parseKstAwayEndAt", () => {
   );
 });
 
-test("builds an immediate reservation from a free-form label and time", () => {
+test("keeps the message as-is and expires at its last clock time", () => {
   expect(
     createAwayReservationFromInput(
-      "🍚 밥 먹으러 감 00:30까지",
+      "밥 먹으러 감 00:30까지",
       Date.parse("2026-08-20T00:00:00.000Z"),
     ),
   ).toEqual({
     time: "00:30",
     endAt: Date.parse("2026-08-20T15:30:00.000Z"),
-    status: "🍚 밥 먹으러 감 · 00:30까지",
+    status: "밥 먹으러 감 00:30까지",
   });
-});
-
-test("prepends a matching emoji when the label has none", () => {
-  const now = Date.parse("2026-08-20T00:00:00.000Z");
-
-  expect(createAwayReservationFromInput("밥 먹으러 감 00:30까지", now).status).toBe(
-    "🍚 밥 먹으러 감 · 00:30까지",
-  );
-  expect(createAwayReservationFromInput("병원 09:00까지", now).status).toBe(
-    "🏥 병원 · 09:00까지",
-  );
-  expect(createAwayReservationFromInput("잠깐 나갔다 옴 11:00까지", now).status).toBe(
-    "🚪 잠깐 나갔다 옴 · 11:00까지",
-  );
-  expect(createAwayReservationFromInput("2교시 09:00까지", now).status).toBe(
-    "🚪 2교시 · 09:00까지",
-  );
-});
-
-test("still accepts the legacy time-first content", () => {
-  expect(
-    createAwayReservationFromInput(
-      "08:30까지 함",
-      Date.parse("2026-08-20T00:00:00.000Z"),
-    ),
-  ).toEqual({
-    time: "08:30",
-    endAt: Date.parse("2026-08-20T23:30:00.000Z"),
-    status: "⏳ 함 · 08:30까지",
-  });
-});
-
-test("builds a range reservation that can cross midnight", () => {
-  expect(
-    createAwayReservationFromInput(
-      "23:00부터 01:00까지 자리 비움",
-      Date.parse("2026-08-20T12:00:00.000Z"),
-    ),
-  ).toEqual({
-    startTime: "23:00",
-    endTime: "01:00",
-    endAt: Date.parse("2026-08-20T16:00:00.000Z"),
-    status: "🚪 23:00~01:00 자리 비움",
-  });
-});
-
-test("shows the range reason next to the span", () => {
-  const now = Date.parse("2026-08-20T00:00:00.000Z");
-
-  expect(createAwayReservationFromInput("13:00부터 15:00까지 병원", now).status).toBe(
-    "🏥 13:00~15:00 자리 비움 · 병원",
-  );
-  expect(createAwayReservationFromInput("13:00부터 15:00까지 🚗 정비소", now).status).toBe(
-    "🚗 13:00~15:00 자리 비움 · 정비소",
-  );
-  expect(createAwayReservationFromInput("13:00부터 15:00까지", now).status).toBe(
-    "🚪 13:00~15:00 자리 비움",
-  );
 });
 
 test.each([
-  "~08:30까지 함",
-  "8:30까지 함",
-  "24:00까지 함",
-  "밥 먹으러 감 12:60까지",
-  "밥 먹으러 감",
-  "13:00부터 25:00까지 자리 비움",
-])("rejects unsupported /away content: %s", (content) => {
-  expect(() => createAwayReservationFromInput(content, 0)).toThrow("내용은");
+  "🍚 밥 먹으러 감 00:30까지",
+  "10:00~18:00 자리 비움 · 병원, 컬활 시험",
+  "08:30까지 함",
+  "2교시 09:00까지",
+])("shows %s exactly as typed", (content) => {
+  expect(
+    createAwayReservationFromInput(content, Date.parse("2026-08-20T00:00:00.000Z"))
+      .status,
+  ).toBe(content);
 });
+
+test("expires at the last clock time when the message holds a range", () => {
+  const reservation = createAwayReservationFromInput(
+    "23:00~01:00 자리 비움",
+    Date.parse("2026-08-20T12:00:00.000Z"),
+  );
+
+  expect(reservation.time).toBe("01:00");
+  expect(reservation.endAt).toBe(Date.parse("2026-08-20T16:00:00.000Z"));
+});
+
+test.each(["밥 먹으러 감", "8:30까지 함", "24:00까지 함", "   "])(
+  "rejects content without a usable clock time: %s",
+  (content) => {
+    expect(() => createAwayReservationFromInput(content, 0)).toThrow("내용은");
+  },
+);
 
 test("classifies persisted reservations for restart recovery", () => {
   const now = 1_000;
@@ -121,20 +81,6 @@ test("classifies persisted reservations for restart recovery", () => {
   expect(getAwayReservationPhase({ startAt: 2_000, endAt: 3_000 }, now)).toBe("active");
   expect(getAwayReservationPhase({ endAt: 1_000 }, now)).toBe("expired");
   expect(getAwayReservationPhase({ endAt: "bad" }, now)).toBe("invalid");
-});
-
-test("accepts a pasted channel status as input", () => {
-  const now = Date.parse("2026-08-20T00:00:00.000Z");
-
-  expect(createAwayReservationFromInput("🍚 밥 먹으러 감 · 00:30까지", now).status).toBe(
-    "🍚 밥 먹으러 감 · 00:30까지",
-  );
-  expect(
-    createAwayReservationFromInput("🏥 10:00~18:00 자리 비움 · 병원", now).status,
-  ).toBe("🏥 10:00~18:00 자리 비움 · 병원");
-  expect(
-    createAwayReservationFromInput("10:00~18:00 자리 비움 · 병원, 컬활 시험", now).status,
-  ).toBe("🏥 10:00~18:00 자리 비움 · 병원, 컬활 시험");
 });
 
 test("saving a new reservation overwrites the previous guild reservation", () => {

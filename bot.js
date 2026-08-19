@@ -1110,7 +1110,7 @@ const AWAY_COMMANDS = [
       {
         type: ApplicationCommandOptionType.String,
         name: "내용",
-        description: "예: 밥 먹으러 감 00:30까지 / 13:00부터 15:00까지 병원",
+        description: "적은 그대로 표시됩니다. 마지막 HH:MM에 사라져요. 예: 밥 먹으러 감 00:30까지",
         required: true,
         maxLength: 100
       }
