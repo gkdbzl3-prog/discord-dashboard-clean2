@@ -1206,22 +1206,10 @@ function scheduleAwayExpiration(guildId, reservation, retryDelay = null) {
   awayStatusTimers.set(String(guildId), timer);
 }
 
-function scheduleAwayActivation(guildId, reservation, retryDelay = null) {
-  clearAwayTimer(guildId);
-  const delay = retryDelay ?? Math.max(0, Number(reservation.startAt) - Date.now());
-  const timer = setTimeout(() => {
-    void activateScheduledAwayReservation(String(guildId), reservation.startAt);
-  }, delay);
-  awayStatusTimers.set(String(guildId), timer);
-}
-
-async function activateScheduledAwayReservation(guildId, expectedStartAt) {
+async function applyAwayReservation(guildId, expectedEndAt) {
   const root = normalizeDataRoot(loadData());
   const reservation = root?.meta?.awayReservations?.[guildId];
-  const matchesStart = expectedStartAt == null
-    ? reservation?.startAt == null
-    : Number(reservation?.startAt) === Number(expectedStartAt);
-  if (!reservation || !matchesStart) return;
+  if (!reservation || Number(reservation.endAt) !== Number(expectedEndAt)) return;
   if (Number(reservation.endAt) <= Date.now()) {
     await expireAwayReservation(guildId, reservation.endAt);
     return;
@@ -1232,8 +1220,12 @@ async function activateScheduledAwayReservation(guildId, expectedStartAt) {
     await setVoiceChannelStatus(client.rest, channel.id, reservation.status);
     scheduleAwayExpiration(guildId, reservation);
   } catch (err) {
-    console.error("away status activation failed:", err?.message || err);
-    scheduleAwayActivation(guildId, reservation, 60_000);
+    console.error("away status apply failed:", err?.message || err);
+    clearAwayTimer(guildId);
+    const timer = setTimeout(() => {
+      void applyAwayReservation(String(guildId), expectedEndAt);
+    }, 60_000);
+    awayStatusTimers.set(String(guildId), timer);
   }
 }
 
@@ -1252,12 +1244,7 @@ async function restoreAwayReservations() {
       continue;
     }
 
-    if (phase === "pending") {
-      scheduleAwayActivation(guildId, reservation);
-      continue;
-    }
-
-    await activateScheduledAwayReservation(guildId, reservation.startAt);
+    await applyAwayReservation(guildId, reservation.endAt);
   }
 }
 
@@ -1876,28 +1863,15 @@ client.on("interactionCreate", async (interaction) => {
         };
     const channel = await resolveStudyVoiceChannel(guildId);
     const reservation = { ...reservationInput, channelId: channel.id };
-    const phase = getAwayReservationPhase(reservation);
 
-    await setVoiceChannelStatus(
-      client.rest,
-      channel.id,
-      phase === "pending" ? null : reservation.status
-    );
+    await setVoiceChannelStatus(client.rest, channel.id, reservation.status);
 
     const root = normalizeDataRoot(loadData());
     saveAwayReservation(root, guildId, reservation);
     saveData(root);
-    if (phase === "pending") {
-      scheduleAwayActivation(guildId, reservation);
-    } else {
-      scheduleAwayExpiration(guildId, reservation);
-    }
+    scheduleAwayExpiration(guildId, reservation);
 
-    await interaction.editReply(
-      phase === "pending"
-        ? `${reservation.startTime}부터 표시됩니다: ${reservation.status}`
-        : `상태를 설정했습니다: ${reservation.status}`
-    );
+    await interaction.editReply(`상태를 설정했습니다: ${reservation.status}`);
   } catch (err) {
     console.error("❌ interactionCreate error:", err);
     const { MessageFlags } = require("discord.js")

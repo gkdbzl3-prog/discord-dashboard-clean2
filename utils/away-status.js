@@ -52,17 +52,28 @@ function isValidClockTime(hour, minute) {
   return hour <= 23 && minute <= 59;
 }
 
-function decorateAwayLabel(label) {
+const LEADING_EMOJI_RE =
+  /^((?:\p{Extended_Pictographic}[‍️\p{Emoji_Modifier}]*)+)\s*([\s\S]*)$/u;
+
+function splitAwayLabel(label) {
   const text = String(label || "").trim();
-  if (!text) return `${DEFAULT_AWAY_EMOJI} ${DEFAULT_RANGE_LABEL}`;
-  if (/^\p{Extended_Pictographic}/u.test(text)) return text;
+  const withEmoji = LEADING_EMOJI_RE.exec(text);
+  if (withEmoji) return { emoji: withEmoji[1], text: withEmoji[2].trim() };
 
   const rule = AWAY_EMOJI_RULES.find(([pattern]) => pattern.test(text));
-  return `${rule ? rule[1] : DEFAULT_AWAY_EMOJI} ${text}`;
+  return { emoji: rule ? rule[1] : DEFAULT_AWAY_EMOJI, text };
 }
 
 function buildAwayChannelStatus(label, endTime) {
-  return `${decorateAwayLabel(label)} · ${endTime}까지`;
+  const { emoji, text } = splitAwayLabel(label);
+  return `${emoji} ${text || DEFAULT_RANGE_LABEL} · ${endTime}까지`;
+}
+
+function buildAwayRangeStatus(label, startTime, endTime) {
+  const { emoji, text } = splitAwayLabel(label);
+  const span = `${startTime}~${endTime} ${DEFAULT_RANGE_LABEL}`;
+  const reason = /^자리\s*비움$/.test(text) ? "" : text;
+  return reason ? `${emoji} ${span} · ${reason}` : `${DEFAULT_AWAY_EMOJI} ${span}`;
 }
 
 function createAwayReservationFromInput(content, now = Date.now()) {
@@ -81,9 +92,8 @@ function createAwayReservationFromInput(content, now = Date.now()) {
       return {
         startTime,
         endTime,
-        startAt,
         endAt: parseKstAwayEndAt(endTime, startAt),
-        status: buildAwayChannelStatus(label, endTime),
+        status: buildAwayRangeStatus(label, startTime, endTime),
       };
     }
     throw new Error(AWAY_CONTENT_ERROR);
@@ -113,9 +123,6 @@ function getAwayReservationPhase(reservation, now = Date.now()) {
   if (!Number.isFinite(endAt)) return "invalid";
   if (endAt <= now) return "expired";
 
-  const startAt = reservation?.startAt == null ? null : Number(reservation.startAt);
-  if (startAt !== null && !Number.isFinite(startAt)) return "invalid";
-  if (startAt !== null && startAt > now) return "pending";
   return "active";
 }
 

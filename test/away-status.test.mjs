@@ -59,6 +59,9 @@ test("prepends a matching emoji when the label has none", () => {
   expect(createAwayReservationFromInput("잠깐 나갔다 옴 11:00까지", now).status).toBe(
     "🚪 잠깐 나갔다 옴 · 11:00까지",
   );
+  expect(createAwayReservationFromInput("2교시 09:00까지", now).status).toBe(
+    "🚪 2교시 · 09:00까지",
+  );
 });
 
 test("still accepts the legacy time-first content", () => {
@@ -74,7 +77,7 @@ test("still accepts the legacy time-first content", () => {
   });
 });
 
-test("builds a scheduled range reservation that can cross midnight", () => {
+test("builds a range reservation that can cross midnight", () => {
   expect(
     createAwayReservationFromInput(
       "23:00부터 01:00까지 자리 비움",
@@ -83,19 +86,23 @@ test("builds a scheduled range reservation that can cross midnight", () => {
   ).toEqual({
     startTime: "23:00",
     endTime: "01:00",
-    startAt: Date.parse("2026-08-20T14:00:00.000Z"),
     endAt: Date.parse("2026-08-20T16:00:00.000Z"),
-    status: "🚪 자리 비움 · 01:00까지",
+    status: "🚪 23:00~01:00 자리 비움",
   });
 });
 
-test("defaults the range label when only the times are given", () => {
-  expect(
-    createAwayReservationFromInput(
-      "13:00부터 15:00까지",
-      Date.parse("2026-08-20T00:00:00.000Z"),
-    ).status,
-  ).toBe("🚪 자리 비움 · 15:00까지");
+test("shows the range reason next to the span", () => {
+  const now = Date.parse("2026-08-20T00:00:00.000Z");
+
+  expect(createAwayReservationFromInput("13:00부터 15:00까지 병원", now).status).toBe(
+    "🏥 13:00~15:00 자리 비움 · 병원",
+  );
+  expect(createAwayReservationFromInput("13:00부터 15:00까지 🚗 정비소", now).status).toBe(
+    "🚗 13:00~15:00 자리 비움 · 정비소",
+  );
+  expect(createAwayReservationFromInput("13:00부터 15:00까지", now).status).toBe(
+    "🚪 13:00~15:00 자리 비움",
+  );
 });
 
 test.each([
@@ -111,11 +118,10 @@ test.each([
 
 test("classifies persisted reservations for restart recovery", () => {
   const now = 1_000;
-  expect(getAwayReservationPhase({ startAt: 2_000, endAt: 3_000 }, now)).toBe("pending");
-  expect(getAwayReservationPhase({ startAt: 500, endAt: 3_000 }, now)).toBe("active");
   expect(getAwayReservationPhase({ endAt: 3_000 }, now)).toBe("active");
-  expect(getAwayReservationPhase({ startAt: 500, endAt: 1_000 }, now)).toBe("expired");
-  expect(getAwayReservationPhase({ startAt: 500, endAt: "bad" }, now)).toBe("invalid");
+  expect(getAwayReservationPhase({ startAt: 2_000, endAt: 3_000 }, now)).toBe("active");
+  expect(getAwayReservationPhase({ endAt: 1_000 }, now)).toBe("expired");
+  expect(getAwayReservationPhase({ endAt: "bad" }, now)).toBe("invalid");
 });
 
 test("builds the channel status with an optional message", () => {
