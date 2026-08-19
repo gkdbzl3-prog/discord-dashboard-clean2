@@ -22,12 +22,6 @@ function parseKstAwayEndAt(time, now = Date.now()) {
   return endAt;
 }
 
-function buildAwayStatus(time, message) {
-  const prefix = String(message || "").trim();
-  const suffix = `${time}까지 자리 비움`;
-  return prefix ? `${prefix} | ${suffix}` : suffix;
-}
-
 const AWAY_EMOJI_RULES = [
   [/밥|식사|점심|저녁|아침|먹/, "🍚"],
   [/커피|카페|음료|차 마/, "☕"],
@@ -41,10 +35,12 @@ const AWAY_EMOJI_RULES = [
 const DEFAULT_AWAY_EMOJI = "🚪";
 const DEFAULT_RANGE_LABEL = "자리 비움";
 const AWAY_CONTENT_ERROR =
-  "내용은 ‘🍚 밥 먹으러 감 00:30까지’ 또는 ‘13:00부터 15:00까지 자리 비움’ 형식으로 입력해 주세요.";
+  "내용은 ‘밥 먹으러 감 00:30까지’ 또는 ‘13:00부터 15:00까지 병원’ 형식으로 입력해 주세요.";
 
 const TIME_SOURCE = String.raw`(\d{2}):(\d{2})`;
-const AWAY_RANGE_RE = new RegExp(`^${TIME_SOURCE}부터 ${TIME_SOURCE}까지(?:\\s+(.*))?$`);
+const AWAY_RANGE_RE = new RegExp(
+  `^${TIME_SOURCE}\\s*(?:부터|~|-|—)\\s*${TIME_SOURCE}\\s*(?:까지)?(?:\\s+([\\s\\S]*))?$`,
+);
 const AWAY_LABEL_FIRST_RE = new RegExp(`^(.+?)\\s+${TIME_SOURCE}까지$`);
 const AWAY_TIME_FIRST_RE = new RegExp(`^${TIME_SOURCE}까지\\s+(.+)$`);
 
@@ -64,20 +60,34 @@ function splitAwayLabel(label) {
   return { emoji: rule ? rule[1] : DEFAULT_AWAY_EMOJI, text };
 }
 
+function normalizeAwayReason(label) {
+  return String(label || "")
+    .trim()
+    .replace(/^자리\s*비움/, "")
+    .replace(/^\s*[·|,]\s*/, "")
+    .replace(/\s*[·|,]\s*$/, "")
+    .trim();
+}
+
 function buildAwayChannelStatus(label, endTime) {
-  const { emoji, text } = splitAwayLabel(label);
+  const { emoji, text } = splitAwayLabel(normalizeAwayReason(label));
   return `${emoji} ${text || DEFAULT_RANGE_LABEL} · ${endTime}까지`;
 }
 
-function buildAwayRangeStatus(label, startTime, endTime) {
-  const { emoji, text } = splitAwayLabel(label);
+function buildAwayRangeStatus(label, startTime, endTime, fallbackEmoji) {
+  const reason = normalizeAwayReason(label);
   const span = `${startTime}~${endTime} ${DEFAULT_RANGE_LABEL}`;
-  const reason = /^자리\s*비움$/.test(text) ? "" : text;
-  return reason ? `${emoji} ${span} · ${reason}` : `${DEFAULT_AWAY_EMOJI} ${span}`;
+  if (!reason) return `${fallbackEmoji || DEFAULT_AWAY_EMOJI} ${span}`;
+
+  const { emoji, text } = splitAwayLabel(reason);
+  return `${emoji} ${span} · ${text}`;
 }
 
 function createAwayReservationFromInput(content, now = Date.now()) {
-  const value = String(content || "").trim();
+  const raw = String(content || "").trim();
+  const lead = LEADING_EMOJI_RE.exec(raw);
+  const leadingEmoji = lead && /^\d{2}:\d{2}/.test(lead[2]) ? lead[1] : null;
+  const value = leadingEmoji ? lead[2] : raw;
 
   const rangeMatch = AWAY_RANGE_RE.exec(value);
   if (rangeMatch) {
@@ -93,7 +103,7 @@ function createAwayReservationFromInput(content, now = Date.now()) {
         startTime,
         endTime,
         endAt: parseKstAwayEndAt(endTime, startAt),
-        status: buildAwayRangeStatus(label, startTime, endTime),
+        status: buildAwayRangeStatus(label, startTime, endTime, leadingEmoji),
       };
     }
     throw new Error(AWAY_CONTENT_ERROR);
@@ -151,7 +161,6 @@ async function setVoiceChannelStatus(rest, channelId, status) {
 }
 
 module.exports = {
-  buildAwayStatus,
   clearAwayReservation,
   createAwayReservationFromInput,
   getAwayReservationPhase,

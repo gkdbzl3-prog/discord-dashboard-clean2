@@ -17,11 +17,9 @@ const path = require("path");
 const fs = require("fs");
 const { shouldLoginDiscordClient } = require("./utils/discord-login-policy");
 const {
-  buildAwayStatus,
   clearAwayReservation,
   createAwayReservationFromInput,
   getAwayReservationPhase,
-  parseKstAwayEndAt,
   saveAwayReservation,
   setVoiceChannelStatus
 } = require("./utils/away-status");
@@ -1112,24 +1110,9 @@ const AWAY_COMMANDS = [
       {
         type: ApplicationCommandOptionType.String,
         name: "내용",
-        description: "예: 🍚 밥 먹으러 감 00:30까지 / 13:00부터 15:00까지 자리 비움",
-        required: false,
+        description: "예: 밥 먹으러 감 00:30까지 / 13:00부터 15:00까지 병원",
+        required: true,
         maxLength: 100
-      },
-      {
-        type: ApplicationCommandOptionType.String,
-        name: "시간",
-        description: "기존 형식: 복귀 예정 시각 (HH:MM)",
-        required: false,
-        minLength: 5,
-        maxLength: 5
-      },
-      {
-        type: ApplicationCommandOptionType.String,
-        name: "메시지",
-        description: "시간과 함께 사용, 예: 🏥 병원",
-        required: false,
-        maxLength: 450
       }
     ]
   },
@@ -1852,15 +1835,9 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    const content = interaction.options.getString("내용");
-    const legacyTime = interaction.options.getString("시간");
-    const legacyMessage = interaction.options.getString("메시지") || "";
-    const reservationInput = content
-      ? createAwayReservationFromInput(content)
-      : {
-          endAt: parseKstAwayEndAt(legacyTime),
-          status: buildAwayStatus(legacyTime, legacyMessage)
-        };
+    const reservationInput = createAwayReservationFromInput(
+      interaction.options.getString("내용")
+    );
     const channel = await resolveStudyVoiceChannel(guildId);
     const reservation = { ...reservationInput, channelId: channel.id };
 
@@ -1876,7 +1853,7 @@ client.on("interactionCreate", async (interaction) => {
     console.error("❌ interactionCreate error:", err);
     const { MessageFlags } = require("discord.js")
     const errorMessage = String(err?.message || "");
-    const replyMessage = /^(내용은 |시간은 )/.test(errorMessage)
+    const replyMessage = /^내용은 /.test(errorMessage)
       ? errorMessage
       : "처리 중 오류가 발생했어";
     try {

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 import {
-  buildAwayStatus,
   clearAwayReservation,
   createAwayReservationFromInput,
   getAwayReservationPhase,
@@ -124,11 +123,18 @@ test("classifies persisted reservations for restart recovery", () => {
   expect(getAwayReservationPhase({ endAt: "bad" }, now)).toBe("invalid");
 });
 
-test("builds the channel status with an optional message", () => {
-  expect(buildAwayStatus("08:30", "🏥 병원")).toBe(
-    "🏥 병원 | 08:30까지 자리 비움",
+test("accepts a pasted channel status as input", () => {
+  const now = Date.parse("2026-08-20T00:00:00.000Z");
+
+  expect(createAwayReservationFromInput("🍚 밥 먹으러 감 · 00:30까지", now).status).toBe(
+    "🍚 밥 먹으러 감 · 00:30까지",
   );
-  expect(buildAwayStatus("08:30", "   ")).toBe("08:30까지 자리 비움");
+  expect(
+    createAwayReservationFromInput("🏥 10:00~18:00 자리 비움 · 병원", now).status,
+  ).toBe("🏥 10:00~18:00 자리 비움 · 병원");
+  expect(
+    createAwayReservationFromInput("10:00~18:00 자리 비움 · 병원, 컬활 시험", now).status,
+  ).toBe("🏥 10:00~18:00 자리 비움 · 병원, 컬활 시험");
 });
 
 test("saving a new reservation overwrites the previous guild reservation", () => {
