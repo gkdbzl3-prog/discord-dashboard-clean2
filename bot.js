@@ -8,7 +8,8 @@ const createAdminRouter = require('./routes/admin');
 const { registerAwayOverlayRoute } = require('./routes/away-overlay');
 const engagementFeatures = require('./config/engagement-features');
 const { loginDiscordWithSessionRetry } = require('./utils/discord-login-retry');
-const { loadData, saveData } = require('./data/store');
+const { shouldLoginDiscordClient } = require('./utils/discord-login-policy');
+const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
   parseDepartureTime,
@@ -1581,8 +1582,16 @@ const DISCORD_LOGIN_TOKEN = String(
   ""
 ).trim();
 
-if (!DISCORD_LOGIN_TOKEN) {
+const discordLoginPolicy = shouldLoginDiscordClient(process.env);
+if (discordLoginPolicy.reason === 'missing-token') {
   console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
+} else if (!discordLoginPolicy.ok) {
+  console.warn(
+    'Discord bot login skipped for local run. ' +
+    'Set ENABLE_LOCAL_DISCORD_LOGIN=true only when Fly is stopped.'
+  );
 } else {
-  loginDiscordWithSessionRetry(client, DISCORD_LOGIN_TOKEN);
+  loginDiscordWithSessionRetry(client, DISCORD_LOGIN_TOKEN, {
+    lockFile: `${DATA_FILE}.discord-login-lock.json`,
+  });
 }
