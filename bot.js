@@ -5,6 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const createAdminRouter = require('./routes/admin');
+const { registerAwayOverlayRoute } = require('./routes/away-overlay');
 const { loadData, saveData } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
@@ -40,6 +41,8 @@ app.use(express.static("public", {
 app.get("/", (req, res) => {
   res.send("dashboard running");
 });
+
+registerAwayOverlayRoute(app);
 
 app.get('/favicon.ico', (req, res) => res.status(204));
 
@@ -1603,5 +1606,4 @@ if (!DISCORD_LOGIN_TOKEN) {
     .then(() => console.log("Discord bot logged in"))
     .catch((err) => console.error("Bot login failed:", err));
 }
-
 
