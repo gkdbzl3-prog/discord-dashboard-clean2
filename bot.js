@@ -7,6 +7,7 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const createAdminRouter = require('./routes/admin');
 const { registerAwayOverlayRoute } = require('./routes/away-overlay');
 const engagementFeatures = require('./config/engagement-features');
+const { loginDiscordWithSessionRetry } = require('./utils/discord-login-retry');
 const { loadData, saveData } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
@@ -1583,7 +1584,5 @@ const DISCORD_LOGIN_TOKEN = String(
 if (!DISCORD_LOGIN_TOKEN) {
   console.error("Bot login skipped: missing DISCORD_TOKEN/BOT_TOKEN (.env not loaded)");
 } else {
-  client.login(DISCORD_LOGIN_TOKEN)
-    .then(() => console.log("Discord bot logged in"))
-    .catch((err) => console.error("Bot login failed:", err));
+  loginDiscordWithSessionRetry(client, DISCORD_LOGIN_TOKEN);
 }
