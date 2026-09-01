@@ -55,11 +55,19 @@ function selectAwayState(dataRoot, guildId) {
     return guilds[String(guildId)]?.settings?.awayCountdown || null;
   }
 
+  const defaultGuildId = String(dataRoot?.meta?.defaultGuildId || '').trim();
+  const defaultState = guilds[defaultGuildId]?.settings?.awayCountdown;
+  if (defaultState) return defaultState;
+
+  let newestState = null;
   for (const guild of Object.values(guilds)) {
-    const state = guild?.settings?.awayCountdown;
-    if (state) return state;
+    const state = guild?.settings?.awayCountdown || null;
+    if (!state) continue;
+    if (!newestState || Number(state.createdAt || 0) > Number(newestState.createdAt || 0)) {
+      newestState = state;
+    }
   }
-  return null;
+  return newestState;
 }
 
 module.exports = {

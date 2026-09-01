@@ -85,3 +85,21 @@ test('selects the requested guild countdown and otherwise finds an active one', 
   assert.equal(away.selectAwayState(root), first);
   assert.equal(away.selectAwayState({ guilds: {} }), null);
 });
+
+test('prefers the data default guild and otherwise the newest countdown', () => {
+  const oldState = { message: 'old', createdAt: 10 };
+  const defaultState = { message: 'default', createdAt: 20 };
+  const newestState = { message: 'newest', createdAt: 30 };
+  const root = {
+    meta: { defaultGuildId: 'second' },
+    guilds: {
+      first: { settings: { awayCountdown: oldState } },
+      second: { settings: { awayCountdown: defaultState } },
+      third: { settings: { awayCountdown: newestState } },
+    },
+  };
+
+  assert.equal(away.selectAwayState(root), defaultState);
+  root.meta.defaultGuildId = 'missing';
+  assert.equal(away.selectAwayState(root), newestState);
+});

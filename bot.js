@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 8080;
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const createAdminRouter = require('./routes/admin');
 const { registerAwayOverlayRoute } = require('./routes/away-overlay');
+const engagementFeatures = require('./config/engagement-features');
 const { loadData, saveData } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
@@ -51,11 +52,7 @@ app.use(express.json());
 app.get('/api/away', (req, res) => {
   const root = normalizeDataRoot(loadData());
   const requestedGuildId = String(req.query.guildId || '').trim();
-  const defaultGuildId = String(
-    process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || ''
-  ).trim();
-  let state = selectAwayState(root, requestedGuildId || defaultGuildId);
-  if (!state && !requestedGuildId) state = selectAwayState(root);
+  const state = selectAwayState(root, requestedGuildId);
 
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -242,7 +239,11 @@ if (STUDY_VC_ID) {
       user.nickname = member.displayName;
       user.username = member.user.username;
     });
-    await ensureQuietCheerPinnedMessage(guild, guildData);
+    if (engagementFeatures.quietCheer) {
+      await ensureQuietCheerPinnedMessage(guild, guildData);
+    } else {
+      await removeQuietCheerPinnedMessages(guild, guildData);
+    }
     await ensureStudySlashCommands(guild);
   }
 
@@ -368,7 +369,7 @@ const QUIET_CHEER_PIN_TEXT = "오늘도 각자 자리에서 열심히 하는 중
 const QUIET_CHEER_BUTTON_ID = "quiet_cheer_send";
 const QUIET_CHEER_DROP_TEXT = "누군가 조용히 응원을 두고 갔어요 🌿\n익명 응원 1개 도착\n오늘도 같이 버티는 중이라는 신호가 왔어요";
 const CAM_REVIEW_BUTTON_PREFIX = "cam_review";
-const ENABLE_DM_REVIEW_BUTTON = true;
+const ENABLE_DM_REVIEW_BUTTON = engagementFeatures.reviewDm;
 const ENABLE_NIGHTLY_REVIEW_DM = false;
 const REVIEW_TEST_USER_ID = String(
   process.env.REVIEW_TEST_USER_ID ||
@@ -434,6 +435,7 @@ async function resolveStudyTextChannel(discordGuild, guildData) {
 
 async function ensureQuietCheerPinnedMessage(discordGuild, guildData) {
   try {
+    if (!engagementFeatures.quietCheer) return;
     if (!process.env.FLY_APP_NAME) return; // 로컬 실행 중 중복 생성 방지
     const textChannel = await resolveStudyTextChannel(discordGuild, guildData);
     if (!textChannel) return;
@@ -554,10 +556,6 @@ async function ensureStudySlashCommands(discordGuild) {
     const administrator = PermissionFlagsBits.Administrator.toString();
     const desiredCommands = [
       {
-        name: "응원",
-        description: "캠 활성화 중인 사람에게 랜덤 응원을 보냅니다."
-      },
-      {
         name: "away",
         description: "외출 예정 시각까지 남은 시간을 OBS와 음성채널에 표시합니다.",
         default_member_permissions: administrator,
@@ -585,6 +583,12 @@ async function ensureStudySlashCommands(discordGuild) {
     ];
 
     const commands = await discordGuild.commands.fetch();
+    const obsoleteCommandNames = new Set(['응원']);
+    for (const command of commands.values()) {
+      if (obsoleteCommandNames.has(command.name)) {
+        await command.delete();
+      }
+    }
     for (const desired of desiredCommands) {
       const existing = commands.find((c) => c.name === desired.name);
       if (!existing) {
@@ -760,6 +764,7 @@ async function sendPeriodEndNoticeTick() {
   __periodNoticeTickBusy = true;
 
   try {
+    if (!engagementFeatures.periodNotices) return;
     if (!client.isReady()) return;
     if (!process.env.FLY_APP_NAME) return; // 로컬 중복 전송 방지
 
@@ -1230,6 +1235,10 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
       const ackMode = await safeButtonAck();
  console.log("✅ ackMode:", ackMode);
       if (interaction.customId === QUIET_CHEER_BUTTON_ID) {
+        if (!engagementFeatures.quietCheer) {
+          await safeFollowUp("응원 기능은 종료됐어", ackMode);
+          return;
+        }
         if (interaction.guildId) {
           try {
             const root = normalizeDataRoot(loadData());
@@ -1416,6 +1425,11 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
         await interaction.deferReply({ ephemeral: true });
       }
 
+      if (!engagementFeatures.randomCheerCommand) {
+        await interaction.editReply({ content: "응원 기능은 종료됐어" });
+        return;
+      }
+
       const guildId = interaction.guildId;
       const discordGuild = interaction.guild;
 
@@ -1487,45 +1501,14 @@ client.on('messageCreate', async (msg) => {
   const userId = msg.author.id;
 
 
-   if (content === '!회고테스트') {
-    const guildId =
-      msg.guildId ||
-        msg.guildId ||
-        process.env.DEFAULT_GUILD_ID ||
-        process.env.GUILD_ID ||
-        "default";
-
-    const ok = await sendReviewPromptDm(
-      msg.author, 
-      guildId,
-      "테스트 회고 DM이야 🙌 버튼 눌러서 확인해줘",
-      { force: true }
-    );
-
-    if (!ok) {
-      try {
-        await msg.author.send('회고 테스트 DM 전송 실패했어. 디엠 허용 설정 확인해줘');
-      } catch (_) {}
-    } else {
-      try {
-        await msg.reply('회고 DM 보냈어');
-      } catch (_) {}
-    }
-    return;
-  }
-
-
-
   const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
   const root = normalizeDataRoot(loadData());
   const { data: latestData, guild } = withGuildDataById(root, guildId);
 
   if (content === '!응원고정') {
-    guild.settings ??= {};
-    guild.settings.quietCheerMessageId = null;
-    await ensureQuietCheerPinnedMessage(msg.guild, guild);
+    await removeQuietCheerPinnedMessages(msg.guild, guild);
     saveData(latestData);
-    await msg.reply('응원 고정메시지 갱신 완료');
+    await msg.reply('응원 기능은 종료됐어');
     return;
   }
 
@@ -1541,9 +1524,7 @@ client.on('messageCreate', async (msg) => {
       '📅 `!today`\n' +
       '📆 `!week`\n' +
       '🎯 `!goal 3h`\n' +
-      '🌿 `!응원고정`\n' +
-      '🧪 `!회고테스트`\n'
-
+      ''
     );
     return;
   }
@@ -1606,4 +1587,3 @@ if (!DISCORD_LOGIN_TOKEN) {
     .then(() => console.log("Discord bot logged in"))
     .catch((err) => console.error("Bot login failed:", err));
 }
-
