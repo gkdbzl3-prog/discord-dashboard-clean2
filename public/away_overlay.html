@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>외출 카운트다운</title>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Noto Sans KR", "Pretendard", sans-serif;
+      color: #ffffff;
+    }
+
+    #overlay {
+      max-width: 92vw;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+    }
+
+    #overlay[hidden] {
+      display: none;
+    }
+
+    #message {
+      font-size: clamp(24px, 7vw, 42px);
+      font-weight: 600;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    #countdown {
+      margin-top: 8px;
+      font-size: clamp(34px, 10vw, 64px);
+      font-weight: 800;
+      line-height: 1.15;
+    }
+  </style>
+</head>
+<body>
+  <main id="overlay" hidden>
+    <div id="message"></div>
+    <div id="countdown"></div>
+  </main>
+
+  <script>
+    const apiParam = new URLSearchParams(location.search).get("api");
+    const AWAY_API_URL = apiParam ||
+      (location.protocol === "http:" || location.protocol === "https:"
+        ? "/api/away"
+        : "http://localhost:8080/api/away");
+    let latestAway = null;
+
+    function renderAway(payload, now = Date.now()) {
+      const overlay = document.getElementById("overlay");
+      const message = document.getElementById("message");
+      const countdown = document.getElementById("countdown");
+
+      if (!payload || payload.active !== true) {
+        overlay.hidden = true;
+        message.textContent = "";
+        countdown.textContent = "";
+        return;
+      }
+
+      const remainingMs = Math.max(0, Number(payload.targetAt) - Number(now));
+      const minutes = Math.ceil(remainingMs / 60000);
+      message.textContent = String(payload.message || "외출 준비");
+      countdown.textContent = `외출까지 ${minutes}분`;
+      overlay.hidden = false;
+    }
+
+    async function refreshAway() {
+      try {
+        const response = await fetch(AWAY_API_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error(`away API ${response.status}`);
+        latestAway = await response.json();
+        renderAway(latestAway);
+      } catch (error) {
+        console.warn("외출 카운트다운을 불러오지 못했어:", error);
+      }
+    }
+
+    function startAwayOverlay() {
+      renderAway(null);
+      refreshAway();
+      setInterval(() => renderAway(latestAway), 1000);
+      setInterval(refreshAway, 5000);
+    }
+
+    window.addEventListener("DOMContentLoaded", startAwayOverlay);
+  </script>
+</body>
+</html>
