@@ -97,3 +97,66 @@ test('refuses to guess between several unconfigured guilds', () => {
   assert.equal(obs.resolveObsGuildId({}, {}, ['g1', 'g2']), null);
   assert.equal(obs.resolveObsGuildId({}, {}, []), null);
 });
+
+test('pulls the time out of a single free-form input', () => {
+  assert.equal(typeof obs.parseObsInput, 'function');
+  assert.deepEqual(obs.parseObsInput('09:20 🏥병원'), {
+    action: 'set',
+    departureTime: '09:20',
+    message: '🏥병원',
+  });
+  assert.deepEqual(obs.parseObsInput('09:20'), {
+    action: 'set',
+    departureTime: '09:20',
+    message: '',
+  });
+});
+
+test('finds the time wherever it sits in the input', () => {
+  assert.deepEqual(obs.parseObsInput('🏥병원 09:20'), {
+    action: 'set',
+    departureTime: '09:20',
+    message: '🏥병원',
+  });
+  assert.deepEqual(obs.parseObsInput('오늘 14:30 치과 예약'), {
+    action: 'set',
+    departureTime: '14:30',
+    message: '오늘 치과 예약',
+  });
+});
+
+test('takes the first time when the reason mentions another one', () => {
+  assert.deepEqual(obs.parseObsInput('14:30 회의 15:00까지'), {
+    action: 'set',
+    departureTime: '14:30',
+    message: '회의 15:00까지',
+  });
+});
+
+test('refuses an input with no time in it at all', () => {
+  assert.deepEqual(obs.parseObsInput('🏥병원'), { action: 'invalid', reason: 'time' });
+  assert.deepEqual(obs.parseObsInput(''), { action: 'invalid', reason: 'time' });
+  assert.deepEqual(obs.parseObsInput('25:00 병원'), { action: 'invalid', reason: 'time' });
+});
+
+test('allows the obs chat command only in a DM or the log channel', () => {
+  assert.equal(typeof obs.isObsChannelAllowed, 'function');
+  assert.equal(obs.isObsChannelAllowed({ isDirectMessage: true, channelId: 'c9' }), true);
+  assert.equal(
+    obs.isObsChannelAllowed({ channelId: 'logs', logChannelId: 'logs' }),
+    true,
+  );
+  assert.equal(
+    obs.isObsChannelAllowed({ channelId: 'general', logChannelId: 'logs' }),
+    false,
+  );
+});
+
+test('keeps the obs chat command out of every channel when no log channel is set', () => {
+  assert.equal(obs.isObsChannelAllowed({ channelId: 'general' }), false);
+  assert.equal(obs.isObsChannelAllowed({ isDirectMessage: true }), true);
+});
+
+test('compares channel ids as strings', () => {
+  assert.equal(obs.isObsChannelAllowed({ channelId: 123, logChannelId: '123' }), true);
+});

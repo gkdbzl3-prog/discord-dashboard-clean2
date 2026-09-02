@@ -7,6 +7,25 @@ const CLEAR_KEYWORDS = new Set(['끄기', 'off']);
 // 붙여 쓰는 게 자연스러워서 공백 없이도 받는다.
 const OBS_COMMAND = /^!obs(?![a-z0-9])\s*(.*)$/i;
 
+// 한 칸에 통째로 적게 하고 봇이 시각만 뽑아낸다. 시각을 맨 앞에 두라고
+// 요구하지 않는 건, 별도 입력 칸을 두면 그 칸이 비어 있는 채로 전송되기
+// 때문이다(실제로 그렇게 사유가 통째로 날아간 적이 있다).
+function parseObsInput(text) {
+  const words = String(text || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  const timeIndex = words.findIndex((word) => parseDepartureTime(word));
+  if (timeIndex === -1) {
+    return { action: 'invalid', reason: 'time' };
+  }
+
+  const departureTime = words[timeIndex];
+  const message = words.filter((_, index) => index !== timeIndex).join(' ');
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return { action: 'invalid', reason: 'too-long' };
+  }
+
+  return { action: 'set', departureTime, message };
+}
+
 function parseObsChatCommand(content) {
   const match = OBS_COMMAND.exec(String(content || '').trim());
   if (!match) return null;
@@ -16,17 +35,14 @@ function parseObsChatCommand(content) {
     return { action: 'clear' };
   }
 
-  const [departureTime, ...messageParts] = rest.split(' ');
-  if (!parseDepartureTime(departureTime)) {
-    return { action: 'invalid', reason: 'time' };
-  }
+  return parseObsInput(rest);
+}
 
-  const message = messageParts.join(' ');
-  if (message.length > MAX_MESSAGE_LENGTH) {
-    return { action: 'invalid', reason: 'too-long' };
-  }
-
-  return { action: 'set', departureTime, message };
+// 채널에 흔적을 남기지 않는 게 목적이라 DM과 로그 채널에서만 받는다.
+function isObsChannelAllowed({ isDirectMessage, channelId, logChannelId } = {}) {
+  if (isDirectMessage) return true;
+  const allowed = String(logChannelId || '').trim();
+  return !!allowed && String(channelId) === allowed;
 }
 
 // DM에는 서버가 없으니 어느 서버의 카운트다운을 건드릴지 정해야 한다.
@@ -47,4 +63,10 @@ function resolveObsGuildId(dataRoot, env = {}, guildIds = []) {
   return joined.size === 1 ? [...joined][0] : null;
 }
 
-module.exports = { parseObsChatCommand, resolveObsGuildId, MAX_MESSAGE_LENGTH };
+module.exports = {
+  parseObsChatCommand,
+  parseObsInput,
+  isObsChannelAllowed,
+  resolveObsGuildId,
+  MAX_MESSAGE_LENGTH,
+};

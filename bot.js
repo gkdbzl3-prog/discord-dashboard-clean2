@@ -19,7 +19,12 @@ const {
   formatVoiceStatus,
   selectAwayState
 } = require('./away-countdown');
-const { parseObsChatCommand, resolveObsGuildId } = require('./obs-chat-command');
+const {
+  parseObsChatCommand,
+  parseObsInput,
+  isObsChannelAllowed,
+  resolveObsGuildId
+} = require('./obs-chat-command');
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -586,33 +591,22 @@ async function ensureStudySlashCommands(discordGuild) {
       },
       {
         name: "obs",
-        description: "OBS에만 카운트다운을 표시합니다. 음성채널 상태는 건드리지 않습니다.",
+        description: "OBS에만 카운트다운을 표시합니다. 끄는 건 /back 입니다.",
         default_member_permissions: administrator,
         options: [
           {
             type: 3,
-            name: "시간",
-            description: "자리를 비우는 시각 (예: 14:30)",
-            required: true
-          },
-          {
-            type: 3,
-            name: "메시지",
-            description: "함께 표시할 사유 (예: 🏥 병원)",
-            required: false,
-            max_length: 100
+            name: "내용",
+            description: "시각을 넣어서 통째로 적어줘 (예: 09:20 🏥병원)",
+            required: true,
+            max_length: 110
           }
         ]
-      },
-      {
-        name: "obs끄기",
-        description: "OBS 카운트다운을 내립니다.",
-        default_member_permissions: administrator
       }
     ];
 
     const commands = await discordGuild.commands.fetch();
-    const obsoleteCommandNames = new Set(['응원']);
+    const obsoleteCommandNames = new Set(['응원', 'obs끄기']);
     for (const command of commands.values()) {
       if (obsoleteCommandNames.has(command.name)) {
         await command.delete();
@@ -1361,10 +1355,7 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
 
     // OBS 전용 카운트다운. /away와 달리 음성채널 상태는 건드리지 않고,
     // 응답이 ephemeral이라 명령도 답장도 남에게 보이지 않는다.
-    if (
-      interaction.isChatInputCommand() &&
-      (interaction.commandName === "obs" || interaction.commandName === "obs끄기")
-    ) {
+    if (interaction.isChatInputCommand() && interaction.commandName === "obs") {
       if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: true });
       }
@@ -1383,21 +1374,17 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
       const { data: obsData, guild: obsGuild } = withGuildDataById(obsRoot, interaction.guildId);
       obsGuild.settings ??= {};
 
-      if (interaction.commandName === "obs끄기") {
-        delete obsGuild.settings.awayCountdown;
-        saveData(obsData);
-        await interaction.editReply({ content: "✅ OBS에서 내렸어" });
+      const parsed = parseObsInput(interaction.options.getString("내용", true));
+      if (parsed.action === 'invalid') {
+        await interaction.editReply({
+          content: parsed.reason === 'too-long'
+            ? "사유는 100자까지만 돼"
+            : "08:30처럼 HH:mm 시각을 같이 적어줘 (예: 09:20 🏥병원)"
+        });
         return;
       }
 
-      const departureTime = interaction.options.getString("시간", true).trim();
-      const message = (interaction.options.getString("메시지") || "").trim();
-
-      if (!parseDepartureTime(departureTime)) {
-        await interaction.editReply({ content: "시간은 08:30처럼 HH:mm 형식으로 입력해줘" });
-        return;
-      }
-
+      const { departureTime, message } = parsed;
       obsGuild.settings.awayCountdown = createAwayCountdown({
         message,
         departureTime,
@@ -1406,7 +1393,7 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
       saveData(obsData);
 
       await interaction.editReply({
-        content: `👀 OBS에 띄웠어: ${formatAwayHeadline(message, departureTime)}`
+        content: `👀 OBS에 띄웠어: ${formatAwayHeadline(message, departureTime)}\n내리려면 \`/back\``
       });
       return;
     }
@@ -1590,6 +1577,16 @@ client.on('messageCreate', async (msg) => {
     // DM으로 보내면 채널에 흔적이 남지 않는다. 대신 어느 서버에 띄울지는
     // 직접 골라야 한다.
     const isDirectMessage = !msg.guildId;
+
+    // 남의 눈에 띄지 않는 게 목적이니 허용된 곳이 아니면 조용히 넘어간다.
+    if (!isObsChannelAllowed({
+      isDirectMessage,
+      channelId: msg.channelId,
+      logChannelId: guild.settings?.logChannelId || process.env.LOG_CHANNEL_ID
+    })) {
+      return;
+    }
+
     const targetGuildId = msg.guildId
       || resolveObsGuildId(root, process.env, [...client.guilds.cache.keys()]);
     if (!targetGuildId) {
@@ -1606,38 +1603,38 @@ client.on('messageCreate', async (msg) => {
       return;
     }
 
+    if (obsCommand.action === 'clear') {
+      await msg.reply('내리는 건 `/back`으로 통일했어');
+      return;
+    }
+
     if (obsCommand.action === 'invalid') {
       await msg.reply(
         obsCommand.reason === 'too-long'
-          ? '메시지는 100자까지만 돼'
-          : '형식: `!obs 14:30 🏥 병원` / 끄려면 `!obs끄기`'
+          ? '사유는 100자까지만 돼'
+          : '08:30처럼 HH:mm 시각을 같이 적어줘 (예: `!obs 09:20 🏥병원`)'
       );
       return;
     }
 
     const { data: obsData, guild: obsGuild } = withGuildDataById(root, targetGuildId);
     obsGuild.settings ??= {};
-    if (obsCommand.action === 'clear') {
-      delete obsGuild.settings.awayCountdown;
-    } else {
-      obsGuild.settings.awayCountdown = createAwayCountdown({
-        message: obsCommand.message,
-        departureTime: obsCommand.departureTime,
-        userId
-      });
-    }
+    obsGuild.settings.awayCountdown = createAwayCountdown({
+      message: obsCommand.message,
+      departureTime: obsCommand.departureTime,
+      userId
+    });
     saveData(obsData);
 
     // 확인 표시는 부가 기능이라 실패해도 오버레이는 이미 갱신된 상태다.
     try {
       if (isDirectMessage) {
         await msg.reply(
-          obsCommand.action === 'clear'
-            ? '✅ OBS에서 내렸어'
-            : `👀 OBS에 띄웠어: ${formatAwayHeadline(obsCommand.message, obsCommand.departureTime)}`
+          `👀 OBS에 띄웠어: ${formatAwayHeadline(obsCommand.message, obsCommand.departureTime)}`
+          + '\n내리려면 `/back`'
         );
       } else {
-        await msg.react(obsCommand.action === 'clear' ? '✅' : '👀');
+        await msg.react('👀');
       }
     } catch (err) {
       console.error('[obs] 확인 표시 실패:', err?.message || err);
