@@ -31,7 +31,7 @@
       display: none;
     }
 
-    #message {
+    #headline {
       font-size: clamp(24px, 7vw, 42px);
       font-weight: 600;
       line-height: 1.3;
@@ -48,7 +48,7 @@
 </head>
 <body>
   <main id="overlay" hidden>
-    <div id="message"></div>
+    <div id="headline"></div>
     <div id="countdown"></div>
   </main>
 
@@ -62,20 +62,20 @@
 
     function renderAway(payload, now = Date.now()) {
       const overlay = document.getElementById("overlay");
-      const message = document.getElementById("message");
+      const headline = document.getElementById("headline");
       const countdown = document.getElementById("countdown");
 
       if (!payload || payload.active !== true) {
         overlay.hidden = true;
-        message.textContent = "";
+        headline.textContent = "";
         countdown.textContent = "";
         return;
       }
 
       const remainingMs = Math.max(0, Number(payload.targetAt) - Number(now));
       const minutes = Math.ceil(remainingMs / 60000);
-      message.textContent = String(payload.message || "외출 준비");
-      countdown.textContent = `외출까지 ${minutes}분`;
+      headline.textContent = String(payload.headline || "자리 비움");
+      countdown.textContent = `${minutes}분 남음`;
       overlay.hidden = false;
     }
 

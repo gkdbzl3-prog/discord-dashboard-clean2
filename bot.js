@@ -18,6 +18,7 @@ const {
   formatVoiceStatus,
   selectAwayState
 } = require('./away-countdown');
+const { parseObsChatCommand } = require('./obs-chat-command');
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -1506,6 +1507,50 @@ client.on('messageCreate', async (msg) => {
   const guildId = msg.guildId || process.env.DEFAULT_GUILD_ID || process.env.GUILD_ID || "default";
   const root = normalizeDataRoot(loadData());
   const { data: latestData, guild } = withGuildDataById(root, guildId);
+
+  // `!obs`는 `/away`의 채팅판이다. 카운트다운은 똑같이 띄우되
+  // 음성채널 상태는 건드리지 않는다.
+  const obsCommand = parseObsChatCommand(content);
+  if (obsCommand) {
+    if (!msg.guildId) {
+      await msg.reply('서버에서만 사용할 수 있어');
+      return;
+    }
+    if (!msg.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      return;
+    }
+
+    if (obsCommand.action === 'invalid') {
+      await msg.reply(
+        obsCommand.reason === 'too-long'
+          ? '메시지는 100자까지만 돼'
+          : '형식: `!obs 14:30 🏥 병원` / 끄려면 `!obs끄기`'
+      );
+      return;
+    }
+
+    guild.settings ??= {};
+    if (obsCommand.action === 'clear') {
+      delete guild.settings.awayCountdown;
+    } else {
+      guild.settings.awayCountdown = {
+        message: obsCommand.message,
+        departureTime: obsCommand.departureTime,
+        targetAt: nextKstDepartureAt(obsCommand.departureTime),
+        createdAt: Date.now(),
+        createdBy: userId
+      };
+    }
+    saveData(latestData);
+
+    // 반응은 확인용일 뿐이라 실패해도 오버레이는 이미 갱신된 상태다.
+    try {
+      await msg.react(obsCommand.action === 'clear' ? '✅' : '👀');
+    } catch (err) {
+      console.error('[obs] 반응 실패:', err?.message || err);
+    }
+    return;
+  }
 
   if (content === '!응원고정') {
     await removeQuietCheerPinnedMessages(msg.guild, guild);

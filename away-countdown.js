@@ -31,6 +31,12 @@ function minutesUntilDeparture(targetAt, now = Date.now()) {
   return Math.ceil(remainingMs / 60_000);
 }
 
+function formatAwayHeadline(message, departureTime) {
+  const reason = String(message || '').trim();
+  const headline = `${String(departureTime || '').trim()}에 자리 비움`;
+  return reason ? `${headline} | ${reason}` : headline;
+}
+
 function awayOverlaySnapshot(state, now = Date.now()) {
   if (!state || !Number.isFinite(Number(state.targetAt))) {
     return { active: false };
@@ -40,6 +46,7 @@ function awayOverlaySnapshot(state, now = Date.now()) {
     active: true,
     message: String(state.message || ''),
     departureTime: String(state.departureTime || ''),
+    headline: formatAwayHeadline(state.message, state.departureTime),
     targetAt: Number(state.targetAt),
     minutesRemaining: minutesUntilDeparture(state.targetAt, now),
   };
@@ -75,6 +82,7 @@ module.exports = {
   nextKstDepartureAt,
   minutesUntilDeparture,
   awayOverlaySnapshot,
+  formatAwayHeadline,
   formatVoiceStatus,
   selectAwayState,
 };

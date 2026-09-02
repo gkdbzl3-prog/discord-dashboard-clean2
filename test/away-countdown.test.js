@@ -51,6 +51,7 @@ test('exposes the full message and clamped countdown to the overlay', () => {
       active: true,
       message: '🏥 병원 진료',
       departureTime: '14:30',
+      headline: '14:30에 자리 비움 | 🏥 병원 진료',
       targetAt: state.targetAt,
       minutesRemaining: 30,
     },
@@ -102,4 +103,29 @@ test('prefers the data default guild and otherwise the newest countdown', () => 
   assert.equal(away.selectAwayState(root), defaultState);
   root.meta.defaultGuildId = 'missing';
   assert.equal(away.selectAwayState(root), newestState);
+});
+
+test('formats the overlay headline as departure time plus reason', () => {
+  assert.equal(typeof away.formatAwayHeadline, 'function');
+  assert.equal(
+    away.formatAwayHeadline('🏥 병원', '14:30'),
+    '14:30에 자리 비움 | 🏥 병원',
+  );
+});
+
+test('drops the separator when no reason was given', () => {
+  assert.equal(away.formatAwayHeadline('', '14:30'), '14:30에 자리 비움');
+  assert.equal(away.formatAwayHeadline('   ', '09:05'), '09:05에 자리 비움');
+});
+
+test('sends the ready-made headline to the overlay', () => {
+  const state = {
+    message: '🏥 병원',
+    departureTime: '14:30',
+    targetAt: Date.parse('2026-09-01T05:30:00.000Z'),
+  };
+  assert.equal(
+    away.awayOverlaySnapshot(state, Date.parse('2026-09-01T05:00:30.000Z')).headline,
+    '14:30에 자리 비움 | 🏥 병원',
+  );
 });
