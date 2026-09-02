@@ -29,4 +29,22 @@ function parseObsChatCommand(content) {
   return { action: 'set', departureTime, message };
 }
 
-module.exports = { parseObsChatCommand, MAX_MESSAGE_LENGTH };
+// DM에는 서버가 없으니 어느 서버의 카운트다운을 건드릴지 정해야 한다.
+// 설정된 곳을 우선하되, 봇이 실제로 들어가 있는 서버만 후보로 본다.
+function resolveObsGuildId(dataRoot, env = {}, guildIds = []) {
+  const joined = new Set(guildIds.map((id) => String(id)));
+  const configured = [
+    dataRoot?.meta?.defaultGuildId,
+    env.DEFAULT_GUILD_ID,
+    env.GUILD_ID,
+  ];
+
+  for (const candidate of configured) {
+    const id = String(candidate || '').trim();
+    if (id && joined.has(id)) return id;
+  }
+
+  return joined.size === 1 ? [...joined][0] : null;
+}
+
+module.exports = { parseObsChatCommand, resolveObsGuildId, MAX_MESSAGE_LENGTH };

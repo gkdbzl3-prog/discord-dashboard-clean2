@@ -67,3 +67,33 @@ test('rejects a message longer than the overlay limit', () => {
   });
   assert.equal(obs.parseObsChatCommand(`!obs 14:30 ${'ㄱ'.repeat(100)}`).action, 'set');
 });
+
+test('routes a DM to the guild the data marks as default', () => {
+  assert.equal(typeof obs.resolveObsGuildId, 'function');
+  const dataRoot = { meta: { defaultGuildId: 'g2' } };
+  assert.equal(obs.resolveObsGuildId(dataRoot, {}, ['g1', 'g2', 'g3']), 'g2');
+});
+
+test('falls back to the configured guild env vars in order', () => {
+  const guildIds = ['g1', 'g2', 'g3'];
+  assert.equal(obs.resolveObsGuildId({}, { DEFAULT_GUILD_ID: 'g3' }, guildIds), 'g3');
+  assert.equal(obs.resolveObsGuildId({}, { GUILD_ID: 'g1' }, guildIds), 'g1');
+  assert.equal(
+    obs.resolveObsGuildId({}, { DEFAULT_GUILD_ID: 'g3', GUILD_ID: 'g1' }, guildIds),
+    'g3',
+  );
+});
+
+test('skips configured guilds the bot is not actually in', () => {
+  const dataRoot = { meta: { defaultGuildId: 'gone' } };
+  assert.equal(obs.resolveObsGuildId(dataRoot, { GUILD_ID: 'g2' }, ['g1', 'g2']), 'g2');
+});
+
+test('uses the only guild when nothing is configured', () => {
+  assert.equal(obs.resolveObsGuildId({}, {}, ['g1']), 'g1');
+});
+
+test('refuses to guess between several unconfigured guilds', () => {
+  assert.equal(obs.resolveObsGuildId({}, {}, ['g1', 'g2']), null);
+  assert.equal(obs.resolveObsGuildId({}, {}, []), null);
+});

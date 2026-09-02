@@ -15,10 +15,11 @@ const {
   parseDepartureTime,
   nextKstDepartureAt,
   awayOverlaySnapshot,
+  formatAwayHeadline,
   formatVoiceStatus,
   selectAwayState
 } = require('./away-countdown');
-const { parseObsChatCommand } = require('./obs-chat-command');
+const { parseObsChatCommand, resolveObsGuildId } = require('./obs-chat-command');
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -1512,11 +1513,22 @@ client.on('messageCreate', async (msg) => {
   // 음성채널 상태는 건드리지 않는다.
   const obsCommand = parseObsChatCommand(content);
   if (obsCommand) {
-    if (!msg.guildId) {
-      await msg.reply('서버에서만 사용할 수 있어');
+    // DM으로 보내면 채널에 흔적이 남지 않는다. 대신 어느 서버에 띄울지는
+    // 직접 골라야 한다.
+    const isDirectMessage = !msg.guildId;
+    const targetGuildId = msg.guildId
+      || resolveObsGuildId(root, process.env, [...client.guilds.cache.keys()]);
+    if (!targetGuildId) {
+      await msg.reply('어느 서버에 띄울지 알 수 없어. DEFAULT_GUILD_ID를 설정해줘');
       return;
     }
-    if (!msg.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+
+    const targetGuild = client.guilds.cache.get(targetGuildId);
+    const member = msg.member
+      || await targetGuild?.members.fetch(userId).catch(() => null);
+    if (!member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      // 채널에서는 남의 눈에 띄지 않게 조용히 넘어간다.
+      if (isDirectMessage) await msg.reply('관리자만 쓸 수 있어');
       return;
     }
 
@@ -1529,11 +1541,12 @@ client.on('messageCreate', async (msg) => {
       return;
     }
 
-    guild.settings ??= {};
+    const { data: obsData, guild: obsGuild } = withGuildDataById(root, targetGuildId);
+    obsGuild.settings ??= {};
     if (obsCommand.action === 'clear') {
-      delete guild.settings.awayCountdown;
+      delete obsGuild.settings.awayCountdown;
     } else {
-      guild.settings.awayCountdown = {
+      obsGuild.settings.awayCountdown = {
         message: obsCommand.message,
         departureTime: obsCommand.departureTime,
         targetAt: nextKstDepartureAt(obsCommand.departureTime),
@@ -1541,13 +1554,21 @@ client.on('messageCreate', async (msg) => {
         createdBy: userId
       };
     }
-    saveData(latestData);
+    saveData(obsData);
 
-    // 반응은 확인용일 뿐이라 실패해도 오버레이는 이미 갱신된 상태다.
+    // 확인 표시는 부가 기능이라 실패해도 오버레이는 이미 갱신된 상태다.
     try {
-      await msg.react(obsCommand.action === 'clear' ? '✅' : '👀');
+      if (isDirectMessage) {
+        await msg.reply(
+          obsCommand.action === 'clear'
+            ? '✅ OBS에서 내렸어'
+            : `👀 OBS에 띄웠어: ${formatAwayHeadline(obsCommand.message, obsCommand.departureTime)}`
+        );
+      } else {
+        await msg.react(obsCommand.action === 'clear' ? '✅' : '👀');
+      }
     } catch (err) {
-      console.error('[obs] 반응 실패:', err?.message || err);
+      console.error('[obs] 확인 표시 실패:', err?.message || err);
     }
     return;
   }
