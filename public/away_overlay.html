@@ -60,6 +60,16 @@
         : "http://localhost:8080/api/away");
     let latestAway = null;
 
+    // away-countdown.js의 formatRemaining과 같은 규칙. 분이 1초마다 바뀌니
+    // 서버에서 문자열을 받아둘 수 없어 여기서 직접 만든다.
+    function formatRemaining(minutes) {
+      const total = Math.max(0, Math.floor(Number(minutes) || 0));
+      const hours = Math.floor(total / 60);
+      const rest = total % 60;
+      if (!hours) return `${rest}분`;
+      return rest ? `${hours}시간 ${rest}분` : `${hours}시간`;
+    }
+
     function renderAway(payload, now = Date.now()) {
       const overlay = document.getElementById("overlay");
       const headline = document.getElementById("headline");
@@ -75,7 +85,7 @@
       const remainingMs = Math.max(0, Number(payload.targetAt) - Number(now));
       const minutes = Math.ceil(remainingMs / 60000);
       headline.textContent = String(payload.headline || "자리 비움");
-      countdown.textContent = `${minutes}분 남음`;
+      countdown.textContent = `${formatRemaining(minutes)} 남음`;
       overlay.hidden = false;
     }
 

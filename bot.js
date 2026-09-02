@@ -13,7 +13,7 @@ const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
   parseDepartureTime,
-  nextKstDepartureAt,
+  createAwayCountdown,
   awayOverlaySnapshot,
   formatAwayHeadline,
   formatVoiceStatus,
@@ -582,6 +582,31 @@ async function ensureStudySlashCommands(discordGuild) {
       {
         name: "back",
         description: "외출 카운트다운과 음성채널 상태를 지웁니다.",
+        default_member_permissions: administrator
+      },
+      {
+        name: "obs",
+        description: "OBS에만 카운트다운을 표시합니다. 음성채널 상태는 건드리지 않습니다.",
+        default_member_permissions: administrator,
+        options: [
+          {
+            type: 3,
+            name: "시간",
+            description: "자리를 비우는 시각 (예: 14:30)",
+            required: true
+          },
+          {
+            type: 3,
+            name: "메시지",
+            description: "함께 표시할 사유 (예: 🏥 병원)",
+            required: false,
+            max_length: 100
+          }
+        ]
+      },
+      {
+        name: "obs끄기",
+        description: "OBS 카운트다운을 내립니다.",
         default_member_permissions: administrator
       }
     ];
@@ -1334,6 +1359,58 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
       return;
     }
 
+    // OBS 전용 카운트다운. /away와 달리 음성채널 상태는 건드리지 않고,
+    // 응답이 ephemeral이라 명령도 답장도 남에게 보이지 않는다.
+    if (
+      interaction.isChatInputCommand() &&
+      (interaction.commandName === "obs" || interaction.commandName === "obs끄기")
+    ) {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+
+      if (!interaction.guildId || !interaction.guild) {
+        await interaction.editReply({ content: "서버에서만 사용할 수 있어" });
+        return;
+      }
+
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+        await interaction.editReply({ content: "관리자만 사용할 수 있어" });
+        return;
+      }
+
+      const obsRoot = normalizeDataRoot(loadData());
+      const { data: obsData, guild: obsGuild } = withGuildDataById(obsRoot, interaction.guildId);
+      obsGuild.settings ??= {};
+
+      if (interaction.commandName === "obs끄기") {
+        delete obsGuild.settings.awayCountdown;
+        saveData(obsData);
+        await interaction.editReply({ content: "✅ OBS에서 내렸어" });
+        return;
+      }
+
+      const departureTime = interaction.options.getString("시간", true).trim();
+      const message = (interaction.options.getString("메시지") || "").trim();
+
+      if (!parseDepartureTime(departureTime)) {
+        await interaction.editReply({ content: "시간은 08:30처럼 HH:mm 형식으로 입력해줘" });
+        return;
+      }
+
+      obsGuild.settings.awayCountdown = createAwayCountdown({
+        message,
+        departureTime,
+        userId: interaction.user.id
+      });
+      saveData(obsData);
+
+      await interaction.editReply({
+        content: `👀 OBS에 띄웠어: ${formatAwayHeadline(message, departureTime)}`
+      });
+      return;
+    }
+
     // 외출 카운트다운 명령어 처리
     if (
       interaction.isChatInputCommand() &&
@@ -1371,18 +1448,15 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
           return;
         }
 
-        const targetAt = nextKstDepartureAt(departureTime);
         const voiceStatus = formatVoiceStatus(message, departureTime);
 
         // 오버레이용 저장이 먼저다. 음성채널 상태는 부가 기능이라
         // 그쪽이 실패해도 카운트다운은 떠야 한다.
-        guild.settings.awayCountdown = {
+        guild.settings.awayCountdown = createAwayCountdown({
           message,
           departureTime,
-          targetAt,
-          createdAt: Date.now(),
-          createdBy: interaction.user.id
-        };
+          userId: interaction.user.id
+        });
         saveData(latestData);
 
         let vcNote = "";
@@ -1546,13 +1620,11 @@ client.on('messageCreate', async (msg) => {
     if (obsCommand.action === 'clear') {
       delete obsGuild.settings.awayCountdown;
     } else {
-      obsGuild.settings.awayCountdown = {
+      obsGuild.settings.awayCountdown = createAwayCountdown({
         message: obsCommand.message,
         departureTime: obsCommand.departureTime,
-        targetAt: nextKstDepartureAt(obsCommand.departureTime),
-        createdAt: Date.now(),
-        createdBy: userId
-      };
+        userId
+      });
     }
     saveData(obsData);
 

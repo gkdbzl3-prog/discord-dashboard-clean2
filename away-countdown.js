@@ -31,6 +31,24 @@ function minutesUntilDeparture(targetAt, now = Date.now()) {
   return Math.ceil(remainingMs / 60_000);
 }
 
+function createAwayCountdown({ message, departureTime, userId, now = Date.now() }) {
+  return {
+    message: String(message || ''),
+    departureTime: String(departureTime || ''),
+    targetAt: nextKstDepartureAt(departureTime, now),
+    createdAt: now,
+    createdBy: userId,
+  };
+}
+
+function formatRemaining(minutes) {
+  const total = Math.max(0, Math.floor(Number(minutes) || 0));
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  if (!hours) return `${rest}분`;
+  return rest ? `${hours}시간 ${rest}분` : `${hours}시간`;
+}
+
 function formatAwayHeadline(message, departureTime) {
   const reason = String(message || '').trim();
   const headline = `${String(departureTime || '').trim()}에 자리 비움`;
@@ -81,7 +99,9 @@ module.exports = {
   parseDepartureTime,
   nextKstDepartureAt,
   minutesUntilDeparture,
+  createAwayCountdown,
   awayOverlaySnapshot,
+  formatRemaining,
   formatAwayHeadline,
   formatVoiceStatus,
   selectAwayState,

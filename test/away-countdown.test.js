@@ -129,3 +129,45 @@ test('sends the ready-made headline to the overlay', () => {
     '14:30에 자리 비움 | 🏥 병원',
   );
 });
+
+test('keeps a sub-hour countdown in plain minutes', () => {
+  assert.equal(typeof away.formatRemaining, 'function');
+  assert.equal(away.formatRemaining(23), '23분');
+  assert.equal(away.formatRemaining(59), '59분');
+  assert.equal(away.formatRemaining(0), '0분');
+});
+
+test('splits an hour or more into hours and minutes', () => {
+  assert.equal(away.formatRemaining(61), '1시간 1분');
+  assert.equal(away.formatRemaining(899), '14시간 59분');
+});
+
+test('drops the minutes on a whole number of hours', () => {
+  assert.equal(away.formatRemaining(60), '1시간');
+  assert.equal(away.formatRemaining(120), '2시간');
+});
+
+test('builds the stored countdown from a command', () => {
+  assert.equal(typeof away.createAwayCountdown, 'function');
+  const now = Date.parse('2026-09-01T05:07:00.000Z'); // KST 14:07
+  assert.deepEqual(
+    away.createAwayCountdown({
+      message: '🏥 병원',
+      departureTime: '14:30',
+      userId: 'u1',
+      now,
+    }),
+    {
+      message: '🏥 병원',
+      departureTime: '14:30',
+      targetAt: Date.parse('2026-09-01T05:30:00.000Z'),
+      createdAt: now,
+      createdBy: 'u1',
+    },
+  );
+});
+
+test('stores an empty reason rather than undefined', () => {
+  const built = away.createAwayCountdown({ departureTime: '09:05', userId: 'u1' });
+  assert.equal(built.message, '');
+});
