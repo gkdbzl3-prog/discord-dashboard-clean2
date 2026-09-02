@@ -9,6 +9,11 @@ const { registerAwayOverlayRoute } = require('./routes/away-overlay');
 const engagementFeatures = require('./config/engagement-features');
 const { loginDiscordWithSessionRetry } = require('./utils/discord-login-retry');
 const { shouldLoginDiscordClient } = require('./utils/discord-login-policy');
+const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const {
+  countStudyChannelHumans,
+  decideStudyVcAction
+} = require('./study-voice-presence');
 const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
@@ -123,6 +128,59 @@ client.on("error", err => {
 
 // Register admin routes after client is created
 app.use('/', createAdminRouter(client));
+
+// 7fa1414(2026-09-01 "bot.js 수정")에서 통째로 빠졌던 스터디 채널 상주 기능이다.
+let studyVcConnection = null;
+
+async function updateStudyChannelPresence() {
+  const studyVcId = process.env.STUDY_VC_ID;
+  if (!studyVcId) return;
+
+  try {
+    const channel = await client.channels.fetch(studyVcId);
+    if (!channel?.guild) return;
+
+    const action = decideStudyVcAction({
+      humanCount: countStudyChannelHumans(channel),
+      connected: !!studyVcConnection
+    });
+
+    if (action === 'leave') {
+      studyVcConnection.destroy();
+      studyVcConnection = null;
+      console.log("[voice] 2명 이상 접속 → 스터디 채널 퇴장");
+      return;
+    }
+
+    if (action !== 'join') return;
+
+    studyVcConnection = joinVoiceChannel({
+      channelId: studyVcId,
+      guildId: channel.guild.id,
+      adapterCreator: channel.guild.voiceAdapterCreator,
+      selfDeaf: true,
+      selfMute: true
+    });
+
+    // 끊겼을 때 재연결 중인지 잠깐 지켜보고, 아니면 정리한 뒤 다시 시도한다.
+    studyVcConnection.on(VoiceConnectionStatus.Disconnected, async () => {
+      try {
+        await Promise.race([
+          entersState(studyVcConnection, VoiceConnectionStatus.Signalling, 5_000),
+          entersState(studyVcConnection, VoiceConnectionStatus.Connecting, 5_000)
+        ]);
+      } catch {
+        studyVcConnection?.destroy();
+        studyVcConnection = null;
+        setTimeout(() => updateStudyChannelPresence(), 5_000);
+      }
+    });
+
+    console.log("[voice] 스터디 채널 상주 시작:", studyVcId);
+  } catch (err) {
+    console.error("[voice] 스터디 채널 상태 업데이트 실패:", err?.message || err);
+  }
+}
 
 
 
@@ -258,7 +316,7 @@ if (STUDY_VC_ID) {
 
   saveData(data);
 
-
+  await updateStudyChannelPresence();
 });
 
 
@@ -1006,6 +1064,12 @@ setInterval(() => {
 }, 20000);
 
 client.on("voiceStateUpdate", (oldState, newState) => {
+  const studyVcCheck = process.env.STUDY_VC_ID;
+  if (studyVcCheck
+    && (oldState.channelId === studyVcCheck || newState.channelId === studyVcCheck)) {
+    updateStudyChannelPresence().catch(() => {});
+  }
+
   const userId = newState.id;
   const member = newState.member || oldState.member;
   if (!member) return;
