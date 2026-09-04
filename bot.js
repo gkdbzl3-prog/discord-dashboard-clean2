@@ -1,5 +1,7 @@
 ﻿require("dotenv").config({ override: true });
 console.log("🔥 REAL BOT.JS MARKER 2026-04-14 A");
+const { installCrashGuard } = require("./utils/crash-guard");
+installCrashGuard();
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -124,6 +126,13 @@ const client = new Client({
 // ready 안에 있으면 ready 이벤트 전에 발생하는 에러를 잡지 못함.
 client.on("error", err => {
   console.error("Discord Client Error:", err);
+});
+
+// 게이트웨이 샤드가 끊기는 건 정상 운영 중에도 일어난다. discord.js 가 알아서
+// 재연결하므로 로그만 남긴다. 이걸 등록해 두지 않으면 discord.js 가 error 를
+// 밖으로 던져 crash-guard 까지 가게 된다.
+client.on("shardError", err => {
+  console.error("Discord Shard Error:", err?.code || err?.message || err);
 });
 
 // Register admin routes after client is created
