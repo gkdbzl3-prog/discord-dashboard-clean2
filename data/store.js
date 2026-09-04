@@ -114,7 +114,9 @@ function loadData() {
 }
 
 function saveData(data) {
-  const payload = JSON.stringify(normalizeDataRoot(data), null, 2);
+  // 들여쓰기를 빼면 파일이 절반으로 줄고 stringify/write 시간도 그만큼 줄어든다.
+  // 30MB짜리 data.json 을 30초마다 다시 쓰다 CPU를 다 써버린 적이 있다.
+  const payload = JSON.stringify(normalizeDataRoot(data));
   const maxRetries = 2;
 
   try {

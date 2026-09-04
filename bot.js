@@ -16,6 +16,7 @@ const {
   countStudyChannelHumans,
   decideStudyVcAction
 } = require('./study-voice-presence');
+const { appendAutoSplitSession } = require('./session-compaction');
 const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
@@ -961,12 +962,7 @@ async function reconcileLiveStates() {
           if (user.currentStart) {
             const tailDuration = Math.floor((now - user.currentStart) / 1000);
             if (tailDuration > 0) {
-              user.sessions.unshift({
-                start: user.currentStart,
-                end: now,
-                seconds: tailDuration,
-                source: "auto_split"
-              });
+              appendAutoSplitSession(user, now);
             }
           }
 
@@ -1037,19 +1033,17 @@ setInterval(() => {
       const duration = Math.floor((now - user.currentStart) / 1000);
 
       if (duration >= 30) {
-        user.sessions ??= [];
-
-        user.sessions.unshift({
-          start: user.currentStart,
-          end: now,
-          seconds: duration,
-          source: "auto_split"
-        });
+        // 이어지는 tick 은 새 레코드를 쌓지 않고 직전 블록을 늘린다.
+        // 예전엔 매번 unshift 해서 한 사람 sessions 가 72,502개까지 갔다.
+        const { merged } = appendAutoSplitSession(user, now);
 
         user.totalSeconds = aggregateTotalByEventAndManual(user);
         user.currentStart = now;
         changed = true;
-        console.log("✅ 자동 분할 저장 완료!", guildId, userId, duration);
+        console.log(
+          merged ? "✅ 자동 분할 저장(블록 연장)" : "✅ 자동 분할 저장(새 블록)",
+          guildId, userId, duration
+        );
       }
     }
   }
@@ -1154,12 +1148,7 @@ https://zzozzozzo.fly.dev/`);
     if (user.currentStart) {
       const tailDuration = Math.floor((end - user.currentStart) / 1000);
       if (tailDuration > 0) {
-        user.sessions.unshift({
-          start: user.currentStart,
-          end,
-          seconds: tailDuration,
-          source: "auto_split"
-        });
+        appendAutoSplitSession(user, end);
       }
     }
 
