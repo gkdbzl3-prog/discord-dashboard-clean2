@@ -147,6 +147,30 @@ client.on("shardError", err => {
   console.error("Discord Shard Error:", err?.code || err?.message || err);
 });
 
+// 내리는 입구는 여러 개지만(/back, DM의 !obs끄기) 끄는 방법은 하나여야 한다.
+// 오버레이 카운트다운과 /away 가 세운 음성채널 상태를 **둘 다** 지운다.
+// 음성채널 상태는 부가 기능이라, 실패해도 카운트다운은 이미 내려간 상태다.
+async function clearAwayEverywhere(guildId) {
+  const root = normalizeDataRoot(loadData());
+  const { data, guild } = withGuildDataById(root, guildId);
+  guild.settings ??= {};
+
+  const hadCountdown = !!guild.settings.awayCountdown;
+  delete guild.settings.awayCountdown;
+  saveData(data);
+
+  const studyVcId = guild.settings.studyVcId || process.env.STUDY_VC_ID || null;
+  if (!studyVcId) return { hadCountdown, note: "" };
+
+  try {
+    await client.rest.put(`/channels/${studyVcId}/voice-status`, { body: { status: null } });
+    return { hadCountdown, note: "" };
+  } catch (err) {
+    console.error("[away] voice-status 초기화 실패:", err?.message || err);
+    return { hadCountdown, note: " (음성채널 상태는 직접 지워줘)" };
+  }
+}
+
 // Register admin routes after client is created
 app.use('/', createAdminRouter(client));
 
@@ -1539,20 +1563,7 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
         return;
       }
 
-      delete guild.settings.awayCountdown;
-      saveData(latestData);
-
-      let backNote = "";
-      if (studyVcId) {
-        try {
-          await client.rest.put(`/channels/${studyVcId}/voice-status`, {
-            body: { status: null }
-          });
-        } catch (err) {
-          console.error("[away] voice-status 초기화 실패:", err?.message || err);
-          backNote = " (음성채널 상태는 직접 지워줘)";
-        }
-      }
+      const { note: backNote } = await clearAwayEverywhere(interaction.guildId);
       await interaction.editReply({ content: `외출 카운트다운을 지웠어${backNote}` });
       return;
     }
@@ -1677,7 +1688,25 @@ client.on('messageCreate', async (msg) => {
     }
 
     if (obsCommand.action === 'clear') {
-      await msg.reply('내리는 건 `/back`으로 통일했어');
+      // /back 은 슬래시 명령이라 서버에서만 쓸 수 있다. DM으로 켠 것을 DM으로
+      // 끄지 못하면 흔적을 남기지 않으려던 목적이 무너지므로 여기서도 받는다.
+      const { hadCountdown, note } = await clearAwayEverywhere(targetGuildId);
+
+      // 켤 때와 같은 규칙이다. DM에는 글로 답하고, 채널에는 반응만 달아
+      // 남의 눈에 띄지 않게 한다.
+      try {
+        if (isDirectMessage) {
+          await msg.reply(
+            hadCountdown
+              ? `외출 카운트다운을 지웠어${note}`
+              : `띄워둔 카운트다운이 없어${note}`
+          );
+        } else {
+          await msg.react(hadCountdown ? '✅' : '🤔');
+        }
+      } catch (err) {
+        console.error('[obs] 확인 표시 실패:', err?.message || err);
+      }
       return;
     }
 
