@@ -132,3 +132,37 @@ test('앞으로 쌓이는 블록은 시작 기준으로 계산해 잘림이 누�
   assert.strictEqual(user.sessions.length, 1);
   assert.strictEqual(user.sessions[0].seconds, 61);
 });
+
+const { compactAllSessions } = require('../session-compaction');
+
+test('저장소 전체를 훑어 압축하고 줄어든 개수를 돌려준다', () => {
+  const root = {
+    guilds: {
+      g1: {
+        users: {
+          u1: { sessions: [auto(KST_NOON + MIN, KST_NOON + 2 * MIN), auto(KST_NOON, KST_NOON + MIN)] },
+          u2: { sessions: [] }
+        }
+      },
+      g2: { users: { u3: {} } }
+    }
+  };
+
+  assert.strictEqual(compactAllSessions(root), 1);
+  assert.strictEqual(root.guilds.g1.users.u1.sessions.length, 1);
+});
+
+test('이미 압축된 데이터는 두 번 돌려도 그대로다', () => {
+  const root = {
+    guilds: { g1: { users: { u1: { sessions: [auto(KST_NOON, KST_NOON + 2 * MIN)] } } } }
+  };
+
+  assert.strictEqual(compactAllSessions(root), 0);
+  assert.strictEqual(compactAllSessions(root), 0);
+  assert.strictEqual(root.guilds.g1.users.u1.sessions.length, 1);
+});
+
+test('guilds 가 없어도 터지지 않는다', () => {
+  assert.strictEqual(compactAllSessions({}), 0);
+  assert.strictEqual(compactAllSessions(undefined), 0);
+});

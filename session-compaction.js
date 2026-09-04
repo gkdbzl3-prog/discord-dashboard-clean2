@@ -95,8 +95,32 @@ function compactAutoSplitSessions(sessions) {
   return out;
 }
 
+// 저장소 전체를 한 번 훑어 압축한다. 부팅할 때 불러 두면
+//  1) 밖에서 스크립트로 고쳐 넣다 30초 tick 과 경합해 덮어써지는 일이 없고,
+//  2) 어떤 이유로 다시 불어나도 다음 재시작에 알아서 정리된다.
+// 이미 압축된 데이터에는 아무것도 하지 않고 0 을 돌려준다.
+function compactAllSessions(dataRoot) {
+  let removed = 0;
+
+  for (const guild of Object.values(dataRoot?.guilds || {})) {
+    for (const user of Object.values(guild?.users || {})) {
+      const sessions = Array.isArray(user?.sessions) ? user.sessions : null;
+      if (!sessions || sessions.length === 0) continue;
+
+      const compacted = compactAutoSplitSessions(sessions);
+      if (compacted.length === sessions.length) continue;
+
+      removed += sessions.length - compacted.length;
+      user.sessions = compacted;
+    }
+  }
+
+  return removed;
+}
+
 module.exports = {
   appendAutoSplitSession,
+  compactAllSessions,
   secondsOf,
   compactAutoSplitSessions,
   withinOneKstDay,

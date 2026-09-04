@@ -16,7 +16,7 @@ const {
   countStudyChannelHumans,
   decideStudyVcAction
 } = require('./study-voice-presence');
-const { appendAutoSplitSession } = require('./session-compaction');
+const { appendAutoSplitSession, compactAllSessions } = require('./session-compaction');
 const { loadData, saveData, DATA_FILE } = require('./data/store');
 const { ensureGuild, normalizeDataRoot } = require('./data/guild-data');
 const {
@@ -36,7 +36,18 @@ const {
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-let data = loadData();
+let data = normalizeDataRoot(loadData());
+
+// 부팅할 때 한 번 세션을 압축한다. 밖에서 스크립트로 고쳐 넣으면 30초 tick 이
+// 직전에 읽어둔 사본으로 되돌려 써버려서(2026-09-04 실제로 당함) 여기서 한다.
+// 이미 정리된 데이터면 아무 일도 하지 않는다.
+{
+  const removed = compactAllSessions(data);
+  if (removed > 0) {
+    saveData(data);
+    console.log(`[compact] 이어지는 자동 분할 세션 ${removed}개를 블록으로 합쳤습니다`);
+  }
+}
 const {
   ActionRowBuilder,
   ButtonBuilder,
