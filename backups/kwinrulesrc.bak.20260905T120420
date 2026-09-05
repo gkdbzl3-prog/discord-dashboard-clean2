@@ -1,0 +1,25 @@
+[71627054-a614-496a-8516-d0c4ffb2d19e]
+Description=krita의 앱 설정
+clientmachine=localhost
+wmclass=krita
+wmclasscomplete=true
+wmclassmatch=1
+
+[7f92a5af-51e8-4fbb-9c39-fb5677477a2c]
+Description=카톡 포커스 방지
+fsplevel=4
+fsplevelrule=2
+wmclass=kakaotalk.exe
+wmclasscomplete=true
+wmclassmatch=2
+
+[General]
+count=3
+rules=71627054-a614-496a-8516-d0c4ffb2d19e,e74292d9-1322-4422-a802-eb96678bb899,7f92a5af-51e8-4fbb-9c39-fb5677477a2c
+
+[e74292d9-1322-4422-a802-eb96678bb899]
+Description=krita의 앱 설정
+clientmachine=localhost
+wmclass=krita
+wmclasscomplete=true
+wmclassmatch=1
