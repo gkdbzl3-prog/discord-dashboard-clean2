@@ -10,7 +10,7 @@ set -euo pipefail
 
 URL="${AWAY_DESKTOP_URL:-https://zzozzozzo.fly.dev/away?mode=desktop}"
 PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/away-desktop/profile"
-SIZE="${AWAY_DESKTOP_SIZE:-340,150}"
+SIZE="${AWAY_DESKTOP_SIZE:-340,230}"
 
 BROWSER=""
 for candidate in google-chrome-stable google-chrome chromium chromium-browser \

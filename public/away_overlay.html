@@ -166,11 +166,7 @@
     }
 
     [data-mode="desktop"] #headline {
-      margin-top: 10px;
-      font-size: 15px;
-      line-height: 1.35;
-      letter-spacing: 0.01em;
-      color: rgba(244, 241, 234, 0.72);
+      display: none;
     }
 
     [data-mode="desktop"] #overlay {
@@ -180,8 +176,42 @@
 
     [data-mode="desktop"] #reason { order: -2; }
 
-    /* OBS에는 사유 줄이 따로 없다. headline이 이미 사유를 물고 있다. */
-    [data-mode="obs"] #reason { display: none; }
+    /* 데스크톱은 OBS와 달리 자리가 넉넉하니 계획을 통째로 보여준다.
+       자리 비울 시각만 크게 두고 출발·도착은 아래에 붙인다. */
+    [data-mode="desktop"] #schedule {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 14px;
+      margin-top: 12px;
+      padding-top: 11px;
+      border-top: 1px solid var(--edge);
+      font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    [data-mode="desktop"] #schedule:empty {
+      display: none;
+    }
+
+    /* 줄 묶음은 격자에서 사라지고 칸만 남는다. */
+    [data-mode="desktop"] #schedule .row {
+      display: contents;
+    }
+
+    [data-mode="desktop"] #schedule .clock {
+      color: rgba(244, 241, 234, 0.72);
+    }
+
+    /* 카운트다운이 겨누는 줄. 나머지와 구별되어야 한다. */
+    [data-mode="desktop"] #schedule .target .clock {
+      color: var(--accent);
+    }
+
+    /* OBS에는 사유 줄도 일정 표도 없다. headline이 이미 사유를 물고 있다. */
+    [data-mode="obs"] #reason,
+    [data-mode="obs"] #schedule { display: none; }
   </style>
 </head>
 <body>
@@ -189,6 +219,7 @@
     <div id="reason"></div>
     <div id="headline"></div>
     <div id="countdown"></div>
+    <div id="schedule"></div>
   </main>
 
   <script>
@@ -230,11 +261,43 @@
       return "";
     }
 
+    // 데스크톱에만 붙는 일정 표. 같은 시각이 두 번 나오면 한 줄로 접는다.
+    // (이동시간을 안 적었으면 출발과 도착이 같고, 옛 기록은 셋 다 같다.)
+    function scheduleRows(payload) {
+      const away = String(payload.awayTime || "").trim();
+      const depart = String(payload.departTime || "").trim();
+      const arrive = String(payload.arriveTime || "").trim();
+
+      const rows = [{ label: "자리 비움", clock: away, target: true }];
+      if (depart && depart !== away) rows.push({ label: "출발", clock: depart });
+      if (arrive && arrive !== depart) rows.push({ label: "도착", clock: arrive });
+      return rows.filter((row) => row.clock);
+    }
+
+    function renderSchedule(node, rows) {
+      node.replaceChildren();
+      for (const row of rows) {
+        const wrap = document.createElement("div");
+        wrap.className = row.target ? "row target" : "row";
+
+        const label = document.createElement("span");
+        label.textContent = row.label;
+
+        const clock = document.createElement("span");
+        clock.className = "clock";
+        clock.textContent = row.clock;
+
+        wrap.append(label, clock);
+        node.append(wrap);
+      }
+    }
+
     function renderAway(payload, now = Date.now()) {
       const overlay = document.getElementById("overlay");
       const reason = document.getElementById("reason");
       const headline = document.getElementById("headline");
       const countdown = document.getElementById("countdown");
+      const schedule = document.getElementById("schedule");
 
       if (!payload || payload.active !== true) {
         // OBS는 사라지는 게 맞고, 데스크톱은 창이 남아 있어야 하니
@@ -244,6 +307,7 @@
         document.documentElement.setAttribute("data-state", "idle");
         reason.textContent = "";
         headline.textContent = "";
+        schedule.replaceChildren();
         countdown.textContent = IS_DESKTOP ? "예정 없음" : "";
         return;
       }
@@ -255,6 +319,7 @@
       document.documentElement.setAttribute("data-state", "away");
       reason.textContent = lines.reason;
       headline.textContent = lines.headline;
+      if (IS_DESKTOP) renderSchedule(schedule, scheduleRows(payload));
       countdown.textContent = minutes <= 0 && IS_DESKTOP
         ? "지금 나가야 해"
         : `${formatRemaining(minutes)} 남음`;
