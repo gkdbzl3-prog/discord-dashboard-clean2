@@ -4,6 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>외출 카운트다운</title>
+  <!-- OBS는 투명 배경 그대로, `?mode=desktop`은 KDE에 띄우는 카드다.
+       첫 페인트 전에 정해야 배경이 한 번 번쩍이지 않는다. -->
+  <script>
+    document.documentElement.dataset.mode =
+      new URLSearchParams(location.search).get("mode") === "desktop" ? "desktop" : "obs";
+  </script>
   <style>
     /* ── 폰트 바꾸는 곳 ──────────────────────────────────────
        아래 url의 파일 이름과 format 두 군데만 고치면 됩니다.
@@ -60,10 +66,127 @@
       font-weight: normal;
       line-height: 1.15;
     }
+
+    /* ── 여기부터 데스크톱 모드(`?mode=desktop`) ─────────────────
+       OBS는 화면 위에 글자만 얹으면 되지만, 데스크톱은 벽지 위에
+       홀로 뜨는 창이라 카드가 필요하다. 위 규칙은 그대로 두고
+       [data-mode="desktop"] 아래에서만 덮어쓴다.
+       ──────────────────────────────────────────────────────── */
+    [data-mode="desktop"] {
+      --ink: #f4f1ea;
+      --muted: rgba(244, 241, 234, 0.55);
+      --accent: #9fd8c2;
+      --card: rgba(22, 24, 28, 0.82);
+      --edge: rgba(244, 241, 234, 0.14);
+    }
+
+    /* 곧 나가야 하면 색이 먼저 말해준다. */
+    [data-mode="desktop"][data-urgency="soon"] { --accent: #f2c879; }
+    [data-mode="desktop"][data-urgency="now"] { --accent: #f09a8a; }
+
+    [data-mode="desktop"] body {
+      padding: 10px;
+      box-sizing: border-box;
+      background: transparent;
+      color: var(--ink);
+      cursor: default;
+      user-select: none;
+    }
+
+    [data-mode="desktop"] #overlay {
+      /* 창 어디를 잡아도 끌 수 있게. 크롬 앱 모드에서만 먹는다. */
+      -webkit-app-region: drag;
+      app-region: drag;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: none;
+      padding: 18px 22px;
+      border-radius: 18px;
+      background: var(--card);
+      border: 1px solid var(--edge);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(18px);
+      text-align: left;
+      text-shadow: none;
+    }
+
+    /* 예정이 없어도 창은 남아야 한다. OBS처럼 숨기면 빈 창만 뜬다. */
+    [data-mode="desktop"] #overlay[hidden] {
+      display: flex;
+    }
+
+    /* 큰 숫자만 손글씨로 두고 작은 글씨는 또렷한 글꼴로 간다.
+       손글씨체는 13~15px에서 잘 안 읽힌다. */
+    [data-mode="desktop"] #reason,
+    [data-mode="desktop"] #headline {
+      font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo",
+                   "Noto Color Emoji", sans-serif;
+      font-variant-numeric: tabular-nums;
+    }
+
+    [data-mode="desktop"] #reason {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      letter-spacing: 0.01em;
+      color: var(--muted);
+      margin-bottom: 10px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    /* 사유가 없으면 점만 남아 고장난 것처럼 보인다. */
+    [data-mode="desktop"] #reason:empty {
+      display: none;
+    }
+
+    /* 예정이 없을 때는 조용해야 한다. 강조색도 큰 글씨도 쓰지 않는다. */
+    [data-mode="desktop"][data-state="idle"] #countdown {
+      font-size: 26px;
+      color: var(--muted);
+    }
+
+    [data-mode="desktop"] #reason::before {
+      content: "";
+      flex: none;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    [data-mode="desktop"] #countdown {
+      margin: 0;
+      order: -1;
+      font-size: 42px;
+      line-height: 1.05;
+      color: var(--accent);
+    }
+
+    [data-mode="desktop"] #headline {
+      margin-top: 10px;
+      font-size: 15px;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+      color: rgba(244, 241, 234, 0.72);
+    }
+
+    [data-mode="desktop"] #overlay {
+      display: flex;
+      flex-direction: column;
+    }
+
+    [data-mode="desktop"] #reason { order: -2; }
+
+    /* OBS에는 사유 줄이 따로 없다. headline이 이미 사유를 물고 있다. */
+    [data-mode="obs"] #reason { display: none; }
   </style>
 </head>
 <body>
   <main id="overlay" hidden>
+    <div id="reason"></div>
     <div id="headline"></div>
     <div id="countdown"></div>
   </main>
@@ -86,22 +209,60 @@
       return rest ? `${hours}시간 ${rest}분` : `${hours}시간`;
     }
 
+    const IS_DESKTOP = document.documentElement.dataset.mode === "desktop";
+
+    // 데스크톱 카드는 사유를 따로 쓰니 headline에서 떼어낸다.
+    // OBS는 서버가 만들어 준 한 줄을 그대로 쓴다.
+    function awayLines(payload) {
+      if (!IS_DESKTOP) {
+        return { reason: "", headline: String(payload.headline || "자리 비움") };
+      }
+      const awayTime = String(payload.awayTime || "").trim();
+      return {
+        reason: String(payload.message || "").trim(),
+        headline: awayTime ? `${awayTime}에 자리 비움` : "자리 비움",
+      };
+    }
+
+    function urgencyOf(minutes) {
+      if (minutes <= 0) return "now";
+      if (minutes <= 10) return "soon";
+      return "";
+    }
+
     function renderAway(payload, now = Date.now()) {
       const overlay = document.getElementById("overlay");
+      const reason = document.getElementById("reason");
       const headline = document.getElementById("headline");
       const countdown = document.getElementById("countdown");
 
       if (!payload || payload.active !== true) {
+        // OBS는 사라지는 게 맞고, 데스크톱은 창이 남아 있어야 하니
+        // 쉬는 얼굴을 보여준다. hidden은 모드별 CSS가 갈라 받는다.
         overlay.hidden = true;
+        document.documentElement.removeAttribute("data-urgency");
+        document.documentElement.setAttribute("data-state", "idle");
+        reason.textContent = "";
         headline.textContent = "";
-        countdown.textContent = "";
+        countdown.textContent = IS_DESKTOP ? "예정 없음" : "";
         return;
       }
 
       const remainingMs = Math.max(0, Number(payload.targetAt) - Number(now));
       const minutes = Math.ceil(remainingMs / 60000);
-      headline.textContent = String(payload.headline || "자리 비움");
-      countdown.textContent = `${formatRemaining(minutes)} 남음`;
+      const lines = awayLines(payload);
+
+      document.documentElement.setAttribute("data-state", "away");
+      reason.textContent = lines.reason;
+      headline.textContent = lines.headline;
+      countdown.textContent = minutes <= 0 && IS_DESKTOP
+        ? "지금 나가야 해"
+        : `${formatRemaining(minutes)} 남음`;
+
+      const urgency = urgencyOf(minutes);
+      if (urgency) document.documentElement.setAttribute("data-urgency", urgency);
+      else document.documentElement.removeAttribute("data-urgency");
+
       overlay.hidden = false;
     }
 

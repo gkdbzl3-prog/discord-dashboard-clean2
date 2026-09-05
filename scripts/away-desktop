@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# 외출 카운트다운을 KDE 데스크톱에 띄운다. OBS 오버레이와 같은 페이지를
+# `?mode=desktop` 으로 열 뿐이다.
+#
+# 크로미움 계열이 필요하다. 주소창 없는 작은 창(`--app=`)은 파이어폭스
+# 계열에 없는 기능이라(--ssb 는 없어졌고 --kiosk 는 전체화면이다) Zen 을
+# 쓰더라도 이 창만 크롬으로 띄운다. 전용 프로필을 따로 쓰므로 평소
+# 브라우징과 로그인, 확장, 세션이 섞이지 않는다.
+set -euo pipefail
+
+URL="${AWAY_DESKTOP_URL:-https://zzozzozzo.fly.dev/away?mode=desktop}"
+PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/away-desktop/profile"
+SIZE="${AWAY_DESKTOP_SIZE:-340,150}"
+
+BROWSER=""
+for candidate in google-chrome-stable google-chrome chromium chromium-browser \
+                 brave-browser microsoft-edge-stable vivaldi-stable; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    BROWSER="$candidate"
+    break
+  fi
+done
+
+if [ -z "$BROWSER" ]; then
+  echo "크로미움 계열 브라우저가 하나 필요해. 주소창 없는 앱 창을 여는 데만 쓴다." >&2
+  exit 1
+fi
+
+mkdir -p "$PROFILE"
+
+exec "$BROWSER" \
+  --app="$URL" \
+  --user-data-dir="$PROFILE" \
+  --class=away-desktop \
+  --window-size="$SIZE" \
+  --no-first-run \
+  --no-default-browser-check \
+  --disable-sync \
+  "$@"

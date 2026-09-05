@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=외출 카운트다운
+Comment=자리 비울 시각까지 남은 시간을 데스크톱에 띄운다
+Exec=__EXEC__
+Icon=clock
+Categories=Utility;
+StartupWMClass=away-desktop
+Terminal=false
