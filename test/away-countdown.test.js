@@ -42,7 +42,7 @@ test('exposes the full message and clamped countdown to the overlay', () => {
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
   const state = away.createAwayCountdown({
     message: '🏥 병원 진료',
-    departureTime: '15:00',
+    departureTime: '16:00',
     travelMinutes: 40,
     userId: 'u1',
     now,
@@ -51,10 +51,10 @@ test('exposes the full message and clamped countdown to the overlay', () => {
   assert.deepEqual(away.awayOverlaySnapshot(state, now), {
     active: true,
     message: '🏥 병원 진료',
-    departureTime: '15:00',
+    departureTime: '16:00',
     awayTime: '13:20',
-    departTime: '14:20',
-    arriveTime: '15:00',
+    departTime: '15:20',
+    arriveTime: '16:00',
     travelMinutes: 40,
     headline: '13:20에 자리 비움 | 🏥 병원 진료',
     targetAt: Date.parse('2026-09-01T04:20:00.000Z'),
@@ -78,21 +78,21 @@ test('reads a duration only when it carries a Korean unit', () => {
   assert.equal(away.parseDurationMinutes('0분'), null);
 });
 
-test('subtracts the travel time and then the hour of getting ready', () => {
+test('subtracts the travel time and then the hours of getting ready', () => {
   assert.equal(typeof away.awayPlan, 'function');
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
-  const plan = away.awayPlan({ departureTime: '15:00', travelMinutes: 40, now });
+  const plan = away.awayPlan({ departureTime: '16:00', travelMinutes: 40, now });
 
-  assert.equal(new Date(plan.arriveAt).toISOString(), '2026-09-01T06:00:00.000Z'); // 15:00
-  assert.equal(new Date(plan.departAt).toISOString(), '2026-09-01T05:20:00.000Z'); // 14:20
+  assert.equal(new Date(plan.arriveAt).toISOString(), '2026-09-01T07:00:00.000Z'); // 16:00
+  assert.equal(new Date(plan.departAt).toISOString(), '2026-09-01T06:20:00.000Z'); // 15:20
   assert.equal(new Date(plan.awayAt).toISOString(), '2026-09-01T04:20:00.000Z');   // 13:20
   assert.equal(plan.prepMinutes, away.PREP_MINUTES);
-  assert.equal(away.PREP_MINUTES, 60);
+  assert.equal(away.PREP_MINUTES, 120);
 });
 
-test('leaves the desk an hour early when no travel time was given', () => {
+test('still backs off the prep time when no travel time was given', () => {
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
-  const plan = away.awayPlan({ departureTime: '15:00', now });
+  const plan = away.awayPlan({ departureTime: '16:00', now });
 
   assert.equal(plan.departAt, plan.arriveAt);
   assert.equal(new Date(plan.awayAt).toISOString(), '2026-09-01T05:00:00.000Z'); // 14:00
@@ -113,7 +113,7 @@ test('shows the same two lines back to the person who typed them', () => {
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
   const state = away.createAwayCountdown({
     message: '병원',
-    departureTime: '15:00',
+    departureTime: '16:00',
     travelMinutes: 40,
     userId: 'u1',
     now,
@@ -185,7 +185,7 @@ test('sends the ready-made headline to the overlay', () => {
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
   const state = away.createAwayCountdown({
     message: '🏥 병원',
-    departureTime: '15:00',
+    departureTime: '16:00',
     travelMinutes: 40,
     now,
   });
@@ -218,18 +218,18 @@ test('builds the stored countdown from a command', () => {
   assert.deepEqual(
     away.createAwayCountdown({
       message: '🏥 병원',
-      departureTime: '15:00',
+      departureTime: '16:00',
       travelMinutes: 40,
       userId: 'u1',
       now,
     }),
     {
       message: '🏥 병원',
-      departureTime: '15:00',
+      departureTime: '16:00',
       travelMinutes: 40,
-      prepMinutes: 60,
-      arriveAt: Date.parse('2026-09-01T06:00:00.000Z'),
-      departAt: Date.parse('2026-09-01T05:20:00.000Z'),
+      prepMinutes: 120,
+      arriveAt: Date.parse('2026-09-01T07:00:00.000Z'),
+      departAt: Date.parse('2026-09-01T06:20:00.000Z'),
       targetAt: Date.parse('2026-09-01T04:20:00.000Z'),
       createdAt: now,
       createdBy: 'u1',

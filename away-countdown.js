@@ -2,8 +2,9 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // 자리를 비우고부터 실제로 나서기까지 준비에 쓰는 시간. 날마다 재는 대신
-// 한 시간으로 고정한다(날님이 정한 값). 여기만 바꾸면 전부 따라온다.
-const PREP_MINUTES = 60;
+// 두 시간으로 고정한다(날님이 정한 값. 한 시간으로 시작했다가 실제로 더
+// 걸린다고 하셔서 늘렸다). 여기만 바꾸면 전부 따라온다.
+const PREP_MINUTES = 120;
 
 function parseDepartureTime(value) {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(value || '').trim());
