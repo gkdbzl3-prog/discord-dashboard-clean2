@@ -104,14 +104,6 @@ function formatAwayHeadline(message, awayTime) {
   return reason ? `${headline} | ${reason}` : headline;
 }
 
-function formatAwayDetail(departTime, arriveTime) {
-  const depart = `${String(departTime || '').trim()}에 출발`;
-  const arrive = String(arriveTime || '').trim();
-  return arrive && arrive !== String(departTime || '').trim()
-    ? `${depart} · ${arrive} 도착`
-    : depart;
-}
-
 // 저장해 둔 값이 없는 옛 기록도 그려져야 한다. 그때는 targetAt이 곧 출발이었고
 // 이동시간도 준비시간도 없었다.
 function readAwayTimes(state) {
@@ -140,22 +132,17 @@ function awayOverlaySnapshot(state, now = Date.now()) {
     arriveTime,
     travelMinutes: Math.max(0, Math.floor(Number(state.travelMinutes) || 0)),
     headline: formatAwayHeadline(state.message, awayTime),
-    detail: formatAwayDetail(departTime, arriveTime),
     targetAt: awayAt,
     minutesRemaining: minutesUntilDeparture(awayAt, now),
   };
 }
 
-// DM/응답으로 되돌려주는 확인 문구. 오버레이에 뜨는 것과 같은 세 줄을 보여줘서
+// DM/응답으로 되돌려주는 확인 문구. 오버레이에 뜨는 것과 같은 두 줄을 보여줘서
 // 잘못 적었으면 바로 알아채게 한다.
 function awayOverlayReply(state, now = Date.now()) {
   const snapshot = awayOverlaySnapshot(state, now);
   if (!snapshot.active) return '시각을 못 읽었어';
-  return [
-    snapshot.headline,
-    snapshot.detail,
-    `${formatRemaining(snapshot.minutesRemaining)} 남음`,
-  ].join('\n');
+  return `${snapshot.headline}\n${formatRemaining(snapshot.minutesRemaining)} 남음`;
 }
 
 function formatVoiceStatus(message, departureTime) {
@@ -195,7 +182,6 @@ module.exports = {
   awayOverlaySnapshot,
   formatRemaining,
   formatAwayHeadline,
-  formatAwayDetail,
   awayOverlayReply,
   formatVoiceStatus,
   selectAwayState,

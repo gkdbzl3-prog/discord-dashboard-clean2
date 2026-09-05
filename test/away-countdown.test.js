@@ -57,7 +57,6 @@ test('exposes the full message and clamped countdown to the overlay', () => {
     arriveTime: '15:00',
     travelMinutes: 40,
     headline: '13:20에 자리 비움 | 🏥 병원 진료',
-    detail: '14:20에 출발 · 15:00 도착',
     targetAt: Date.parse('2026-09-01T04:20:00.000Z'),
     minutesRemaining: 20,
   });
@@ -106,11 +105,10 @@ test('draws a stored countdown from before travel and prep existed', () => {
   );
 
   assert.equal(snapshot.headline, '14:30에 자리 비움 | 🏥 병원');
-  assert.equal(snapshot.detail, '14:30에 출발');
   assert.equal(snapshot.minutesRemaining, 30);
 });
 
-test('shows the same three lines back to the person who typed them', () => {
+test('shows the same two lines back to the person who typed them', () => {
   assert.equal(typeof away.awayOverlayReply, 'function');
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
   const state = away.createAwayCountdown({
@@ -123,7 +121,7 @@ test('shows the same three lines back to the person who typed them', () => {
 
   assert.equal(
     away.awayOverlayReply(state, now),
-    '13:20에 자리 비움 | 병원\n14:20에 출발 · 15:00 도착\n20분 남음',
+    '13:20에 자리 비움 | 병원\n20분 남음',
   );
   assert.equal(away.awayOverlayReply(null), '시각을 못 읽었어');
 });
