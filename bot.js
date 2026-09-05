@@ -23,7 +23,7 @@ const {
   parseDepartureTime,
   createAwayCountdown,
   awayOverlaySnapshot,
-  formatAwayHeadline,
+  awayOverlayReply,
   formatVoiceStatus,
   selectAwayState
 } = require('./away-countdown');
@@ -700,7 +700,7 @@ async function ensureStudySlashCommands(discordGuild) {
           {
             type: 3,
             name: "내용",
-            description: "시각을 넣어서 통째로 적어줘 (예: 09:20 🏥병원)",
+            description: "도착 시각과 가는 데 걸리는 시간 (예: 15:00 40분 🏥병원)",
             required: true,
             max_length: 110
           }
@@ -1476,21 +1476,23 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
         await interaction.editReply({
           content: parsed.reason === 'too-long'
             ? "사유는 100자까지만 돼"
-            : "08:30처럼 HH:mm 시각을 같이 적어줘 (예: 09:20 🏥병원)"
+            : "도착 시각을 HH:mm으로 적어줘. 가는 데 걸리는 시간도 (예: 15:00 40분 🏥병원)"
         });
         return;
       }
 
-      const { departureTime, message } = parsed;
-      obsGuild.settings.awayCountdown = createAwayCountdown({
+      const { departureTime, travelMinutes, message } = parsed;
+      const obsState = createAwayCountdown({
         message,
         departureTime,
+        travelMinutes,
         userId: interaction.user.id
       });
+      obsGuild.settings.awayCountdown = obsState;
       saveData(obsData);
 
       await interaction.editReply({
-        content: `👀 OBS에 띄웠어: ${formatAwayHeadline(message, departureTime)}\n내리려면 \`/back\``
+        content: `👀 OBS에 띄웠어\n${awayOverlayReply(obsState)}\n내리려면 \`/back\``
       });
       return;
     }
@@ -1714,25 +1716,27 @@ client.on('messageCreate', async (msg) => {
       await msg.reply(
         obsCommand.reason === 'too-long'
           ? '사유는 100자까지만 돼'
-          : '08:30처럼 HH:mm 시각을 같이 적어줘 (예: `!obs 09:20 🏥병원`)'
+          : '도착 시각을 HH:mm으로 적어줘. 가는 데 걸리는 시간도 (예: `!obs 15:00 40분 🏥병원`)'
       );
       return;
     }
 
     const { data: obsData, guild: obsGuild } = withGuildDataById(root, targetGuildId);
     obsGuild.settings ??= {};
-    obsGuild.settings.awayCountdown = createAwayCountdown({
+    const chatObsState = createAwayCountdown({
       message: obsCommand.message,
       departureTime: obsCommand.departureTime,
+      travelMinutes: obsCommand.travelMinutes,
       userId
     });
+    obsGuild.settings.awayCountdown = chatObsState;
     saveData(obsData);
 
     // 확인 표시는 부가 기능이라 실패해도 오버레이는 이미 갱신된 상태다.
     try {
       if (isDirectMessage) {
         await msg.reply(
-          `👀 OBS에 띄웠어: ${formatAwayHeadline(obsCommand.message, obsCommand.departureTime)}`
+          `👀 OBS에 띄웠어\n${awayOverlayReply(chatObsState)}`
           + '\n내리려면 `/back`'
         );
       } else {

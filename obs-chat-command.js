@@ -1,4 +1,4 @@
-const { parseDepartureTime } = require('./away-countdown');
+const { parseDepartureTime, parseDurationMinutes } = require('./away-countdown');
 
 const MAX_MESSAGE_LENGTH = 100;
 const CLEAR_KEYWORDS = new Set(['끄기', 'off']);
@@ -10,6 +10,9 @@ const OBS_COMMAND = /^!obs(?![a-z0-9])\s*(.*)$/i;
 // 한 칸에 통째로 적게 하고 봇이 시각만 뽑아낸다. 시각을 맨 앞에 두라고
 // 요구하지 않는 건, 별도 입력 칸을 두면 그 칸이 비어 있는 채로 전송되기
 // 때문이다(실제로 그렇게 사유가 통째로 날아간 적이 있다).
+//
+// 시각은 출발 시각, 단위가 붙은 숫자는 약속 장소까지 걸리는 시간이다.
+// `1시간 20분`처럼 띄어 쓸 수 있으니 나온 것들을 모두 더한다.
 function parseObsInput(text) {
   const words = String(text || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
   const timeIndex = words.findIndex((word) => parseDepartureTime(word));
@@ -18,12 +21,24 @@ function parseObsInput(text) {
   }
 
   const departureTime = words[timeIndex];
-  const message = words.filter((_, index) => index !== timeIndex).join(' ');
+  let travelMinutes = 0;
+  const rest = [];
+  words.forEach((word, index) => {
+    if (index === timeIndex) return;
+    const minutes = parseDurationMinutes(word);
+    if (minutes === null) {
+      rest.push(word);
+      return;
+    }
+    travelMinutes += minutes;
+  });
+
+  const message = rest.join(' ');
   if (message.length > MAX_MESSAGE_LENGTH) {
     return { action: 'invalid', reason: 'too-long' };
   }
 
-  return { action: 'set', departureTime, message };
+  return { action: 'set', departureTime, travelMinutes, message };
 }
 
 function parseObsChatCommand(content) {

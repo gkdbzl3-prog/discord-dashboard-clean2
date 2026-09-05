@@ -18,6 +18,7 @@ test('reads the departure time and the message after it', () => {
   assert.deepEqual(obs.parseObsChatCommand('!obs 14:30 🏥 병원'), {
     action: 'set',
     departureTime: '14:30',
+    travelMinutes: 0,
     message: '🏥 병원',
   });
 });
@@ -26,6 +27,7 @@ test('allows a bare departure time with no message', () => {
   assert.deepEqual(obs.parseObsChatCommand('!obs 14:30'), {
     action: 'set',
     departureTime: '14:30',
+    travelMinutes: 0,
     message: '',
   });
 });
@@ -34,6 +36,7 @@ test('tolerates surrounding and repeated whitespace', () => {
   assert.deepEqual(obs.parseObsChatCommand('  !obs   09:05    마트   가는   중  '), {
     action: 'set',
     departureTime: '09:05',
+    travelMinutes: 0,
     message: '마트 가는 중',
   });
 });
@@ -103,11 +106,13 @@ test('pulls the time out of a single free-form input', () => {
   assert.deepEqual(obs.parseObsInput('09:20 🏥병원'), {
     action: 'set',
     departureTime: '09:20',
+    travelMinutes: 0,
     message: '🏥병원',
   });
   assert.deepEqual(obs.parseObsInput('09:20'), {
     action: 'set',
     departureTime: '09:20',
+    travelMinutes: 0,
     message: '',
   });
 });
@@ -116,11 +121,13 @@ test('finds the time wherever it sits in the input', () => {
   assert.deepEqual(obs.parseObsInput('🏥병원 09:20'), {
     action: 'set',
     departureTime: '09:20',
+    travelMinutes: 0,
     message: '🏥병원',
   });
   assert.deepEqual(obs.parseObsInput('오늘 14:30 치과 예약'), {
     action: 'set',
     departureTime: '14:30',
+    travelMinutes: 0,
     message: '오늘 치과 예약',
   });
 });
@@ -129,7 +136,41 @@ test('takes the first time when the reason mentions another one', () => {
   assert.deepEqual(obs.parseObsInput('14:30 회의 15:00까지'), {
     action: 'set',
     departureTime: '14:30',
+    travelMinutes: 0,
     message: '회의 15:00까지',
+  });
+});
+
+test('reads the travel time out of the same line', () => {
+  assert.deepEqual(obs.parseObsInput('15:00 40분 병원'), {
+    action: 'set',
+    departureTime: '15:00',
+    travelMinutes: 40,
+    message: '병원',
+  });
+});
+
+test('adds up a travel time written across two words', () => {
+  assert.deepEqual(obs.parseObsInput('18:00 1시간 30분 본가'), {
+    action: 'set',
+    departureTime: '18:00',
+    travelMinutes: 90,
+    message: '본가',
+  });
+  assert.deepEqual(obs.parseObsInput('18:00 1시간30분 본가'), {
+    action: 'set',
+    departureTime: '18:00',
+    travelMinutes: 90,
+    message: '본가',
+  });
+});
+
+test('leaves a bare number in the reason alone', () => {
+  assert.deepEqual(obs.parseObsInput('15:00 병원 3층'), {
+    action: 'set',
+    departureTime: '15:00',
+    travelMinutes: 0,
+    message: '병원 3층',
   });
 });
 
