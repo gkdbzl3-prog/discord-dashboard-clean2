@@ -31,7 +31,8 @@ const {
   parseObsChatCommand,
   parseObsInput,
   isObsChannelAllowed,
-  resolveObsGuildId
+  resolveObsGuildId,
+  MAX_MESSAGE_LENGTH
 } = require('./obs-chat-command');
 const multer = require("multer");
 const path = require("path");
@@ -1475,7 +1476,7 @@ console.log("✅ interactionCreate LIVE 2026-04-14 v1");
       if (parsed.action === 'invalid') {
         await interaction.editReply({
           content: parsed.reason === 'too-long'
-            ? "사유는 100자까지만 돼"
+            ? `사유는 ${MAX_MESSAGE_LENGTH}자까지만 돼`
             : "도착 시각을 HH:mm으로 적어줘. 가는 데 걸리는 시간도 (예: 15:00 40분 🏥병원)"
         });
         return;
@@ -1715,7 +1716,7 @@ client.on('messageCreate', async (msg) => {
     if (obsCommand.action === 'invalid') {
       await msg.reply(
         obsCommand.reason === 'too-long'
-          ? '사유는 100자까지만 돼'
+          ? `사유는 ${MAX_MESSAGE_LENGTH}자까지만 돼`
           : '도착 시각을 HH:mm으로 적어줘. 가는 데 걸리는 시간도 (예: `!obs 15:00 40분 🏥병원`)'
       );
       return;

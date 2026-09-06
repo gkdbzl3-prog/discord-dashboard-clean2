@@ -63,12 +63,15 @@ test('reports a bad departure time instead of setting the overlay', () => {
 });
 
 test('rejects a message longer than the overlay limit', () => {
-  const tooLong = 'ㄱ'.repeat(101);
+  const tooLong = 'ㄱ'.repeat(obs.MAX_MESSAGE_LENGTH + 1);
   assert.deepEqual(obs.parseObsChatCommand(`!obs 14:30 ${tooLong}`), {
     action: 'invalid',
     reason: 'too-long',
   });
-  assert.equal(obs.parseObsChatCommand(`!obs 14:30 ${'ㄱ'.repeat(100)}`).action, 'set');
+  assert.equal(
+    obs.parseObsChatCommand(`!obs 14:30 ${'ㄱ'.repeat(obs.MAX_MESSAGE_LENGTH)}`).action,
+    'set',
+  );
 });
 
 test('routes a DM to the guild the data marks as default', () => {

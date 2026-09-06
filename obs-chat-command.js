@@ -1,6 +1,6 @@
 const { parseDepartureTime, parseDurationMinutes } = require('./away-countdown');
 
-const MAX_MESSAGE_LENGTH = 100;
+const MAX_MESSAGE_LENGTH = 200;
 const CLEAR_KEYWORDS = new Set(['끄기', 'off']);
 
 // `!obs` 뒤에 영숫자가 붙으면 다른 명령이다 (`!obsessed`). 한글 `끄기`는
