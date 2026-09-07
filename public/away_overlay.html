@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ko">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,7 +26,8 @@
       font-display: swap;
     }
 
-    html, body {
+    html,
+    body {
       width: 100%;
       height: 100%;
       margin: 0;
@@ -39,7 +41,7 @@
       justify-content: center;
       /* 이모지는 폰트에 없으니 뒤의 이모지 폰트가 글자별로 받아준다. */
       font-family: "OverlayFont", "Apple SD Gothic Neo", "Malgun Gothic",
-                   "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
+        "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
       color: #ffffff;
     }
 
@@ -81,8 +83,13 @@
     }
 
     /* 곧 나가야 하면 색이 먼저 말해준다. */
-    [data-mode="desktop"][data-urgency="soon"] { --accent: #f2c879; }
-    [data-mode="desktop"][data-urgency="now"] { --accent: #f09a8a; }
+    [data-mode="desktop"][data-urgency="soon"] {
+      --accent: #f2c879;
+    }
+
+    [data-mode="desktop"][data-urgency="now"] {
+      --accent: #f09a8a;
+    }
 
     [data-mode="desktop"] body {
       padding: 10px;
@@ -120,7 +127,7 @@
     [data-mode="desktop"] #reason,
     [data-mode="desktop"] #headline {
       font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo",
-                   "Noto Color Emoji", sans-serif;
+        "Noto Color Emoji", sans-serif;
       font-variant-numeric: tabular-nums;
     }
 
@@ -174,7 +181,9 @@
       flex-direction: column;
     }
 
-    [data-mode="desktop"] #reason { order: -2; }
+    [data-mode="desktop"] #reason {
+      order: -2;
+    }
 
     /* 데스크톱은 OBS와 달리 자리가 넉넉하니 계획을 통째로 보여준다.
        자리 비울 시각만 크게 두고 출발·도착은 아래에 붙인다. */
@@ -211,9 +220,12 @@
 
     /* OBS에는 사유 줄도 일정 표도 없다. headline이 이미 사유를 물고 있다. */
     [data-mode="obs"] #reason,
-    [data-mode="obs"] #schedule { display: none; }
+    [data-mode="obs"] #schedule {
+      display: none;
+    }
   </style>
 </head>
+
 <body>
   <main id="overlay" hidden>
     <div id="reason"></div>
@@ -321,7 +333,7 @@
       headline.textContent = lines.headline;
       if (IS_DESKTOP) renderSchedule(schedule, scheduleRows(payload));
       countdown.textContent = minutes <= 0 && IS_DESKTOP
-        ? "지금 나가야 해"
+        ? "지금 움직여야 해"
         : `${formatRemaining(minutes)} 남음`;
 
       const urgency = urgencyOf(minutes);
@@ -352,4 +364,5 @@
     window.addEventListener("DOMContentLoaded", startAwayOverlay);
   </script>
 </body>
+
 </html>
