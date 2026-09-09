@@ -55,6 +55,13 @@
       display: none;
     }
 
+    #stage { display: none; }
+    [data-mode="desktop"] #stage:not(:empty) {
+      display: block;
+      font-size: 24px;
+      color: var(--accent);
+    }
+
     #headline {
       font-size: clamp(24px, 7vw, 42px);
       font-weight: normal;
@@ -231,6 +238,7 @@
     <div id="reason"></div>
     <div id="headline"></div>
     <div id="countdown"></div>
+    <div id="stage" aria-live="polite"></div>
     <div id="schedule"></div>
   </main>
 
@@ -310,6 +318,8 @@
       const headline = document.getElementById("headline");
       const countdown = document.getElementById("countdown");
       const schedule = document.getElementById("schedule");
+      const stage = document.getElementById("stage");
+      stage.textContent = "";
 
       if (!payload || payload.active !== true) {
         // OBS는 사라지는 게 맞고, 데스크톱은 창이 남아 있어야 하니
@@ -332,11 +342,14 @@
       reason.textContent = lines.reason;
       headline.textContent = lines.headline;
       if (IS_DESKTOP) renderSchedule(schedule, scheduleRows(payload));
-      countdown.textContent = minutes <= 0 && IS_DESKTOP
-        ? "지금 움직여야 해"
-        : `${formatRemaining(minutes)} 남음`;
+      countdown.textContent = IS_DESKTOP ? `${formatRemaining(minutes)} 남음` : `${minutes}분 남음`;
+      if (IS_DESKTOP) {
+        if (minutes <= 0) stage.textContent = "약속 시간이야";
+        else if (payload.departAt != null && now >= Number(payload.departAt)) stage.textContent = "나가야 해";
+        else if (payload.prepareAt != null && now >= Number(payload.prepareAt)) stage.textContent = "슬슬 준비해";
+      }
 
-      const urgency = urgencyOf(minutes);
+      const urgency = IS_DESKTOP && stage.textContent === "나가야 해" ? "now" : urgencyOf(minutes);
       if (urgency) document.documentElement.setAttribute("data-urgency", urgency);
       else document.documentElement.removeAttribute("data-urgency");
 

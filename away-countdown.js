@@ -1,9 +1,7 @@
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// 자리를 비우고부터 실제로 나서기까지 준비에 쓰는 시간. 날마다 재는 대신
-// 두 시간으로 고정한다(날님이 정한 값. 한 시간으로 시작했다가 실제로 더
-// 걸린다고 하셔서 늘렸다). 여기만 바꾸면 전부 따라온다.
+// 약속 시각 두 시간 전부터 준비 안내를 표시한다.
 const PREP_MINUTES = 120;
 
 function parseDepartureTime(value) {
@@ -55,10 +53,7 @@ function minutesUntilDeparture(targetAt, now = Date.now()) {
   return Math.ceil(remainingMs / 60_000);
 }
 
-// 적는 건 시각 하나와 약속 장소까지 걸리는 시간 둘뿐이다. 거기서 두 번 뺀다.
-//   출발            = 적은 시각 − 이동시간
-//   자리 비움(준비) = 출발 − 준비시간
-// 카운트다운이 세는 건 마지막 것, 자리를 비워야 하는 시각이다.
+// 자리 비움은 약속 시각에서 이동시간만 뺀 출발 시각이다.
 function awayPlan({ departureTime, travelMinutes = 0, prepMinutes = PREP_MINUTES, now = Date.now() }) {
   const arriveAt = nextKstDepartureAt(departureTime, now);
   if (!Number.isFinite(Number(arriveAt))) return null;
@@ -69,7 +64,7 @@ function awayPlan({ departureTime, travelMinutes = 0, prepMinutes = PREP_MINUTES
   return {
     arriveAt,
     departAt,
-    awayAt: departAt - prep * 60_000,
+    awayAt: departAt,
     travelMinutes: travel,
     prepMinutes: prep,
   };
@@ -84,7 +79,7 @@ function createAwayCountdown({ message, departureTime, travelMinutes = 0, userId
     prepMinutes: plan ? plan.prepMinutes : PREP_MINUTES,
     arriveAt: plan ? plan.arriveAt : null,
     departAt: plan ? plan.departAt : null,
-    // 카운트다운은 자리를 비워야 하는 시각까지 센다.
+    // 저장된 targetAt은 자리 비움 시각. API 카운트다운은 도착까지 센다.
     targetAt: plan ? plan.awayAt : null,
     createdAt: now,
     createdBy: userId,
@@ -108,14 +103,14 @@ function formatAwayHeadline(message, awayTime) {
 // 저장해 둔 값이 없는 옛 기록도 그려져야 한다. 그때는 targetAt이 곧 출발이었고
 // 이동시간도 준비시간도 없었다.
 function readAwayTimes(state) {
-  const awayAt = Number(state.targetAt);
-  const departAt = Number.isFinite(Number(state.departAt)) ? Number(state.departAt) : awayAt;
-  const arriveAt = Number.isFinite(Number(state.arriveAt)) ? Number(state.arriveAt) : departAt;
+  const departAt = state.departAt != null && Number.isFinite(Number(state.departAt)) ? Number(state.departAt) : Number(state.targetAt);
+  const awayAt = departAt;
+  const arriveAt = state.arriveAt != null && Number.isFinite(Number(state.arriveAt)) ? Number(state.arriveAt) : departAt;
   return { awayAt, departAt, arriveAt };
 }
 
 function awayOverlaySnapshot(state, now = Date.now()) {
-  if (!state || !Number.isFinite(Number(state.targetAt))) {
+  if (!state || state.targetAt == null || !Number.isFinite(Number(state.targetAt))) {
     return { active: false };
   }
 
@@ -133,17 +128,19 @@ function awayOverlaySnapshot(state, now = Date.now()) {
     arriveTime,
     travelMinutes: Math.max(0, Math.floor(Number(state.travelMinutes) || 0)),
     headline: formatAwayHeadline(state.message, awayTime),
-    targetAt: awayAt,
-    minutesRemaining: minutesUntilDeparture(awayAt, now),
+    targetAt: arriveAt,
+    departAt,
+    prepareAt: arriveAt - PREP_MINUTES * 60_000,
+    minutesRemaining: minutesUntilDeparture(arriveAt, now),
   };
 }
 
-// DM/응답으로 되돌려주는 확인 문구. 오버레이에 뜨는 것과 같은 두 줄을 보여줘서
+// DM/응답으로 되돌려주는 확인 문구. 오버레이의 시각과 남은 분을 보여줘서
 // 잘못 적었으면 바로 알아채게 한다.
 function awayOverlayReply(state, now = Date.now()) {
   const snapshot = awayOverlaySnapshot(state, now);
   if (!snapshot.active) return '시각을 못 읽었어';
-  return `${snapshot.headline}\n${formatRemaining(snapshot.minutesRemaining)} 남음`;
+  return `${snapshot.headline} ${snapshot.minutesRemaining}분 남음`;
 }
 
 function formatVoiceStatus(message, departureTime) {
