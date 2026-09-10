@@ -53,7 +53,14 @@ function minutesUntilDeparture(targetAt, now = Date.now()) {
   return Math.ceil(remainingMs / 60_000);
 }
 
-// 자리 비움은 약속 시각에서 이동시간만 뺀 출발 시각이다.
+// 준비 시작은 약속 시각에서 준비시간을 뺀 자리다. 다만 이동이 준비시간보다
+// 길면 출발보다 늦어져 버리니 그때는 출발 시각까지 당긴다.
+function prepareStartAt(arriveAt, departAt, prepMinutes = PREP_MINUTES) {
+  const prep = Math.max(0, Math.floor(Number(prepMinutes) || 0));
+  return Math.min(Number(departAt), Number(arriveAt) - prep * 60_000);
+}
+
+// 자리 비움은 컴퓨터 앞을 뜨는 시각, 곧 준비를 시작하는 시각이다.
 function awayPlan({ departureTime, travelMinutes = 0, prepMinutes = PREP_MINUTES, now = Date.now() }) {
   const arriveAt = nextKstDepartureAt(departureTime, now);
   if (!Number.isFinite(Number(arriveAt))) return null;
@@ -64,7 +71,7 @@ function awayPlan({ departureTime, travelMinutes = 0, prepMinutes = PREP_MINUTES
   return {
     arriveAt,
     departAt,
-    awayAt: departAt,
+    awayAt: prepareStartAt(arriveAt, departAt, prep),
     travelMinutes: travel,
     prepMinutes: prep,
   };
@@ -101,11 +108,13 @@ function formatAwayHeadline(message, awayTime) {
 }
 
 // 저장해 둔 값이 없는 옛 기록도 그려져야 한다. 그때는 targetAt이 곧 출발이었고
-// 이동시간도 준비시간도 없었다.
+// 이동시간도 준비시간도 없었다. 약속 시각을 모르면 준비 시작도 지어낼 수 없으니
+// 그 기록만 출발 시각을 자리 비움으로 그대로 쓴다.
 function readAwayTimes(state) {
   const departAt = state.departAt != null && Number.isFinite(Number(state.departAt)) ? Number(state.departAt) : Number(state.targetAt);
-  const awayAt = departAt;
-  const arriveAt = state.arriveAt != null && Number.isFinite(Number(state.arriveAt)) ? Number(state.arriveAt) : departAt;
+  const hasArriveAt = state.arriveAt != null && Number.isFinite(Number(state.arriveAt));
+  const arriveAt = hasArriveAt ? Number(state.arriveAt) : departAt;
+  const awayAt = hasArriveAt ? prepareStartAt(arriveAt, departAt) : departAt;
   return { awayAt, departAt, arriveAt };
 }
 
@@ -130,7 +139,7 @@ function awayOverlaySnapshot(state, now = Date.now()) {
     headline: formatAwayHeadline(state.message, awayTime),
     targetAt: arriveAt,
     departAt,
-    prepareAt: arriveAt - PREP_MINUTES * 60_000,
+    prepareAt: awayAt,
     minutesRemaining: minutesUntilDeparture(arriveAt, now),
   };
 }
@@ -170,6 +179,7 @@ function selectAwayState(dataRoot, guildId) {
 
 module.exports = {
   PREP_MINUTES,
+  prepareStartAt,
   parseDepartureTime,
   parseDurationMinutes,
   kstClock,

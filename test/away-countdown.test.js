@@ -52,11 +52,11 @@ test('exposes the full message and clamped countdown to the overlay', () => {
     active: true,
     message: '🏥 병원 진료',
     departureTime: '16:00',
-    awayTime: '15:20',
+    awayTime: '14:00',
     departTime: '15:20',
     arriveTime: '16:00',
     travelMinutes: 40,
-    headline: '15:20에 자리 비움 | 🏥 병원 진료',
+    headline: '14:00에 자리 비움 | 🏥 병원 진료',
     targetAt: Date.parse('2026-09-01T07:00:00.000Z'),
     departAt: Date.parse('2026-09-01T06:20:00.000Z'),
     prepareAt: Date.parse('2026-09-01T05:00:00.000Z'),
@@ -80,24 +80,33 @@ test('reads a duration only when it carries a Korean unit', () => {
   assert.equal(away.parseDurationMinutes('0분'), null);
 });
 
-test('subtracts only travel time for leaving', () => {
+test('leaves the desk when preparation starts, not when travel starts', () => {
   assert.equal(typeof away.awayPlan, 'function');
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
   const plan = away.awayPlan({ departureTime: '16:00', travelMinutes: 40, now });
 
   assert.equal(new Date(plan.arriveAt).toISOString(), '2026-09-01T07:00:00.000Z'); // 16:00
   assert.equal(new Date(plan.departAt).toISOString(), '2026-09-01T06:20:00.000Z'); // 15:20
-  assert.equal(new Date(plan.awayAt).toISOString(), '2026-09-01T06:20:00.000Z');   // 15:20
+  assert.equal(new Date(plan.awayAt).toISOString(), '2026-09-01T05:00:00.000Z');   // 14:00
   assert.equal(plan.prepMinutes, away.PREP_MINUTES);
   assert.equal(away.PREP_MINUTES, 120);
 });
 
-test('leaves at appointment time when no travel time was given', () => {
+test('starts preparing two hours before the appointment when no travel time was given', () => {
   const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
   const plan = away.awayPlan({ departureTime: '16:00', now });
 
   assert.equal(plan.departAt, plan.arriveAt);
-  assert.equal(new Date(plan.awayAt).toISOString(), '2026-09-01T07:00:00.000Z'); // 16:00
+  assert.equal(new Date(plan.awayAt).toISOString(), '2026-09-01T05:00:00.000Z'); // 14:00
+});
+
+// 이동이 준비시간보다 길면 준비 시작이 출발보다 뒤로 갈 수 없다.
+test('never leaves the desk later than the departure', () => {
+  const now = Date.parse('2026-09-01T04:00:00.000Z'); // KST 13:00
+  const plan = away.awayPlan({ departureTime: '16:00', travelMinutes: 180, now });
+
+  assert.equal(new Date(plan.departAt).toISOString(), '2026-09-01T04:00:00.000Z'); // 13:00
+  assert.equal(plan.awayAt, plan.departAt);
 });
 
 test('draws a stored countdown from before travel and prep existed', () => {
@@ -123,7 +132,7 @@ test('shows the away time and appointment countdown in the reply', () => {
 
   assert.equal(
     away.awayOverlayReply(state, now),
-    '15:20에 자리 비움 | 병원 180분 남음',
+    '14:00에 자리 비움 | 병원 180분 남음',
   );
   assert.equal(away.awayOverlayReply(null), '시각을 못 읽었어');
 });
@@ -193,7 +202,7 @@ test('sends the ready-made headline to the overlay', () => {
   });
   assert.equal(
     away.awayOverlaySnapshot(state, now).headline,
-    '15:20에 자리 비움 | 🏥 병원',
+    '14:00에 자리 비움 | 🏥 병원',
   );
 });
 
@@ -232,7 +241,7 @@ test('builds the stored countdown from a command', () => {
       prepMinutes: 120,
       arriveAt: Date.parse('2026-09-01T07:00:00.000Z'),
       departAt: Date.parse('2026-09-01T06:20:00.000Z'),
-      targetAt: Date.parse('2026-09-01T06:20:00.000Z'),
+      targetAt: Date.parse('2026-09-01T05:00:00.000Z'),
       createdAt: now,
       createdBy: 'u1',
     },

@@ -20,15 +20,20 @@ function page(mode) {
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const context = vm.createContext({ window: { addEventListener() {} }, document, location: { search: '', protocol: 'http:' }, URLSearchParams, setInterval() {}, fetch: () => new Promise(() => {}) });
   vm.runInContext(script, context);
-  return { render(p, now) { context.renderAway(p, now); return nodes; } };
+  return {
+    render(p, now) { context.renderAway(p, now); return nodes; },
+    rows(p) { return JSON.parse(JSON.stringify(context.scheduleRows(p))); },
+  };
 }
-test('14:00 1시간 병원 leaves at 13:00 and counts down to the appointment', () => {
+test('14:00 1시간 병원 leaves the desk at 12:00, departs at 13:00 and counts down to the appointment', () => {
   const p = payload();
-  assert.equal(p.awayTime, '13:00');
+  assert.equal(p.awayTime, '12:00');
+  assert.equal(p.departTime, '13:00');
+  assert.equal(p.arriveTime, '14:00');
   assert.equal(p.minutesRemaining, 120);
   assert.equal(p.targetAt, at('14:00'));
   const state = createAwayCountdown({ ...parseObsInput('14:00 1시간 병원'), now: at('11:00') });
-  assert.equal(awayOverlayReply(state, at('12:00')), '13:00에 자리 비움 | 병원 120분 남음');
+  assert.equal(awayOverlayReply(state, at('12:00')), '12:00에 자리 비움 | 병원 120분 남음');
 });
 test('desktop changes guidance at exact prepare, departure and appointment boundaries', () => {
   const ui = page('desktop');
@@ -43,12 +48,27 @@ test('desktop changes guidance at exact prepare, departure and appointment bound
 });
 test('OBS displays appointment minutes without desktop guidance', () => {
   const nodes = page('obs').render(payload(), at('12:00'));
-  assert.equal(nodes.headline.textContent, '13:00에 자리 비움 | 병원');
+  assert.equal(nodes.headline.textContent, '12:00에 자리 비움 | 병원');
   assert.equal(nodes.countdown.textContent, '120분 남음');
   assert.equal(nodes.stage.textContent, '');
 });
+test('desktop schedule lists prepare, departure and arrival with the countdown on the last row', () => {
+  assert.deepEqual(page('desktop').rows(payload()), [
+    { label: '자리 비움', clock: '12:00' },
+    { label: '출발', clock: '13:00' },
+    { label: '도착', clock: '14:00', target: true },
+  ]);
+});
+test('desktop schedule folds a plan without travel time into two rows', () => {
+  const p = awayOverlaySnapshot(createAwayCountdown({ ...parseObsInput('14:00 병원'), now: at('11:00') }), at('12:00'));
+  assert.deepEqual(page('desktop').rows(p), [
+    { label: '자리 비움', clock: '12:00' },
+    { label: '출발', clock: '14:00', target: true },
+  ]);
+});
 test('existing stored plans use their departure and appointment times', () => {
   const p = awayOverlaySnapshot({ message: '병원', targetAt: at('11:00'), departAt: at('13:00'), arriveAt: at('14:00') }, at('12:00'));
-  assert.equal(p.awayTime, '13:00');
+  assert.equal(p.awayTime, '12:00');
+  assert.equal(p.departTime, '13:00');
   assert.equal(p.minutesRemaining, 120);
 });

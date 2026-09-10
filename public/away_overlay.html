@@ -193,7 +193,7 @@
     }
 
     /* 데스크톱은 OBS와 달리 자리가 넉넉하니 계획을 통째로 보여준다.
-       자리 비울 시각만 크게 두고 출발·도착은 아래에 붙인다. */
+       준비를 시작할 시각부터 출발·도착까지 한 표에 붙인다. */
     [data-mode="desktop"] #schedule {
       display: grid;
       grid-template-columns: auto 1fr;
@@ -281,17 +281,22 @@
       return "";
     }
 
-    // 데스크톱에만 붙는 일정 표. 같은 시각이 두 번 나오면 한 줄로 접는다.
-    // (이동시간을 안 적었으면 출발과 도착이 같고, 옛 기록은 셋 다 같다.)
+    // 데스크톱에만 붙는 일정 표. 자리 비움(준비 시작) → 출발 → 도착 순이고,
+    // 같은 시각이 두 번 나오면 한 줄로 접는다. (이동시간을 안 적었으면 출발과
+    // 도착이 같고, 옛 기록은 셋 다 같다.)
     function scheduleRows(payload) {
       const away = String(payload.awayTime || "").trim();
       const depart = String(payload.departTime || "").trim();
       const arrive = String(payload.arriveTime || "").trim();
 
-      const rows = [{ label: "자리 비움", clock: away, target: true }];
+      const rows = [{ label: "자리 비움", clock: away }];
       if (depart && depart !== away) rows.push({ label: "출발", clock: depart });
       if (arrive && arrive !== depart) rows.push({ label: "도착", clock: arrive });
-      return rows.filter((row) => row.clock);
+
+      const shown = rows.filter((row) => row.clock);
+      // 카운트다운은 도착을 겨눈다. 접히고 남은 마지막 줄이 늘 그 시각이다.
+      if (shown.length) shown[shown.length - 1].target = true;
+      return shown;
     }
 
     function renderSchedule(node, rows) {
