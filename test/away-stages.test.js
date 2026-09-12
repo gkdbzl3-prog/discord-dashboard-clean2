@@ -49,7 +49,7 @@ test('desktop changes guidance at exact prepare, departure and appointment bound
 test('OBS displays appointment minutes without desktop guidance', () => {
   const nodes = page('obs').render(payload(), at('12:00'));
   assert.equal(nodes.headline.textContent, '13:00에 자리 비움 | 병원');
-  assert.equal(nodes.countdown.textContent, '120분 남음');
+  assert.equal(nodes.countdown.textContent, '2시간 남음');
   assert.equal(nodes.stage.textContent, '');
 });
 test('desktop schedule lists prepare, departure and arrival with the countdown on departure', () => {
@@ -81,4 +81,10 @@ test('desktop counts down to departure and stays zero during travel', () => {
   assert.equal(ui.render(p, at('13:00')).countdown.textContent, '0분 남음');
   assert.equal(ui.render(p, at('13:30')).stage.textContent, '나가야 해');
   assert.equal(ui.render(p, at('13:30')).countdown.textContent, '0분 남음');
+});
+
+test('OBS formats remaining hours and minutes', () => {
+  const ui = page('obs');
+  assert.equal(ui.render(payload(), at('12:30')).countdown.textContent, '1시간 30분 남음');
+  assert.equal(ui.render(payload(), at('13:30')).countdown.textContent, '30분 남음');
 });

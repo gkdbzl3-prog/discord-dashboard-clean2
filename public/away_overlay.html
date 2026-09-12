@@ -349,7 +349,7 @@
       reason.textContent = lines.reason;
       headline.textContent = lines.headline;
       if (IS_DESKTOP) renderSchedule(schedule, scheduleRows(payload));
-      countdown.textContent = IS_DESKTOP ? `${formatRemaining(minutes)} 남음` : `${minutes}분 남음`;
+      countdown.textContent = `${formatRemaining(minutes)} 남음`;
       if (IS_DESKTOP) {
         if (now >= Number(payload.targetAt)) stage.textContent = "약속 시간이야";
         else if (payload.departAt != null && now >= Number(payload.departAt)) stage.textContent = "나가야 해";
