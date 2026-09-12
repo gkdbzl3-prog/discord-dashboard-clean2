@@ -136,7 +136,7 @@ function awayOverlaySnapshot(state, now = Date.now()) {
     departTime,
     arriveTime,
     travelMinutes: Math.max(0, Math.floor(Number(state.travelMinutes) || 0)),
-    headline: formatAwayHeadline(state.message, awayTime),
+    headline: formatAwayHeadline(state.message, departTime),
     targetAt: arriveAt,
     departAt,
     prepareAt: awayAt,

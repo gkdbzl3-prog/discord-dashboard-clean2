@@ -33,7 +33,7 @@ test('14:00 1시간 병원 leaves the desk at 12:00, departs at 13:00 and counts
   assert.equal(p.minutesRemaining, 120);
   assert.equal(p.targetAt, at('14:00'));
   const state = createAwayCountdown({ ...parseObsInput('14:00 1시간 병원'), now: at('11:00') });
-  assert.equal(awayOverlayReply(state, at('12:00')), '12:00에 자리 비움 | 병원 120분 남음');
+  assert.equal(awayOverlayReply(state, at('12:00')), '13:00에 자리 비움 | 병원 120분 남음');
 });
 test('desktop changes guidance at exact prepare, departure and appointment boundaries', () => {
   const ui = page('desktop');
@@ -48,15 +48,15 @@ test('desktop changes guidance at exact prepare, departure and appointment bound
 });
 test('OBS displays appointment minutes without desktop guidance', () => {
   const nodes = page('obs').render(payload(), at('12:00'));
-  assert.equal(nodes.headline.textContent, '12:00에 자리 비움 | 병원');
+  assert.equal(nodes.headline.textContent, '13:00에 자리 비움 | 병원');
   assert.equal(nodes.countdown.textContent, '120분 남음');
   assert.equal(nodes.stage.textContent, '');
 });
-test('desktop schedule lists prepare, departure and arrival with the countdown on the last row', () => {
+test('desktop schedule lists prepare, departure and arrival with the countdown on departure', () => {
   assert.deepEqual(page('desktop').rows(payload()), [
     { label: '자리 비움', clock: '12:00' },
-    { label: '출발', clock: '13:00' },
-    { label: '도착', clock: '14:00', target: true },
+    { label: '출발', clock: '13:00', target: true },
+    { label: '도착', clock: '14:00' },
   ]);
 });
 test('desktop schedule folds a plan without travel time into two rows', () => {
@@ -71,4 +71,14 @@ test('existing stored plans use their departure and appointment times', () => {
   assert.equal(p.awayTime, '12:00');
   assert.equal(p.departTime, '13:00');
   assert.equal(p.minutesRemaining, 120);
+});
+
+test('desktop counts down to departure and stays zero during travel', () => {
+  const ui = page('desktop');
+  const p = payload();
+  assert.equal(ui.render(p, at('12:00')).countdown.textContent, '1시간 남음');
+  assert.equal(ui.render(p, at('13:00') - 1).countdown.textContent, '1분 남음');
+  assert.equal(ui.render(p, at('13:00')).countdown.textContent, '0분 남음');
+  assert.equal(ui.render(p, at('13:30')).stage.textContent, '나가야 해');
+  assert.equal(ui.render(p, at('13:30')).countdown.textContent, '0분 남음');
 });

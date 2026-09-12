@@ -56,7 +56,7 @@ test('exposes the full message and clamped countdown to the overlay', () => {
     departTime: '15:20',
     arriveTime: '16:00',
     travelMinutes: 40,
-    headline: '14:00에 자리 비움 | 🏥 병원 진료',
+    headline: '15:20에 자리 비움 | 🏥 병원 진료',
     targetAt: Date.parse('2026-09-01T07:00:00.000Z'),
     departAt: Date.parse('2026-09-01T06:20:00.000Z'),
     prepareAt: Date.parse('2026-09-01T05:00:00.000Z'),
@@ -132,7 +132,7 @@ test('shows the away time and appointment countdown in the reply', () => {
 
   assert.equal(
     away.awayOverlayReply(state, now),
-    '14:00에 자리 비움 | 병원 180분 남음',
+    '15:20에 자리 비움 | 병원 180분 남음',
   );
   assert.equal(away.awayOverlayReply(null), '시각을 못 읽었어');
 });
@@ -202,7 +202,7 @@ test('sends the ready-made headline to the overlay', () => {
   });
   assert.equal(
     away.awayOverlaySnapshot(state, now).headline,
-    '14:00에 자리 비움 | 🏥 병원',
+    '15:20에 자리 비움 | 🏥 병원',
   );
 });
 

@@ -294,8 +294,9 @@
       if (arrive && arrive !== depart) rows.push({ label: "도착", clock: arrive });
 
       const shown = rows.filter((row) => row.clock);
-      // 카운트다운은 도착을 겨눈다. 접히고 남은 마지막 줄이 늘 그 시각이다.
-      if (shown.length) shown[shown.length - 1].target = true;
+      // 카운트다운이 겨누는 출발 시각을 강조한다.
+      const target = shown.find((row) => row.clock === (depart || away));
+      if (target) target.target = true;
       return shown;
     }
 
@@ -339,7 +340,8 @@
         return;
       }
 
-      const remainingMs = Math.max(0, Number(payload.targetAt) - Number(now));
+      const countdownAt = IS_DESKTOP ? (payload.departAt ?? payload.targetAt) : payload.targetAt;
+      const remainingMs = Math.max(0, Number(countdownAt) - Number(now));
       const minutes = Math.ceil(remainingMs / 60000);
       const lines = awayLines(payload);
 
@@ -349,7 +351,7 @@
       if (IS_DESKTOP) renderSchedule(schedule, scheduleRows(payload));
       countdown.textContent = IS_DESKTOP ? `${formatRemaining(minutes)} 남음` : `${minutes}분 남음`;
       if (IS_DESKTOP) {
-        if (minutes <= 0) stage.textContent = "약속 시간이야";
+        if (now >= Number(payload.targetAt)) stage.textContent = "약속 시간이야";
         else if (payload.departAt != null && now >= Number(payload.departAt)) stage.textContent = "나가야 해";
         else if (payload.prepareAt != null && now >= Number(payload.prepareAt)) stage.textContent = "슬슬 준비해";
       }
