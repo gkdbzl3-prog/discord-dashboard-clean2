@@ -340,7 +340,7 @@
         return;
       }
 
-      const countdownAt = IS_DESKTOP ? (payload.departAt ?? payload.targetAt) : payload.targetAt;
+      const countdownAt = payload.departAt ?? payload.targetAt;
       const remainingMs = Math.max(0, Number(countdownAt) - Number(now));
       const minutes = Math.ceil(remainingMs / 60000);
       const lines = awayLines(payload);

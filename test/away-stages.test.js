@@ -46,10 +46,10 @@ test('desktop changes guidance at exact prepare, departure and appointment bound
   assert.equal(ui.render(p, at('14:01')).countdown.textContent, '0분 남음');
   assert.equal(ui.render(null, at('14:01')).stage.textContent, '');
 });
-test('OBS displays appointment minutes without desktop guidance', () => {
+test('OBS counts down to departure without desktop guidance', () => {
   const nodes = page('obs').render(payload(), at('12:00'));
   assert.equal(nodes.headline.textContent, '13:00에 자리 비움 | 병원');
-  assert.equal(nodes.countdown.textContent, '2시간 남음');
+  assert.equal(nodes.countdown.textContent, '1시간 남음');
   assert.equal(nodes.stage.textContent, '');
 });
 test('desktop schedule lists prepare, departure and arrival with the countdown on departure', () => {
@@ -85,6 +85,17 @@ test('desktop counts down to departure and stays zero during travel', () => {
 
 test('OBS formats remaining hours and minutes', () => {
   const ui = page('obs');
-  assert.equal(ui.render(payload(), at('12:30')).countdown.textContent, '1시간 30분 남음');
-  assert.equal(ui.render(payload(), at('13:30')).countdown.textContent, '30분 남음');
+  assert.equal(ui.render(payload(), at('11:30')).countdown.textContent, '1시간 30분 남음');
+  assert.equal(ui.render(payload(), at('12:30')).countdown.textContent, '30분 남음');
+});
+
+test('OBS shows six minutes at 14:24 for a 14:30 departure and clamps after departure', () => {
+  const state = createAwayCountdown({ ...parseObsInput('15:00 30분 약속'), now: at('11:00') });
+  const p = awayOverlaySnapshot(state, at('14:24'));
+  const ui = page('obs');
+  assert.equal(ui.render(p, at('14:24')).headline.textContent, '14:30에 자리 비움 | 약속');
+  assert.equal(ui.render(p, at('14:24')).countdown.textContent, '6분 남음');
+  assert.equal(ui.render(p, at('14:30') - 1).countdown.textContent, '1분 남음');
+  assert.equal(ui.render(p, at('14:30')).countdown.textContent, '0분 남음');
+  assert.equal(ui.render(p, at('14:31')).countdown.textContent, '0분 남음');
 });
